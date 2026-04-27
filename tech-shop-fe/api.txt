@@ -1,0 +1,91 @@
+category:
+	get_all() {
+		id: number
+		name: string
+		img: string
+	}
+
+product:
+	Product: {
+		id: number
+		name: string
+		price: number
+		discount: number
+		quantity: number
+		sold: number
+		rating: number
+		img: string[]
+		specs: { label: string; value: string }[]
+		specs_detail: { label: string; value: string }[]
+		color: { name: string; code: string }[]
+	}
+
+	get_new_products() {
+		product: Product[]
+	}
+
+	get_product_detail(id) {
+		product: Product
+	}
+
+	{
+		apiFilterParams: {
+			page: currentPage,
+			limit: limitPage,
+
+			sort: string, // 'featured', 'price_asc', 'price_desc'.
+
+			brands: string[]
+			discount: boolean
+			price_min: priceMin : -1,
+			price_max: priceMax : -1,
+			ram: string[]
+			screen_size: string[]
+			processor: string[]
+			gpu_brand: string[]
+			drive_size: string[]
+		}
+
+		Ex:
+			/api/products?
+			page=1&
+			limit=20&
+			sort=featured&
+			brands=Asus,Apple,Dell&
+			discount=true&
+			price_min=500&
+			price_max=2000&
+			ram=8GB,16GB&
+			processor=Intel+i7,AMD+Ryzen+7
+	}
+
+	get_products_by_filter(value: apiFilterParams) {
+		product: Product[]
+	}
+
+filter:
+	get_all_filter() {
+		brandOptions: Array<{
+			label: string;
+			value: string;
+			count: number;
+		}>;
+		ramOptions: string[];
+		screenSizeOptions: string[];
+		processorOptions: string[];
+		gpuBrandOptions: string[];
+		driveSizeOptions: string[];
+	}
+
+order:
+	get_order() {
+		id: string
+		placedOn: string
+		total: number
+		delivered: string | null
+		sentTo: string
+		address: string
+		products: Product[]
+		status: 'processing' | 'on-the-way' | 'delivered'
+		paymentType: string
+	}

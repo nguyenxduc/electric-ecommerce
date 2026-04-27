@@ -1,0 +1,24 @@
+Order Detail:
+
+  interface Order {
+    id: string
+    placedOn: string
+    total: number
+    delivered?: string
+    sentTo: string
+    address?: string
+    products: Product[]
+    status?: 'processing' | 'on-the-way' | 'delivered'
+    paymentType?: string
+    transactionId?: string
+    amountPaid?: number
+  }
+
+    interface Product {
+      name: string
+      image?: string
+      color?: string
+      quantity?: number
+      price?: number
+      originalPrice?: number
+    }
