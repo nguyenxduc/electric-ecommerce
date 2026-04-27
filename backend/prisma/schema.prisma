@@ -1,0 +1,598 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ArInternalMetadata {
+  key        String   @id
+  value      String?
+  created_at DateTime
+  updated_at DateTime
+
+  @@map("ar_internal_metadata")
+}
+
+model SchemaMigration {
+  version String @id
+
+  @@map("schema_migrations")
+}
+
+model Category {
+  id          BigInt    @id @default(autoincrement())
+  name        String?
+  slug        String?   @unique
+  image_url   String?
+  description String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  // relations
+  sub_categories SubCategory[]
+  products       Product[]
+  filter_options FilterOption[]
+
+  @@map("categories")
+}
+
+model SubCategory {
+  id          BigInt    @id @default(autoincrement())
+  name        String?
+  image_url   String?
+  description String?
+  category_id BigInt
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  // relations
+  category Category  @relation(fields: [category_id], references: [id])
+  products Product[]
+
+  @@map("sub_categories")
+}
+
+model Product {
+  id              BigInt    @id @default(autoincrement())
+  name            String
+  price           Decimal   @db.Decimal(10, 2)
+  discount        Decimal   @default(0.0) @db.Decimal(10, 2)
+  quantity        Int       @default(0) // total stock (optional aggregate)
+  sold            Int       @default(0)
+  img             String[]  @db.Text
+  specs           Json      @default("[]")
+  specs_detail    Json      @default("[]")
+  color           Json      @default("[]") // legacy color list
+  product_colors  ProductColor[]
+  category_id     BigInt
+  sub_category_id BigInt?
+  rating          Decimal?  @db.Decimal(3, 2)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+  description     String?
+  // relations
+  category     Category     @relation(fields: [category_id], references: [id])
+  sub_category SubCategory? @relation(fields: [sub_category_id], references: [id])
+  reviews      Review[]
+  order_items  OrderItem[]
+  cart_items   CartItem[]
+  wishlists    Wishlist[]
+  embedding    ProductEmbedding? @relation("ProductEmbedding")
+  filter_values ProductFilterValue[]
+
+  @@index([name])
+  @@index([category_id])
+  @@index([sub_category_id])
+  @@index([price])
+  @@index([rating])
+  @@map("products")
+}
+
+model ProductEmbedding {
+  product_id BigInt   @id
+  content    String?
+  embedding  Unsupported("vector")
+  updated_at DateTime @default(now())
+
+  product Product @relation("ProductEmbedding", fields: [product_id], references: [id])
+
+  @@map("product_embeddings")
+}
+
+// Per-color inventory for a product
+model ProductColor {
+  id          BigInt   @id @default(autoincrement())
+  product_id  BigInt
+  name        String?
+  code        String?
+  quantity    Int      @default(0)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  deleted_at  DateTime?
+
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@unique([product_id, code])
+  @@map("product_colors")
+}
+
+model ProductSpec {
+  id         BigInt    @id @default(autoincrement())
+  label      String?
+  value      Json?     @default("[]")
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  @@map("product_specs")
+}
+
+model User {
+  id              BigInt    @id @default(autoincrement())
+  name            String?
+  email           String?   @unique
+  password_digest String?
+  email_verified  Boolean   @default(false)
+  verification_code String?
+  verification_expires_at DateTime?
+  reset_code      String?
+  reset_expires_at DateTime?
+  role            String?   @default("user")
+  phone           String?
+  address         String?
+  avatar          String?
+  // Loyalty & segmentation
+  loyalty_points  Int       @default(0)
+  segment         String?   // e.g. BRONZE, SILVER, GOLD, PLATINUM
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  // relations
+  orders    Order[]
+  reviews   Review[]
+  carts     Cart[]
+  wishlists Wishlist[]
+  coupons   Coupon[]   @relation("UserCoupons")
+  chats     Chat[]
+  messages  Message[]  @relation("MessageSender")
+  ai_chats  AiChat[]
+
+  @@map("users")
+}
+
+model LoyaltyPointTransaction {
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt
+  order_id    BigInt?  // nếu điểm đến từ đơn hàng
+  points      Int      // dương = cộng điểm, âm = trừ điểm
+  type        String   // EARN | REDEEM | ADJUST
+  description String?
+  created_at  DateTime @default(now())
+
+  @@index([user_id, created_at])
+  @@index([order_id])
+  @@map("loyalty_point_transactions")
+}
+
+model Cart {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // relations
+  user       User       @relation(fields: [user_id], references: [id])
+  cart_items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         BigInt    @id @default(autoincrement())
+  cart_id    BigInt
+  product_id BigInt
+  quantity   Int       @default(1)
+  color      Json
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // relations
+  cart    Cart    @relation(fields: [cart_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("cart_items")
+}
+
+model Order {
+  id               BigInt    @id @default(autoincrement())
+  user_id          BigInt
+  order_number     String?   @unique
+  total_amount     Decimal?  @db.Decimal(10, 2)
+  status           String?   @default("pending")
+  shipping_address Json?
+  receiver_name    String?
+  receiver_phone   String?
+  payment_method   String?
+  coupon_id        BigInt?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  deleted_at       DateTime?
+
+  // relations
+  user        User        @relation(fields: [user_id], references: [id])
+  order_items OrderItem[]
+  coupon      Coupon?     @relation(fields: [coupon_id], references: [id])
+  payments    Payment[]
+
+  @@map("orders")
+}
+
+// Thông báo hệ thống gửi cho người dùng
+model Notification {
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt?  // null = broadcast
+  title       String
+  message     String
+  type        String?  // ORDER, PROMO, SYSTEM...
+  is_read     Boolean  @default(false)
+  created_at  DateTime @default(now())
+  read_at     DateTime?
+
+  @@index([user_id, created_at])
+  @@index([is_read, created_at])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt?
+  action     String   // ví dụ: LOGIN, ORDER_STATUS_UPDATE, PRODUCT_CREATE...
+  resource   String?  // e.g. "order", "product", "user"
+  resource_id BigInt?
+  ip         String?
+  user_agent String?
+  metadata   Json?    @default("{}")
+  created_at DateTime @default(now())
+
+  @@index([user_id, created_at])
+  @@index([resource, resource_id])
+  @@index([action, created_at])
+  @@map("audit_logs")
+}
+
+model OrderItem {
+  id          BigInt    @id @default(autoincrement())
+  order_id    BigInt
+  product_id  BigInt
+  quantity    Int?      @default(1)
+  unit_price  Decimal?  @db.Decimal(10, 2)
+  total_price Decimal?  @db.Decimal(10, 2)
+  color       String?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  // relations
+  order   Order   @relation(fields: [order_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+model Review {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  product_id BigInt
+  rating     Int?
+  comment    String?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // relations
+  user    User    @relation(fields: [user_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("reviews")
+}
+
+model Wishlist {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  product_id BigInt
+  created_at DateTime  @default(now())
+  deleted_at DateTime?
+
+  // relations
+  user    User    @relation(fields: [user_id], references: [id])
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@unique([user_id, product_id])
+  @@map("wishlists")
+}
+
+model Coupon {
+  id             BigInt    @id @default(autoincrement())
+  code           String    @unique
+  description    String?
+  discount_type  String    @default("percent")
+  discount_value Decimal   @db.Decimal(10, 2)
+  min_order      Decimal?  @db.Decimal(10, 2)
+  usage_limit    Int?      @default(1)
+  used_count     Int?      @default(0)
+  expires_at     DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  deleted_at     DateTime?
+
+  // relations
+  orders Order[]
+  users  User[]  @relation("UserCoupons")
+
+  @@map("coupons")
+}
+
+model FilterKey {
+  id          BigInt    @id @default(autoincrement())
+  key         String    @unique // 'brand', 'ram', 'screen_size', etc.
+  label       String // Display name: 'Brand', 'RAM', etc.
+  description String? // Optional description
+  data_type   String    @default("string") // string, number, boolean, range
+  is_active   Boolean   @default(true)
+  order       Int       @default(0) // Display order
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  // relations
+  filter_options FilterOption[]
+  product_filter_values ProductFilterValue[]
+
+  @@index([key])
+  @@map("filter_keys")
+}
+
+model FilterOption {
+  id            BigInt    @id @default(autoincrement())
+  filter_key_id BigInt // Reference to FilterKey
+  value         String // Legacy field for backward compatibility
+  display_value String? // Value shown to user: '30% or more', 'On Sale'
+  query_value   String? // Value used for querying: '>=30', 'discount>0'
+  category_id   BigInt? // Optional: filter by category
+  order         Int       @default(0) // Display order
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+
+  // relations
+  filter_key FilterKey  @relation(fields: [filter_key_id], references: [id])
+  category   Category? @relation(fields: [category_id], references: [id])
+  product_filter_values ProductFilterValue[]
+
+  @@unique([filter_key_id, value, category_id])
+  @@index([filter_key_id, category_id])
+  @@map("filter_options")
+}
+
+model Payment {
+  id              BigInt    @id @default(autoincrement())
+  order_id        BigInt
+  provider        String    @default("momo")
+  amount          Decimal   @db.Decimal(10, 2)
+  currency        String    @default("VND")
+  status          String    @default("pending") // pending, paid, failed, expired, canceled
+  momo_order_id   String? // orderId returned by MoMo
+  momo_request_id String?   @unique // requestId used when creating payment
+  momo_trans_id   String? // transId returned after payment
+  pay_url         String?
+  deeplink        String?
+  qr_code_url     String?
+  signature       String?
+  extra_data      String?
+  result_code     Int?
+  message         String?
+  paid_at         DateTime?
+  expired_at      DateTime?
+  raw_response    Json?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
+
+  // relations
+  order Order @relation(fields: [order_id], references: [id])
+
+  @@index([order_id])
+  @@map("payments")
+}
+
+model Setting {
+  id          BigInt    @id @default(autoincrement())
+  key         String    @unique // e.g., 'bank_account_no', 'bank_account_name', 'shipping_fee', etc.
+  value       String // Value stored as string (can be JSON string for complex data)
+  description String? // Human-readable description
+  category    String    @default("general") // bank, shipping, general, payment, etc.
+  data_type   String    @default("string") // string, number, boolean, json
+  is_public   Boolean   @default(false) // Whether this setting can be accessed without auth
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  @@index([category])
+  @@index([key])
+  @@map("settings")
+}
+
+model Chat {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt // Customer who initiated the chat
+  status     String    @default("open") // open, closed, resolved
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // relations
+  user     User      @relation(fields: [user_id], references: [id])
+  messages Message[]
+
+  @@index([user_id])
+  @@index([status])
+  @@map("chats")
+}
+
+model Message {
+  id         BigInt    @id @default(autoincrement())
+  chat_id    BigInt
+  sender_id  BigInt // User ID (can be customer or admin)
+  content    String
+  is_read    Boolean   @default(false)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  // relations
+  chat   Chat @relation(fields: [chat_id], references: [id])
+  sender User @relation("MessageSender", fields: [sender_id], references: [id])
+
+  @@index([chat_id])
+  @@index([sender_id])
+  @@index([is_read])
+  @@map("messages")
+}
+
+model AiChat {
+  id         BigInt     @id @default(autoincrement())
+  user_id    BigInt
+  title      String?
+  thread_key String     @unique
+  created_at DateTime   @default(now())
+  updated_at DateTime   @updatedAt
+
+  user     User       @relation(fields: [user_id], references: [id])
+  messages AiMessage[]
+
+  @@index([user_id])
+  @@index([updated_at])
+  @@map("ai_chats")
+}
+
+model AiMessage {
+  id         BigInt   @id @default(autoincrement())
+  ai_chat_id BigInt
+  role       String
+  content    String
+  metadata   Json?    @default("{}")
+  created_at DateTime @default(now())
+
+  ai_chat AiChat @relation(fields: [ai_chat_id], references: [id], onDelete: Cascade)
+
+  @@index([ai_chat_id])
+  @@index([created_at])
+  @@map("ai_messages")
+}
+
+model AiFeedback {
+  id            BigInt   @id @default(autoincrement())
+  ai_message_id BigInt
+  user_id       BigInt
+  rating        Int      // 1-5
+  comment       String?
+  created_at    DateTime @default(now())
+
+  @@index([ai_message_id])
+  @@index([user_id])
+  @@map("ai_feedback")
+}
+
+// Lightweight event log for recommendation & analytics.
+// Lưu ý: bảng này sẽ rất lớn theo thời gian, nên dùng cho dữ liệu gần đây
+// và có thể archive/aggregate định kỳ sang kho khác.
+model UserBehavior {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt?
+  session_id String?  // cho user chưa đăng nhập
+  product_id BigInt?
+  event_type String   // view | click | add_to_cart | purchase ...
+  event_time DateTime @default(now())
+  metadata   Json?    @default("{}")
+
+  @@index([user_id, event_time])
+  @@index([product_id, event_time])
+  @@index([event_type, event_time])
+  @@index([event_time])
+  @@map("user_behavior")
+}
+
+// Gom nhóm hành vi theo ngày (visitor + sản phẩm + loại sự kiện) — giữ lâu dài, bảng nhỏ hơn raw.
+// visitor_key: "user:<id>" hoặc "sess:<session_id|unknown>"
+model UserBehaviorDaily {
+  id          BigInt   @id @default(autoincrement())
+  visitor_key String
+  product_id  BigInt   @default(0)
+  event_type  String
+  day         DateTime @db.Date
+  event_count Int      @default(0)
+  updated_at  DateTime @default(now()) @updatedAt
+
+  @@unique([visitor_key, product_id, event_type, day])
+  @@index([day])
+  @@index([visitor_key, day])
+  @@index([product_id, day])
+  @@map("user_behavior_daily")
+}
+
+// Bảng lưu điểm tương đồng giữa các sản phẩm, được tính offline.
+// Không bắt buộc quan hệ Prisma để giữ schema đơn giản, dùng id thuần tuý.
+model ProductSimilarity {
+  id                 BigInt   @id @default(autoincrement())
+  product_id         BigInt
+  similar_product_id BigInt
+  score              Float
+  updated_at         DateTime @default(now())
+
+  @@unique([product_id, similar_product_id])
+  @@index([product_id])
+  @@map("product_similarity")
+}
+
+// Log kết quả gợi ý đã được precompute để API trả nhanh.
+model RecommendationLog {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt?
+  session_id String?
+  strategy   String   // e.g. "personalized_cf", "cold_start_best_seller"
+  product_ids BigInt[]
+  created_at DateTime @default(now())
+
+  @@index([user_id, created_at])
+  @@index([session_id, created_at])
+  @@index([strategy, created_at])
+  @@map("recommendation_log")
+}
+
+model ProductFilterValue {
+  id          BigInt  @id @default(autoincrement())
+  product_id  BigInt
+  filter_key_id BigInt
+  option_id   BigInt?
+
+  raw_value   String?  
+  created_at  DateTime @default(now())
+
+  product     Product     @relation(fields: [product_id], references: [id])
+  filter_key  FilterKey   @relation(fields: [filter_key_id], references: [id])
+  option      FilterOption? @relation(fields: [option_id], references: [id])
+
+  @@index([product_id])
+  @@index([filter_key_id])
+  @@unique([product_id, filter_key_id])
+}
