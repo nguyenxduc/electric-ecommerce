@@ -8,9 +8,10 @@ import {
   fetchSimilarProductsByCategory,
   fetchReview,
   searchProducts,
-  fetchProductsByCategory
+  fetchProductsByCategory,
+  fetchHomeRecommendations
 } from '../services/productService'
-import type { ListProductRes, Product } from '../types/product'
+import type { ListProductRes, Product, RecommendationRes } from '../types/product'
 import type { ReviewRes } from '../types/review'
 
 export const useNewProducts = () =>
@@ -25,6 +26,22 @@ export const usePopularProducts = () =>
     queryKey: ['popularProducts'],
     queryFn: fetchPopularProducts,
     staleTime: 5 * 60 * 1000
+  })
+
+export const useHomeRecommendations = (params?: {
+  limit?: number
+  category_id?: number | string
+  enabled?: boolean
+}) =>
+  useQuery<RecommendationRes>({
+    queryKey: ['homeRecommendations', params?.limit ?? 12, params?.category_id ?? 'all'],
+    queryFn: () =>
+      fetchHomeRecommendations({
+        limit: params?.limit ?? 12,
+        category_id: params?.category_id
+      }),
+    enabled: params?.enabled ?? true,
+    staleTime: 2 * 60 * 1000
   })
 
 export const useCollectionProducts = (

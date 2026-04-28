@@ -1,7 +1,43 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+
+// Cache DNS toàn cục để chống mạng/DNS chập chờn.
+// Khi DNS đột ngột fail, vẫn dùng IP đã resolve trước đó (stale-on-error).
+const __dnsCache = new Map();
+const __DNS_TTL_MS = 5 * 60 * 1000;
+const __dnsOriginalLookup = dns.lookup.bind(dns);
+const __dnsPatchedLookup = (hostname, optsOrCb, maybeCb) => {
+  const cb = typeof optsOrCb === "function" ? optsOrCb : maybeCb;
+  const opts = typeof optsOrCb === "function" ? {} : optsOrCb || {};
+  const cached = __dnsCache.get(hostname);
+  const now = Date.now();
+  const fresh = cached && cached.expires > now;
+  const serveCached = () => {
+    if (opts.all) return cb(null, cached.addresses);
+    const first = cached.addresses[0];
+    cb(null, first.address, first.family);
+  };
+  if (fresh) return serveCached();
+  __dnsOriginalLookup(hostname, { ...opts, all: true }, (err, addresses) => {
+    if (err) {
+      if (cached) return serveCached();
+      return cb(err);
+    }
+    __dnsCache.set(hostname, {
+      addresses,
+      expires: now + __DNS_TTL_MS,
+    });
+    if (opts.all) return cb(null, addresses);
+    cb(null, addresses[0].address, addresses[0].family);
+  });
+};
+dns.lookup = __dnsPatchedLookup;
+
 import express from "express";
 import dotenv from "dotenv";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import { ProxyAgent, setGlobalDispatcher } from "undici";
 import { prisma } from "./lib/db.js";
 BigInt.prototype.toJSON = function () {
   return Number(this);
@@ -33,6 +69,18 @@ import cors from "cors";
 
 const app = express();
 dotenv.config();
+
+const AI_PROXY_URL =
+  process.env.AI_HTTP_PROXY ||
+  process.env.HTTPS_PROXY ||
+  process.env.HTTP_PROXY ||
+  "";
+
+if (AI_PROXY_URL) {
+  // Route global fetch() traffic (Gemini SDK) through proxy.
+  setGlobalDispatcher(new ProxyAgent(AI_PROXY_URL));
+  console.log("AI proxy enabled via:", AI_PROXY_URL);
+}
 
 const PORT = process.env.PORT || 3000;
 

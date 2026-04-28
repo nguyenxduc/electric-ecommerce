@@ -11,7 +11,9 @@
     "embed:products": "node scripts/embed-products.js",
     "setup:similarity": "node scripts/setup_similarity.js",
     "job:cf-similarity": "node jobs/computeProductSimilarity.js",
+    "job:offline-user-recommendation": "node jobs/computeUserRecommendations.js",
     "job:prune-user-behavior": "node jobs/pruneUserBehavior.js",
+    "job:prune-recommendation-log": "node jobs/pruneRecommendationLog.js",
     "job:rollup-user-behavior-daily": "node jobs/rollupUserBehaviorDaily.js",
     "job:daily-recommendation": "node jobs/runDailyRecommendationJobs.js"
   },
@@ -27,6 +29,7 @@
     "ai": "^5.0.108",
     "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
+    "cacheable-lookup": "^7.0.0",
     "cloudinary": "^2.7.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",

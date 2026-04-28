@@ -35,3 +35,13 @@ export type ListProductRes = {
   products: Product[]
   pagination: Pagination
 }
+
+export type RecommendationData = {
+  products: Product[]
+  strategy: string
+}
+
+export type RecommendationRes = {
+  success: boolean
+  data: RecommendationData
+}

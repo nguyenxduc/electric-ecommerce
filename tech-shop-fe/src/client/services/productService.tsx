@@ -1,5 +1,5 @@
 import axiosClient from '../../lib/axios'
-import type { ListProductRes, Product } from '../types/product'
+import type { ListProductRes, Product, RecommendationRes } from '../types/product'
 import type { ReviewRes } from '../types/review'
 
 export const fetchNewProducts = async (): Promise<ListProductRes> => {
@@ -12,6 +12,19 @@ export const fetchNewProducts = async (): Promise<ListProductRes> => {
 export const fetchPopularProducts = async (): Promise<ListProductRes> => {
   const { data } = await axiosClient.get<ListProductRes>('/products', {
     params: { sort: 'popular', page: 1, limit: 40 }
+  })
+  return data
+}
+
+export const fetchHomeRecommendations = async (params?: {
+  limit?: number
+  category_id?: number | string
+}): Promise<RecommendationRes> => {
+  const { data } = await axiosClient.get<RecommendationRes>('/recommendations/home', {
+    params: {
+      limit: params?.limit ?? 12,
+      ...(params?.category_id ? { category_id: params.category_id } : {})
+    }
   })
   return data
 }

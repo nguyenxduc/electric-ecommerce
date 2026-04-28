@@ -5,15 +5,17 @@ import SidebarFilters from '../components/collection/SidebarFilters'
 import SortDropdown from '../components/collection/SortDropdown'
 import ProductGrid from '../components/collection/ProductGrid'
 import Pagination from '../components/collection/Pagination'
+import ListProduct from '../components/products/ListProduct'
 import {
   ProductGridSkeleton,
   SectionSkeleton
 } from '../components/common/LoadingSkeleton'
 
-import { useCollectionProducts, useSearchProducts } from '../hooks/useProducts'
+import { useCollectionProducts, useHomeRecommendations, useSearchProducts } from '../hooks/useProducts'
 import { useCategories, useCategoryBySlug } from '../hooks/useCategories'
 import { useFilters } from '../hooks/useFilters'
 import { ListProductRes } from '../types/product'
+import { recommendationStrategyLabel } from '../utils/recommendationLabel'
 
 import { useParams, useSearchParams } from 'react-router-dom'
 
@@ -218,6 +220,24 @@ const Collection = () => {
       category_id: categoryId
     }
   )
+  const { data: recommendationData, isLoading: recommendationLoading } =
+    useHomeRecommendations({
+      limit: 8,
+      category_id: collection === 'all' ? undefined : categoryId,
+      enabled: !searchQuery && collection !== 'all'
+    })
+
+  const recommendationProducts: ListProductRes | null = recommendationData?.data
+    ? {
+        products: recommendationData.data.products,
+        pagination: {
+          current_page: 1,
+          per_page: recommendationData.data.products.length,
+          total_count: recommendationData.data.products.length,
+          total_pages: 1
+        }
+      }
+    : null
 
   // Update URL when page changes
   const setCurrentPage = (newPage: number) => {
@@ -380,6 +400,17 @@ const Collection = () => {
               : ''
           }`}
         >
+          {!searchQuery &&
+          collection !== 'all' &&
+          (recommendationLoading || recommendationProducts?.products?.length) ? (
+            <ListProduct
+              title="Gợi ý theo danh mục"
+              sectionLabel={recommendationStrategyLabel(recommendationData?.data?.strategy)}
+              products={recommendationProducts}
+              isLoading={recommendationLoading}
+            />
+          ) : null}
+
           <div className="flex justify-end mb-6">
             <SortDropdown
               options={sortOptions}

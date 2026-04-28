@@ -1,10 +1,26 @@
 import "dotenv/config";
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
+import { ProxyAgent, setGlobalDispatcher } from "undici";
+
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/db.js";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 
-const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "text-embedding-004";
+const EMBED_MODEL =
+  process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
+const EMBED_API_KEY =
+  process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 const BATCH_SIZE = 25;
+const AI_PROXY_URL =
+  process.env.AI_HTTP_PROXY ||
+  process.env.HTTPS_PROXY ||
+  process.env.HTTP_PROXY ||
+  "";
+
+if (AI_PROXY_URL) {
+  setGlobalDispatcher(new ProxyAgent(AI_PROXY_URL));
+}
 
 const buildContent = (p) => {
   const specs = Array.isArray(p.specs_detail) ? p.specs_detail : [];
@@ -16,9 +32,13 @@ const buildContent = (p) => {
 };
 
 async function main() {
+  if (!EMBED_API_KEY) {
+    throw new Error("Missing GEMINI_API_KEY (or GOOGLE_API_KEY)");
+  }
+
   const embedder = new GoogleGenerativeAIEmbeddings({
     model: EMBED_MODEL,
-    apiKey: process.env.GEMINI_API_KEY,
+    apiKey: EMBED_API_KEY,
   });
 
   const products = await prisma.product.findMany({

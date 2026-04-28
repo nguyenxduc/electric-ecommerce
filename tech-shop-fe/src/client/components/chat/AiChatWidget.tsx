@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import {
   Bot,
   MessageCircle,
@@ -133,6 +134,16 @@ function MessageStars({
 function AiChatWidgetInner() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const [optimisticMessages, setOptimisticMessages] = useState<
+    Array<{
+      id: string
+      role: 'user'
+      chatId: string
+      content: string
+      created_at: string
+      _optimistic: true
+    }>
+  >([])
   const [activeChatId, setActiveChatId] = useState<string | number | undefined>(
     undefined
   )
@@ -152,15 +163,21 @@ function AiChatWidgetInner() {
 
   const { data: messagesData, isLoading: messagesLoading } = useAiMessages(
     selectedChatId,
-    { pausePoll: sendMessageMutation.isPending }
+    { pausePoll: false }
   )
   const messages = messagesData?.data?.messages || []
+  const normalizeText = (value: string) => value.trim().toLowerCase()
+  const activeOptimisticMessages = optimisticMessages.filter(
+    m => String(m.chatId) === String(selectedChatId)
+  )
+  const renderedMessages = [...messages, ...activeOptimisticMessages]
 
   const createChatMutation = useCreateAiChat()
   const deleteChatMutation = useDeleteAiChat()
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (isOpen && scrollRef.current) {
@@ -168,7 +185,27 @@ function AiChatWidgetInner() {
     } else if (isOpen && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages, isOpen, sendMessageMutation.isPending])
+  }, [messages, optimisticMessages, isOpen, sendMessageMutation.isPending])
+
+  // Keep optimistic user messages until server-side user message appears.
+  useEffect(() => {
+    if (!selectedChatId || optimisticMessages.length === 0 || messages.length === 0) return
+    setOptimisticMessages(prev =>
+      prev.filter(opt => {
+        if (String(opt.chatId) !== String(selectedChatId)) return true
+        const matched = messages.some((m: any) => {
+          if (m.role !== 'user') return false
+          if (normalizeText(String(m.content || '')) !== normalizeText(opt.content)) return false
+          const serverTs = new Date(m.created_at).getTime()
+          const optTs = new Date(opt.created_at).getTime()
+          return Number.isFinite(serverTs) && Number.isFinite(optTs)
+            ? serverTs >= optTs - 2000
+            : true
+        })
+        return !matched
+      })
+    )
+  }, [messages, optimisticMessages, selectedChatId])
 
   useEffect(() => {
     if (
@@ -206,13 +243,31 @@ function AiChatWidgetInner() {
 
   const handleSend = async () => {
     if (!message.trim() || !selectedChatId) return
+    const payload = message.trim()
+    const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    flushSync(() => {
+      setOptimisticMessages(prev => [
+        ...prev,
+        {
+          id: tempId,
+          role: 'user',
+          chatId: String(selectedChatId),
+          content: payload,
+          created_at: new Date().toISOString(),
+          _optimistic: true
+        }
+      ])
+      setMessage('')
+    })
+    if (inputRef.current) inputRef.current.value = ''
     try {
       await sendMessageMutation.mutateAsync({
         chatId: selectedChatId,
-        content: message.trim()
+        content: payload
       })
-      setMessage('')
     } catch (error: any) {
+      setOptimisticMessages(prev => prev.filter(m => m.id !== tempId))
+      setMessage(payload)
       toast.error(error?.response?.data?.error || 'Failed to send message')
     }
   }
@@ -317,7 +372,7 @@ function AiChatWidgetInner() {
                   <Loader2 className="w-4 h-4 animate-spin" /> Loading
                   messages...
                 </div>
-              ) : messages.length === 0 && !sendMessageMutation.isPending ? (
+              ) : renderedMessages.length === 0 ? (
                 <div className="text-center text-gray-500 py-10">
                   <MessageCircle className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                   <p>
@@ -327,7 +382,7 @@ function AiChatWidgetInner() {
                   </p>
                 </div>
               ) : (
-                messages.map(msg => {
+                renderedMessages.map(msg => {
                   const isAi = msg.role === 'assistant'
                   const mid = String(msg.id)
                   return (
@@ -338,10 +393,10 @@ function AiChatWidgetInner() {
                       }`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-lg px-4 py-2 text-sm ${
+                        className={`rounded-lg px-4 py-2 text-sm ${
                           isAi
-                            ? 'bg-white border border-gray-200 text-gray-900'
-                            : 'bg-emerald-600 text-white'
+                            ? 'w-full max-w-none bg-white border border-gray-200 text-gray-900'
+                            : 'max-w-[80%] bg-emerald-600 text-white'
                         }`}
                       >
                         <AiMessageMarkdown
@@ -379,13 +434,15 @@ function AiChatWidgetInner() {
             <div className="border-t px-4 py-3 bg-white">
               <div className="flex gap-2">
                 <textarea
+                  ref={inputRef}
                   value={message}
                   onChange={e => setMessage(e.target.value)}
                   placeholder="Type your message..."
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
                   rows={2}
-                  disabled={sendMessageMutation.isPending}
                   onKeyDown={e => {
+                    // Avoid sending while user is still composing IME text (Vietnamese).
+                    if ((e.nativeEvent as KeyboardEvent).isComposing) return
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       handleSend()
@@ -396,16 +453,11 @@ function AiChatWidgetInner() {
                   onClick={handleSend}
                   disabled={
                     !message.trim() ||
-                    sendMessageMutation.isPending ||
                     !selectedChatId
                   }
                   className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center min-w-[52px]"
                 >
-                  {sendMessageMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
+                  <Send className="w-4 h-4" />
                 </button>
               </div>
               <p className="text-[11px] text-gray-500 mt-2">

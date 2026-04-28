@@ -8,9 +8,10 @@ interface ListProductProps {
   title: string
   products: ListProductRes | null
   isLoading?: boolean
+  sectionLabel?: string
 }
 
-const ListProduct = ({ title, products, isLoading = false }: ListProductProps) => {
+const ListProduct = ({ title, products, isLoading = false, sectionLabel }: ListProductProps) => {
   const navigate = useNavigate()
 
   function onClick(id: number) {
@@ -26,7 +27,12 @@ const ListProduct = ({ title, products, isLoading = false }: ListProductProps) =
   return (
     <section className="mb-10 mt-5">
       <div className="mx-2 mb-4 flex items-center justify-between border-b border-b-black py-2">
-        <h2 className="mb-4 text-3xl font-semibold">{title}</h2>
+        <div className="mb-4">
+          <h2 className="text-3xl font-semibold">{title}</h2>
+          {sectionLabel && (
+            <p className="mt-1 text-sm text-emerald-700">{sectionLabel}</p>
+          )}
+        </div>
         <button onClick={ViewAll} className="text-sm text-blue-600 hover:underline">
           View All
         </button>

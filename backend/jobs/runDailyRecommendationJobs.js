@@ -19,7 +19,9 @@ const node = process.execPath;
 const steps = [
   { name: "Rollup user_behavior → daily", file: "rollupUserBehaviorDaily.js" },
   { name: "Prune user_behavior", file: "pruneUserBehavior.js" },
+  { name: "Prune recommendation_log", file: "pruneRecommendationLog.js" },
   { name: "CF similarity", file: "computeProductSimilarity.js" },
+  { name: "Offline user recommendations", file: "computeUserRecommendations.js" },
 ];
 
 for (const { name, file } of steps) {

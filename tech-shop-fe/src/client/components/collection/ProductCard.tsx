@@ -8,15 +8,26 @@ interface ProductCardProps {
   slug?: string
 }
 
+const asNumber = (value: unknown, fallback = 0) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
 const ProductCard = ({ product, slug }: ProductCardProps) => {
   const navigate = useNavigate()
+  const price = asNumber(product.price)
+  const finalPrice = asNumber(product.final_price)
+  const discount = asNumber(product.discount)
+  const rating = asNumber(product.rating)
+  const discountPercentageValue = Number(product.discount_percentage)
 
   // Calculate discount percentage if not provided
   const discountPercentage =
-    product.discount_percentage ??
-    (product.price > 0
-      ? Math.round((product.discount / product.price) * 100)
-      : 0)
+    Number.isFinite(discountPercentageValue)
+      ? discountPercentageValue
+      : price > 0
+      ? Math.round((discount / price) * 100)
+      : 0
 
   const hasDiscount = discountPercentage > 0
 
@@ -59,22 +70,18 @@ const ProductCard = ({ product, slug }: ProductCardProps) => {
       <div className="flex items-center gap-2 mb-2">
         {hasDiscount && (
           <span className="text-xs text-gray-400 line-through">
-            ${product.price.toFixed(2)}
+            ${price.toFixed(2)}
           </span>
         )}
       </div>
       <div className="flex items-center justify-between">
         <span className="text-lg font-semibold">
           $
-          {product.final_price
-            ? product.final_price.toFixed(2)
-            : product.price.toFixed(2)}
+          {(finalPrice > 0 ? finalPrice : price).toFixed(2)}
         </span>
         <div className="flex items-center gap-1">
           <Star className="w-4 h-4 fill-blue-600 text-blue-600" />
-          <span className="text-sm font-semibold">
-            {product.rating?.toFixed(1) || '0.0'}
-          </span>
+          <span className="text-sm font-semibold">{rating.toFixed(1)}</span>
         </div>
       </div>
     </div>
