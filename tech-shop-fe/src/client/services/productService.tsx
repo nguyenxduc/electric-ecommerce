@@ -1,5 +1,11 @@
 import axiosClient from '../../lib/axios'
-import type { ListProductRes, Product, RecommendationRes } from '../types/product'
+import type {
+  ImageOverviewRes,
+  ImageSearchRes,
+  ListProductRes,
+  Product,
+  RecommendationRes
+} from '../types/product'
 import type { ReviewRes } from '../types/review'
 
 export const fetchNewProducts = async (): Promise<ListProductRes> => {
@@ -114,6 +120,33 @@ export const fetchProductsByCategory = async (
 ): Promise<ListProductRes> => {
   const { data } = await axiosClient.get<ListProductRes>(
     `/products/category/${categoryId}`
+  )
+  return data
+}
+
+export const searchProductsByImage = async (file: File): Promise<ImageSearchRes> => {
+  const formData = new FormData()
+  formData.append('image', file)
+  const { data } = await axiosClient.post<ImageSearchRes>(
+    '/products/search-by-image',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    }
+  )
+  return data
+}
+
+export const fetchImageSearchOverview = async (payload: {
+  detected: ImageSearchRes['data']['detected']
+  product_name?: string
+  fallback_notice?: string
+}): Promise<ImageOverviewRes> => {
+  const { data } = await axiosClient.post<ImageOverviewRes>(
+    '/products/search-by-image/overview',
+    payload
   )
   return data
 }

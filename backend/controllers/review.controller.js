@@ -1,4 +1,23 @@
 import { prisma } from "../lib/db.js";
+import { moderateReviewComment } from "../ai/reviewModeration.js";
+
+const validateCommentByAi = async (comment) => {
+  const text = String(comment || "").trim();
+  if (!text) return { ok: true, moderation: null };
+
+  const moderation = await moderateReviewComment(text);
+  if (moderation?.allowed === false) {
+    return {
+      ok: false,
+      moderation,
+      message:
+        moderation.reason ||
+        "Bình luận không phù hợp. Vui lòng chỉnh sửa và gửi lại.",
+    };
+  }
+
+  return { ok: true, moderation };
+};
 
 export const createReview = async (req, res) => {
   try {
@@ -25,6 +44,14 @@ export const createReview = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const moderationCheck = await validateCommentByAi(comment);
+    if (!moderationCheck.ok) {
+      return res.status(400).json({
+        message: moderationCheck.message,
+        moderation: moderationCheck.moderation,
+      });
     }
 
     const savedReview = await prisma.review.create({
@@ -136,6 +163,16 @@ export const updateReview = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Rating must be between 1 and 5" });
+    }
+
+    if (comment !== undefined) {
+      const moderationCheck = await validateCommentByAi(comment);
+      if (!moderationCheck.ok) {
+        return res.status(400).json({
+          message: moderationCheck.message,
+          moderation: moderationCheck.moderation,
+        });
+      }
     }
 
     const updatedReview = await prisma.review.update({

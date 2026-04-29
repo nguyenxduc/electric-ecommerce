@@ -12,15 +12,19 @@ import {
   addSales,
   addRating,
   getSimilarProducts,
+  getImageSearchOverview,
+  searchProductsByImage,
 } from "../controllers/product.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
-import { upload } from "../middleware/upload.middleware.js";
+import { upload, uploadMemory } from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 
 // Public routes
 router.get("/", getAllProducts);
 router.get("/search", searchProducts);
+router.post("/search-by-image", uploadMemory.single("image"), searchProductsByImage);
+router.post("/search-by-image/overview", getImageSearchOverview);
 router.get("/category/:categoryId", getProductsByCategory);
 router.get("/:id/similar", getSimilarProducts);
 router.get("/:id", getProductById);

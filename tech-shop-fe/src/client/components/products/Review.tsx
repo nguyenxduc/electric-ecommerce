@@ -10,11 +10,20 @@ interface ReviewProps {
   productId: number
 }
 
+const extractReviewErrorMessage = (error: any, fallback: string) => {
+  const moderationReason = error?.response?.data?.moderation?.reason
+  const message = error?.response?.data?.message
+  if (typeof moderationReason === 'string' && moderationReason.trim()) return moderationReason
+  if (typeof message === 'string' && message.trim()) return message
+  return fallback
+}
+
 const ReviewComponent = ({ productId }: ReviewProps) => {
   const [page, setPage] = useState(1)
   const [rating, setRating] = useState(0)
   const [hoverRating, setHoverRating] = useState(0)
   const [comment, setComment] = useState('')
+  const [commentError, setCommentError] = useState('')
   const [editingReview, setEditingReview] = useState<Review | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
 
@@ -29,6 +38,8 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
   const summary = reviewsData?.summary
 
   const handleSubmitReview = async () => {
+    setCommentError('')
+
     if (!userData?.user) {
       toast.error('Please login to submit a review')
       return
@@ -52,9 +63,11 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
             setEditingReview(null)
             setRating(0)
             setComment('')
+            setCommentError('')
           },
           onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to update review')
+            const message = extractReviewErrorMessage(error, 'Failed to update review')
+            setCommentError(message)
           }
         }
       )
@@ -71,9 +84,11 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
             toast.success('Review submitted successfully')
             setRating(0)
             setComment('')
+            setCommentError('')
           },
           onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to submit review')
+            const message = extractReviewErrorMessage(error, 'Failed to submit review')
+            setCommentError(message)
           }
         }
       )
@@ -84,6 +99,7 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
     setEditingReview(review)
     setRating(review.rating || 0)
     setComment(review.comment || '')
+    setCommentError('')
   }
 
   const handleDeleteReview = () => {
@@ -178,11 +194,21 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Your Review</label>
               <textarea
                 value={comment}
-                onChange={e => setComment(e.target.value)}
+                onChange={e => {
+                  setComment(e.target.value)
+                  if (commentError) setCommentError('')
+                }}
                 placeholder="Share your thoughts about this product..."
-                className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+                className={`w-full rounded-lg p-3 focus:outline-none focus:ring-2 min-h-[100px] ${
+                  commentError
+                    ? 'border border-red-400 focus:ring-red-500'
+                    : 'border border-gray-300 focus:ring-blue-500'
+                }`}
                 rows={4}
               />
+              {commentError && (
+                <p className="mt-1 text-sm font-medium text-red-600">{commentError}</p>
+              )}
             </div>
             <div className="flex gap-3">
               <button
@@ -199,6 +225,7 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
                     setEditingReview(null)
                     setRating(0)
                     setComment('')
+                    setCommentError('')
                   }}
                   className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
                 >

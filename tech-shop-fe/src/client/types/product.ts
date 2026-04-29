@@ -45,3 +45,39 @@ export type RecommendationRes = {
   success: boolean
   data: RecommendationData
 }
+
+export type ImageSearchDetected = {
+  product_type: string
+  brand: string
+  line_or_model: string
+  search_query: string
+  summary: string
+  confidence: number
+}
+
+export type ImageSearchData = {
+  source: 'image'
+  detected: ImageSearchDetected
+  match_mode: 'exact' | 'related' | 'none'
+  generated_query: string
+  notice: string
+  overview_pending?: boolean
+  action_hint?: string
+  suggested_queries?: string[]
+  products: Product[]
+  pagination: Pagination
+}
+
+export type ImageOverviewRes = {
+  success: boolean
+  data: {
+    overview: string
+  }
+  message?: string
+}
+
+export type ImageSearchRes = {
+  success: boolean
+  data: ImageSearchData
+  message?: string
+}
