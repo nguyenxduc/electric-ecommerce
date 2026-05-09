@@ -38,7 +38,18 @@ export type Order = {
   }>
 }
 
-export const createOrder = async (payload: CreateOrderPayload): Promise<{ message: string; order: Order }> => {
+export const createOrder = async (
+  payload: CreateOrderPayload
+): Promise<{
+  message: string
+  order: Order
+  subtotal?: number
+  amountAfterTierDiscount?: number
+  tierDiscount?: number
+  tierDiscountRate?: number
+  discount?: number
+  finalAmount?: number
+}> => {
   const { data } = await axiosClient.post('/orders', payload)
   return data
 }

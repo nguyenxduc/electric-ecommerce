@@ -26,6 +26,12 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [message, setMessage] = useState('')
+  const [panelHeight, setPanelHeight] = useState(600)
+  const [previewMessage, setPreviewMessage] = useState<{
+    content: string
+    senderName: string
+    createdAt: string
+  } | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
@@ -123,6 +129,23 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
     }
   }
 
+  const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startHeight = panelHeight
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startY - moveEvent.clientY
+      const next = Math.min(850, Math.max(420, startHeight + delta))
+      setPanelHeight(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', {
@@ -165,6 +188,7 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
           className={`fixed bottom-6 right-6 w-96 bg-white rounded-lg shadow-2xl border border-gray-200 z-[9999] flex flex-col ${
             isMinimized ? 'h-16' : 'h-[600px]'
           } transition-all`}
+          style={isMinimized ? undefined : { height: `${panelHeight}px` }}
         >
           {/* Header */}
           <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
@@ -192,6 +216,11 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
 
           {!isMinimized && (
             <>
+              <div
+                className="h-2 cursor-ns-resize bg-gray-100 hover:bg-gray-200 transition-colors"
+                onMouseDown={startResize}
+                title="Drag to resize chat height"
+              />
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                 {messages.length === 0 ? (
@@ -214,7 +243,15 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
                             isAdminMsg
                               ? 'bg-white text-gray-900 border border-gray-200'
                               : 'bg-blue-600 text-white'
-                          }`}
+                          } cursor-pointer`}
+                          onClick={() =>
+                            setPreviewMessage({
+                              content: msg.content,
+                              senderName: isAdminMsg ? msg.sender.name : 'You',
+                              createdAt: msg.created_at
+                            })
+                          }
+                          title="Click to view full message"
                         >
                           {isAdminMsg && (
                             <p className="text-xs font-semibold mb-1 opacity-75">
@@ -261,6 +298,33 @@ function ChatWidgetInner({ userId }: { userId: string | number }) {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {previewMessage && (
+        <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div>
+                <p className="font-semibold text-gray-900">{previewMessage.senderName}</p>
+                <p className="text-xs text-gray-500">
+                  {new Date(previewMessage.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <button
+                className="p-1 rounded hover:bg-gray-100"
+                onClick={() => setPreviewMessage(null)}
+                aria-label="Close preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-auto">
+              <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                {previewMessage.content}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </>

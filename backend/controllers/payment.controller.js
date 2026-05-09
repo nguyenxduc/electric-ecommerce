@@ -1,5 +1,6 @@
 import { VNPay, ProductCode } from "vnpay";
 import { prisma } from "../lib/db.js";
+import crypto from "crypto";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
 
@@ -95,50 +96,195 @@ export const createVnpayPayment = async (req, res) => {
   }
 };
 
-// Create QR code for bank transfer using VietQR API
-export const createBankTransferQR = async (req, res) => {
+export const createMomoPayment = async (req, res) => {
   try {
-    const { amount, orderInfo, accountName } = req.body || {};
+    const { amount, orderInfo, orderId: internalOrderId, orderNumber: internalOrderNumber } =
+      req.body || {};
     const numericAmount = Number(amount);
-    
+
     if (!numericAmount || numericAmount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
-    // Get bank config from Settings (fallback to env for backward compatibility)
-    const bankId = await getSettingValue("bank_id", process.env.BANK_ID || "tpbank");
-    const accountNo = await getSettingValue("bank_account_no", process.env.BANK_ACCOUNT_NO || "");
-    const bankAccountName = await getSettingValue("bank_account_name", process.env.BANK_ACCOUNT_NAME || accountName || "Tech Shop");
-    const template = await getSettingValue("qr_template", process.env.QR_TEMPLATE || "compact2");
+    const partnerCode =
+      process.env.MOMO_PARTNER_CODE || "MOMO";
+    const accessKey =
+      process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
+    const secretKey =
+      process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
+    const endpoint =
+      process.env.MOMO_ENDPOINT || "https://test-payment.momo.vn/v2/gateway/api/create";
 
-    if (!accountNo) {
-      return res.status(500).json({
-        message: "Bank account number not configured. Please configure in Settings.",
-        required: ["bank_id", "bank_account_no", "bank_account_name"],
+    const requestId = `${partnerCode}${Date.now()}`;
+    const momoOrderId = requestId;
+    const requestType = "captureWallet";
+    const extraData = "";
+    const frontendBase = process.env.FRONTEND_URL || "http://localhost:5173";
+    const redirectBase =
+      process.env.MOMO_REDIRECT_URL || `${frontendBase}/payment-result`;
+    const redirectUrl = `${redirectBase}${
+      redirectBase.includes("?") ? "&" : "?"
+    }method=momo&order=${encodeURIComponent(
+      internalOrderNumber || ""
+    )}&orderDbId=${encodeURIComponent(
+      internalOrderId != null ? String(internalOrderId) : ""
+    )}&requestId=${encodeURIComponent(requestId)}`;
+    const ipnUrl =
+      process.env.MOMO_IPN_URL || `${process.env.BACKEND_URL || "http://localhost:3000"}/api/payments/momo-ipn`;
+    const finalOrderInfo = orderInfo || `Thanh toan don hang ${momoOrderId}`;
+
+    const rawSignature =
+      `accessKey=${accessKey}` +
+      `&amount=${Math.round(numericAmount)}` +
+      `&extraData=${extraData}` +
+      `&ipnUrl=${ipnUrl}` +
+      `&orderId=${momoOrderId}` +
+      `&orderInfo=${finalOrderInfo}` +
+      `&partnerCode=${partnerCode}` +
+      `&redirectUrl=${redirectUrl}` +
+      `&requestId=${requestId}` +
+      `&requestType=${requestType}`;
+
+    const signature = crypto
+      .createHmac("sha256", secretKey)
+      .update(rawSignature)
+      .digest("hex");
+
+    const requestBody = {
+      partnerCode,
+      accessKey,
+      requestId,
+      amount: `${Math.round(numericAmount)}`,
+      orderId: momoOrderId,
+      orderInfo: finalOrderInfo,
+      redirectUrl,
+      ipnUrl,
+      extraData,
+      requestType,
+      signature,
+      lang: "vi",
+    };
+
+    const momoRes = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+    const momoData = await momoRes.json();
+
+    if (!momoRes.ok || momoData.resultCode !== 0) {
+      return res.status(400).json({
+        message: momoData?.message || "Failed to create MoMo payment",
+        resultCode: momoData?.resultCode,
       });
     }
 
-    // Build VietQR URL
-    // Format: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<DESCRIPTION>&accountName=<ACCOUNT_NAME>
-    const baseUrl = "https://img.vietqr.io/image";
-    const qrUrl = `${baseUrl}/${bankId}-${accountNo}-${template}.png?amount=${Math.round(numericAmount)}&addInfo=${encodeURIComponent(orderInfo || `Thanh toan don hang ${Date.now()}`)}&accountName=${encodeURIComponent(bankAccountName)}`;
-
-    const orderId = Date.now().toString();
+    // Persist payment so IPN callback can update status later.
+    if (internalOrderId != null) {
+      await prisma.payment.create({
+        data: {
+          order_id: BigInt(internalOrderId),
+          provider: "momo",
+          amount: numericAmount,
+          currency: "VND",
+          status: "pending",
+          momo_order_id: momoOrderId,
+          momo_request_id: requestId,
+          pay_url: momoData.payUrl || null,
+          deeplink: momoData.deeplink || null,
+          qr_code_url: momoData.qrCodeUrl || null,
+          signature,
+          extra_data: extraData,
+          result_code: momoData.resultCode,
+          message: momoData.message,
+          raw_response: momoData,
+        },
+      });
+    }
 
     res.json({
-      qrUrl,
-      orderId,
+      qrUrl: momoData.qrCodeUrl || "",
+      payUrl: momoData.payUrl || "",
+      deeplink: momoData.deeplink || "",
+      orderId: momoOrderId,
+      requestId,
       amount: numericAmount,
-      accountNo,
-      accountName: bankAccountName,
-      bankId,
-      orderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
+      orderInfo: finalOrderInfo,
+      partnerCode,
+      resultCode: momoData.resultCode,
+      message: momoData.message,
     });
   } catch (error) {
     res.status(500).json({
-      message: "Failed to create bank transfer QR",
+      message: "Failed to create MoMo payment",
       error: error?.message,
     });
+  }
+};
+
+// Backward-compatible alias for old frontend clients.
+export const createBankTransferQR = createMomoPayment;
+
+export const momoIpnHandler = async (req, res) => {
+  try {
+    const data = { ...(req.body || {}), ...(req.query || {}) };
+    const resultCode = data.resultCode ?? data.resultcode;
+    const requestId = data.requestId ?? data.requestid;
+    const transId = data.transId ?? data.transid;
+    const momoOrderId = data.orderId ?? data.orderid;
+    const message = data.message ?? data.errMsg ?? data.errorMessage ?? null;
+
+    const isPaid = String(resultCode) === "0" || String(resultCode) === "00";
+
+    if (!requestId && !momoOrderId) {
+      return res.status(200).send("success");
+    }
+
+    const payment = await prisma.payment.findFirst({
+      where: requestId
+        ? { momo_request_id: String(requestId) }
+        : { momo_order_id: String(momoOrderId) },
+      include: { order: true },
+    });
+
+    if (!payment) {
+      return res.status(200).send("success");
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: isPaid ? "paid" : "failed",
+          momo_trans_id: transId ? String(transId) : null,
+          result_code:
+            resultCode != null && resultCode !== ""
+              ? Number(resultCode)
+              : null,
+          message: message || payment.message,
+          paid_at: isPaid ? payment.paid_at ?? new Date() : null,
+          raw_response: data,
+        },
+      });
+
+      // When paid, move the order forward. (Avoid overriding cancelled orders.)
+      if (
+        isPaid &&
+        payment.order &&
+        ["pending", "processing"].includes(payment.order.status || "")
+      ) {
+        await tx.order.update({
+          where: { id: payment.order_id },
+          data: { status: "processing" },
+        });
+      }
+    });
+
+    return res.status(200).send("success");
+  } catch (error) {
+    console.error("MoMo IPN error:", error);
+    // Still respond success to prevent repeated retries while we fix the root cause.
+    return res.status(200).send("success");
   }
 };
 

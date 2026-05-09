@@ -13,6 +13,7 @@ import {
   type AiFeedbackRow
 } from '../../services/aiFeedbackAdminService'
 import SkeletonTable from '../../components/common/SkeletonTable'
+import AdminPagination from '../../components/common/AdminPagination'
 
 export default function AdminAiFeedbackPage() {
   const [days, setDays] = useState(14)
@@ -244,30 +245,13 @@ export default function AdminAiFeedbackPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-              <span className="text-gray-400">
-                Trang {pagination?.page ?? 1} / {pages} —{' '}
-                {pagination?.total ?? 0} bản ghi
-              </span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="px-3 py-1 border rounded disabled:opacity-40"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  className="px-3 py-1 border rounded disabled:opacity-40"
-                  disabled={page >= pages}
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <AdminPagination
+              className="px-4"
+              page={pagination?.page ?? page}
+              totalPages={pages}
+              onPageChange={setPage}
+              totalItems={pagination?.total}
+            />
           </>
         )}
       </div>

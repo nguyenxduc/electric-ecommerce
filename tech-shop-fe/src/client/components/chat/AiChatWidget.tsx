@@ -134,6 +134,12 @@ function MessageStars({
 function AiChatWidgetInner() {
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState('')
+  const [panelHeight, setPanelHeight] = useState(600)
+  const [previewText, setPreviewText] = useState<{
+    content: string
+    role: 'assistant' | 'user'
+    createdAt: string
+  } | null>(null)
   const [optimisticMessages, setOptimisticMessages] = useState<
     Array<{
       id: string
@@ -290,6 +296,23 @@ function AiChatWidgetInner() {
     setRatedMap(prev => ({ ...prev, [id]: stars }))
   }
 
+  const startResize = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startHeight = panelHeight
+    const onMove = (moveEvent: MouseEvent) => {
+      const delta = startY - moveEvent.clientY
+      const next = Math.min(850, Math.max(420, startHeight + delta))
+      setPanelHeight(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
     <>
       {!isOpen && (
@@ -303,7 +326,10 @@ function AiChatWidgetInner() {
       )}
 
       {isOpen && (
-        <div className="fixed bottom-6 right-24 w-[430px] h-[600px] bg-white rounded-lg shadow-2xl border border-gray-200 z-[9998] flex flex-col">
+        <div
+          className="fixed bottom-6 right-24 w-[430px] bg-white rounded-lg shadow-2xl border border-gray-200 z-[9998] flex flex-col"
+          style={{ height: `${panelHeight}px` }}
+        >
           <div className="flex items-center justify-between px-4 py-3 bg-emerald-600 text-white rounded-t-lg">
             <div className="flex items-center gap-2">
               <Bot className="w-5 h-5" />
@@ -319,6 +345,11 @@ function AiChatWidgetInner() {
           </div>
 
           <div className="flex flex-col flex-1 min-h-0">
+            <div
+              className="h-2 cursor-ns-resize bg-gray-100 hover:bg-gray-200 transition-colors"
+              onMouseDown={startResize}
+              title="Drag to resize chat height"
+            />
             <div className="border-b px-4 py-3 flex items-center gap-2 overflow-x-auto">
               {chatsLoading ? (
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -397,7 +428,15 @@ function AiChatWidgetInner() {
                           isAi
                             ? 'w-full max-w-none bg-white border border-gray-200 text-gray-900'
                             : 'max-w-[80%] bg-emerald-600 text-white'
-                        }`}
+                        } cursor-pointer`}
+                        onClick={() =>
+                          setPreviewText({
+                            content: msg.content,
+                            role: isAi ? 'assistant' : 'user',
+                            createdAt: msg.created_at
+                          })
+                        }
+                        title="Click to view full message"
                       >
                         <AiMessageMarkdown
                           text={msg.content}
@@ -463,6 +502,36 @@ function AiChatWidgetInner() {
               <p className="text-[11px] text-gray-500 mt-2">
                 Enter để gửi · Shift+Enter xuống dòng
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewText && (
+        <div className="fixed inset-0 z-[10000] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div>
+                <p className="font-semibold text-gray-900">
+                  {previewText.role === 'assistant' ? 'AI Assistant' : 'You'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {new Date(previewText.createdAt).toLocaleString()}
+                </p>
+              </div>
+              <button
+                className="p-1 rounded hover:bg-gray-100"
+                onClick={() => setPreviewText(null)}
+                aria-label="Close preview"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[65vh] overflow-auto">
+              <AiMessageMarkdown
+                text={previewText.content}
+                variant={previewText.role === 'assistant' ? 'assistant' : 'user'}
+              />
             </div>
           </div>
         </div>

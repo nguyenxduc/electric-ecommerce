@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Camera, LogOut, X, Loader2 } from 'lucide-react'
+import { Camera, LogOut, X, Loader2, Ticket } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
@@ -21,6 +21,7 @@ import Wishlist from '../components/profile/Wishlist'
 import Security from '../components/profile/Security'
 import ProfileContent from '../components/profile/Profile'
 import Loyalty from '../components/profile/Loyalty'
+import VoucherWarehouse from '../components/profile/VoucherWarehouse'
 import {
   useValidateToken,
   useLogout,
@@ -35,6 +36,7 @@ export type ProfileTabKey =
   | 'wishlist'
   | 'security'
   | 'loyalty'
+  | 'vouchers'
   | 'logout'
 
 interface ProfileLayoutProps {
@@ -61,6 +63,7 @@ const NAV: Array<{
   { key: 'wishlist', label: 'Wish list', icon: 'wishlist' },
   { key: 'security', label: 'Security & access', icon: 'security' },
   { key: 'loyalty', label: 'Loyalty & Rewards', icon: 'loyalty' },
+  { key: 'vouchers', label: 'Voucher warehouse', icon: 'loyalty' },
   { key: 'logout', label: 'Log out', icon: 'logout' }
 ]
 
@@ -266,8 +269,28 @@ function Profile() {
                     <Star
                       className={`h-6 w-6 ${
                         item.key === tabActive
-                          ? 'text-blue-600 fill-blue-500'
-                          : 'text-gray-400'
+                          ? 'text-gray-700'
+                          : 'text-gray-500'
+                      }`}
+                    />
+                    <span className="text-sm font-light">{item.label}</span>
+                  </button>
+                )
+              }
+              if (item.key === 'vouchers') {
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setTabActive(item.key)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                      item.key === tabActive
+                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Ticket
+                      className={`h-6 w-6 ${
+                        item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
                       }`}
                     />
                     <span className="text-sm font-light">{item.label}</span>
@@ -303,6 +326,7 @@ function Profile() {
           {tabActive === 'wishlist' && <Wishlist />}
           {tabActive === 'security' && <Security />}
           {tabActive === 'loyalty' && <Loyalty />}
+          {tabActive === 'vouchers' && <VoucherWarehouse />}
           {tabActive === 'logout' && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
               <div className="max-w-md mx-auto text-center">

@@ -19,10 +19,15 @@ import { usePublicSettings } from '../hooks/useSettings'
 import { createOrder } from '../services/orderService'
 import { toast } from 'sonner'
 import {
-  createBankTransferQR,
+  createMomoPayment,
   type BankTransferQRResponse
 } from '../services/paymentService'
-import { validateCoupon } from '../services/couponService'
+import {
+  validateCoupon,
+  validateMyCoupon,
+  getMyCoupons,
+  type MyVoucher
+} from '../services/couponService'
 
 const Checkout = () => {
   const navigate = useNavigate()
@@ -39,6 +44,10 @@ const Checkout = () => {
   const [processing, setProcessing] = useState(false)
   const [qrData, setQrData] = useState<BankTransferQRResponse | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
+  const [momoOrderMeta, setMomoOrderMeta] = useState<{
+    orderNumber: string
+    orderDbId: number
+  } | null>(null)
   const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null)
   const [couponResult, setCouponResult] = useState<{
@@ -46,7 +55,26 @@ const Checkout = () => {
     finalAmount: number
   } | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [showVoucherModal, setShowVoucherModal] = useState(false)
+  const [myVouchers, setMyVouchers] = useState<MyVoucher[]>([])
+  const [voucherLoading, setVoucherLoading] = useState(false)
   const clearCartMutation = useClearCart()
+  const loyaltyPoints = userData?.user?.loyalty_points ?? 0
+  const userSegment = userData?.user?.segment ?? null
+  const tierDiscountRate =
+    userSegment === 'PLATINUM'
+      ? 0.08
+      : userSegment === 'GOLD'
+        ? 0.05
+        : userSegment === 'SILVER'
+          ? 0.02
+          : loyaltyPoints >= 5000
+            ? 0.08
+            : loyaltyPoints >= 2000
+              ? 0.05
+              : loyaltyPoints >= 500
+                ? 0.02
+                : 0
 
   const totals = useMemo(() => {
     const subtotal = cart?.total_original_price || 0
@@ -119,10 +147,15 @@ const Checkout = () => {
       console.error('Failed to clear cart:', err)
     }
 
-    return result.order
+    return result
   }
 
-  const displayTotal = couponResult?.finalAmount ?? totals.grandTotal
+  const tierDiscountAmount = Math.round(totals.grandTotal * tierDiscountRate)
+  const amountAfterTierDiscount = Math.max(
+    0,
+    totals.grandTotal - tierDiscountAmount
+  )
+  const displayTotal = couponResult?.finalAmount ?? amountAfterTierDiscount
 
   const handlePay = async () => {
     if (!items.length) {
@@ -143,10 +176,10 @@ const Checkout = () => {
     if (paymentMethod === 'cod') {
       try {
         setProcessing(true)
-        const order = await createOrderFromCart('cod')
+        const result = await createOrderFromCart('cod')
         toast.success('Order placed successfully - Pay on delivery')
         navigate(
-          `/payment-result?method=cod&order=${order.order_number}&amount=${displayTotal}`
+          `/payment-result?method=cod&order=${result.order.order_number}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
         )
       } catch (err: any) {
         if (err?.message === 'NOT_AUTHENTICATED') {
@@ -160,18 +193,34 @@ const Checkout = () => {
       return
     }
 
-    // Bank transfer - generate QR code first
+    // MoMo Wallet: create order first, then create MoMo payment and redirect to payUrl.
     try {
       setProcessing(true)
-      const data = await createBankTransferQR({
+      const orderResult = await createOrderFromCart('momo')
+
+      const momoData = await createMomoPayment({
         amount: displayTotal,
         orderInfo: `Thanh toan don hang - ${name} - ${phone}`,
-        accountName: name
+        orderId: orderResult.order.id,
+        orderNumber: orderResult.order.order_number
       })
-      setQrData(data)
+
+      setMomoOrderMeta({
+        orderNumber: orderResult.order.order_number,
+        orderDbId: orderResult.order.id
+      })
+
+      const target = momoData.payUrl || momoData.deeplink
+      if (target) {
+        window.location.href = target
+        return
+      }
+
+      // Fallback: show QR if no payUrl/deeplink is returned.
+      setQrData(momoData)
       setShowQRModal(true)
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create payment QR')
+      toast.error(err?.response?.data?.message || 'Failed to create MoMo payment')
     } finally {
       setProcessing(false)
     }
@@ -185,13 +234,24 @@ const Checkout = () => {
   const handleConfirmPayment = async () => {
     try {
       setProcessing(true)
-      const order = await createOrderFromCart('bank_transfer')
+      if (momoOrderMeta) {
+        setShowQRModal(false)
+        toast.success('MoMo request created. Waiting for confirmation...')
+        navigate(
+          `/payment-result?method=momo&order=${encodeURIComponent(
+            momoOrderMeta.orderNumber
+          )}&amount=${displayTotal}&subtotal=${totals.grandTotal}&tierDiscount=${tierDiscountAmount}&voucherDiscount=${
+            couponResult?.discount ?? 0
+          }`
+        )
+        return
+      }
+
+      const result = await createOrderFromCart('momo')
       setShowQRModal(false)
-      toast.success(
-        'Order created successfully. Please complete the bank transfer.'
-      )
+      toast.success('Order created successfully. Please complete MoMo payment.')
       navigate(
-        `/payment-result?method=bank_transfer&order=${order.order_number}&amount=${displayTotal}`
+        `/payment-result?method=momo&order=${result.order.order_number}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
       )
     } catch (err: any) {
       if (err?.message === 'NOT_AUTHENTICATED') {
@@ -211,7 +271,7 @@ const Checkout = () => {
       return
     }
     setCouponLoading(true)
-    validateCoupon(code, totals.grandTotal)
+    validateCoupon(code, amountAfterTierDiscount)
       .then(res => {
         setAppliedCoupon(code)
         setCouponResult({
@@ -228,6 +288,40 @@ const Checkout = () => {
       .finally(() => setCouponLoading(false))
   }
 
+  const openVoucherModal = async () => {
+    setShowVoucherModal(true)
+    setVoucherLoading(true)
+    try {
+      const res = await getMyCoupons()
+      setMyVouchers(res.coupons || [])
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message || 'Failed to load your vouchers'
+      )
+    } finally {
+      setVoucherLoading(false)
+    }
+  }
+
+  const handleApplyMyVoucher = async (voucher: MyVoucher) => {
+    setCouponLoading(true)
+    try {
+      const res = await validateMyCoupon(voucher.code, amountAfterTierDiscount)
+      setCouponInput(voucher.code)
+      setAppliedCoupon(voucher.code)
+      setCouponResult({
+        discount: res.discount,
+        finalAmount: res.finalAmount
+      })
+      toast.success('Voucher applied')
+      setShowVoucherModal(false)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Voucher cannot be applied')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -240,7 +334,9 @@ const Checkout = () => {
     )
   }
 
-  if (!items.length) {
+  // For MoMo: we may create an order and clear the cart before we redirect to MoMo.
+  // Avoid showing "Your cart is empty" while we're in the middle of creating MoMo payment.
+  if (!items.length && !processing && !showQRModal && !momoOrderMeta && !qrData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 text-center space-y-4">
@@ -365,10 +461,10 @@ const Checkout = () => {
                 <div>
                   <p className="font-semibold flex items-center gap-2">
                     <QrCode className="w-4 h-4 text-blue-600" />
-                    Bank Transfer (QR Code)
+                    MoMo Wallet (QR)
                   </p>
                   <p className="text-sm text-gray-500">
-                    Chuyển khoản qua mã QR ngân hàng.
+                    Thanh toan qua MoMo sandbox.
                   </p>
                 </div>
               </label>
@@ -386,7 +482,7 @@ const Checkout = () => {
                 ) : paymentMethod === 'cod' ? (
                   'Place order (COD)'
                 ) : (
-                  'Generate QR Code'
+                  'Thanh toán MoMo'
                 )}
               </button>
             </div>
@@ -422,14 +518,22 @@ const Checkout = () => {
                 value={couponInput}
                 onChange={e => setCouponInput(e.target.value)}
                 placeholder="Enter voucher code"
-                className="flex-1 border rounded px-3 py-2 text-sm"
+                className="flex-1 border rounded px-3 py-2 text-sm "
               />
               <button
                 type="button"
                 onClick={handleApplyCoupon}
+                disabled={couponLoading}
                 className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Apply
+              </button>
+              <button
+                type="button"
+                onClick={openVoucherModal}
+                className="h-9 w-full px-3 py-2 text-sm border border-blue-200 text-blue-700 rounded hover:bg-blue-50"
+              >
+                Vouchers
               </button>
             </div>
             {appliedCoupon && (
@@ -460,6 +564,14 @@ const Checkout = () => {
               <div className="flex justify-between text-green-600">
                 <span>Discount</span>
                 <span>-{totals.discount.toLocaleString('vi-VN')} ₫</span>
+              </div>
+            )}
+            {tierDiscountRate > 0 && (
+              <div className="flex justify-between text-green-700">
+                <span>
+                  Tier discount ({Math.round(tierDiscountRate * 100)}%)
+                </span>
+                <span>-{tierDiscountAmount.toLocaleString('vi-VN')} ₫</span>
               </div>
             )}
             {couponResult && couponResult.discount > 0 && (
@@ -521,10 +633,10 @@ const Checkout = () => {
                   <QrCode className="w-8 h-8 text-blue-600" />
                 </div>
                 <h2 className="text-2xl font-bold mb-2">
-                  Bank Transfer Payment
+                  MoMo Payment
                 </h2>
                 <p className="text-gray-600">
-                  Scan QR code with your banking app to complete payment
+                  Scan QR using MoMo app or open payment link
                 </p>
               </div>
 
@@ -534,7 +646,7 @@ const Checkout = () => {
                   <div className="bg-white p-4 rounded-xl border-2 border-gray-200 shadow-sm mb-4">
                     <img
                       src={qrData.qrUrl}
-                      alt="Bank Transfer QR Code"
+                      alt="MoMo QR Code"
                       className="w-full max-w-[280px] h-auto"
                     />
                   </div>
@@ -554,32 +666,33 @@ const Checkout = () => {
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <p className="text-xs text-gray-600 font-medium mb-2">
-                      Account Number
-                    </p>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-base font-semibold font-mono text-gray-900 break-all">
-                        {qrData.accountNo}
+                  {(qrData.payUrl || qrData.deeplink) && (
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <p className="text-xs text-gray-600 font-medium mb-2">
+                        Payment Link
                       </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-900 break-words flex-1">
+                          {qrData.payUrl || qrData.deeplink}
+                        </p>
+                        <button
+                          onClick={() =>
+                            handleCopyAccount(qrData.payUrl || qrData.deeplink || '')
+                          }
+                          className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition"
+                          title="Copy payment link"
+                        >
+                          <Copy className="w-4 h-4 text-gray-600" />
+                        </button>
+                      </div>
                       <button
-                        onClick={() => handleCopyAccount(qrData.accountNo)}
-                        className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition"
-                        title="Copy account number"
+                        onClick={() => window.open(qrData.payUrl || qrData.deeplink, '_blank')}
+                        className="mt-3 w-full px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                       >
-                        <Copy className="w-4 h-4 text-gray-600" />
+                        Open MoMo Payment
                       </button>
                     </div>
-                  </div>
-
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <p className="text-xs text-gray-600 font-medium mb-2">
-                      Account Name
-                    </p>
-                    <p className="text-base font-semibold text-gray-900">
-                      {qrData.accountName}
-                    </p>
-                  </div>
+                  )}
 
                   <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <p className="text-xs text-gray-600 font-medium mb-2">
@@ -626,12 +739,11 @@ const Checkout = () => {
                   Payment Instructions
                 </p>
                 <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-                  <li>Open your banking app on your phone</li>
-                  <li>Tap on "Scan QR Code" or "Transfer" feature</li>
+                  <li>Open MoMo app on your phone</li>
+                  <li>Tap scan QR feature in MoMo</li>
                   <li>Scan the QR code displayed above</li>
-                  <li>Verify the amount and account information</li>
-                  <li>Complete the transfer</li>
-                  <li>Click "I've Completed Transfer" button below</li>
+                  <li>Verify amount and confirm payment</li>
+                  <li>Click "I've Completed Payment" button below</li>
                 </ol>
               </div>
 
@@ -655,10 +767,107 @@ const Checkout = () => {
                       Processing...
                     </>
                   ) : (
-                    "I've Completed Transfer"
+                    "I've Completed Payment"
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Voucher list modal */}
+      {showVoucherModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full relative">
+            <button
+              onClick={() => setShowVoucherModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full p-1 hover:bg-gray-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                Choose voucher
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Order value after tier discount:{' '}
+                {amountAfterTierDiscount.toLocaleString('vi-VN')} ₫
+              </p>
+
+              {voucherLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div
+                      key={i}
+                      className="h-16 bg-gray-100 rounded-xl animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : myVouchers.length === 0 ? (
+                <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl px-4 py-5 bg-gray-50/60">
+                  No voucher in your warehouse.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {myVouchers.map(v => {
+                    const minOrder = Number(v.min_order || 0)
+                    const canUse =
+                      (v.is_usable ?? true) &&
+                      (!minOrder || amountAfterTierDiscount >= minOrder)
+                    return (
+                      <div
+                        key={v.id}
+                        className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
+                          canUse
+                            ? 'border-blue-100 bg-blue-50/30'
+                            : 'border-gray-200 bg-gray-50 opacity-70'
+                        }`}
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-blue-900">
+                            {v.code}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {v.discount_type === 'percent'
+                              ? `Discount ${v.discount_value}%`
+                              : `Discount ${Number(v.discount_value).toLocaleString('vi-VN')} ₫`}
+                            {minOrder
+                              ? ` • Min ${minOrder.toLocaleString('vi-VN')} ₫`
+                              : ''}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Exp:{' '}
+                            {v.expires_at
+                              ? new Date(v.expires_at).toLocaleDateString(
+                                  'en-GB'
+                                )
+                              : 'No expiry'}
+                          </p>
+                          {v.is_exhausted && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Used up
+                            </p>
+                          )}
+                          {v.is_expired && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Expired
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!canUse || couponLoading}
+                          onClick={() => handleApplyMyVoucher(v)}
+                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40"
+                        >
+                          Choose
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

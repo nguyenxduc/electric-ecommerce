@@ -26,6 +26,7 @@ import AdminCouponsList from './admin/pages/coupons/List'
 import AdminCouponEdit from './admin/pages/coupons/Edit'
 import AdminCouponCreate from './admin/pages/coupons/Create'
 import AdminCustomersList from './admin/pages/customers/List'
+import AdminCustomerTiersPage from './admin/pages/customers/Tiers'
 import AdminFiltersList from './admin/pages/filters/List'
 import AdminFilterCreate from './admin/pages/filters/Create'
 import AdminFilterEdit from './admin/pages/filters/Edit'
@@ -138,7 +139,10 @@ function App() {
               <Route path=":id" element={<AdminCouponEdit />} />
               <Route path="new" element={<AdminCouponCreate />} />
             </Route>
-            <Route path="customers" element={<AdminCustomersList />} />
+            <Route path="customers">
+              <Route index element={<AdminCustomersList />} />
+              <Route path="tiers" element={<AdminCustomerTiersPage />} />
+            </Route>
             <Route path="categories">
               <Route index element={<AdminCategoriesList />} />
               <Route path="new" element={<AdminCategoryCreate />} />

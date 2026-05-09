@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import adminCustomerService from '../services/customerService'
-import { CustomerListResponse, CustomerResponse, UpdateCustomerRequest } from '../types'
+import {
+  CustomerListResponse,
+  CustomerResponse,
+  UpdateCustomerRequest,
+  UpdateCustomerTierRequest,
+  UpdateCustomerPointsRequest
+} from '../types'
 
 const customerKeys = {
   all: ['admin', 'customers'] as const,
@@ -38,6 +44,34 @@ export function useDeleteAdminCustomer() {
   const qc = useQueryClient()
   return useMutation<{ data: { message: string } }, Error, number>({
     mutationFn: id => adminCustomerService.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customerKeys.all })
+    }
+  })
+}
+
+export function useUpdateAdminCustomerTier() {
+  const qc = useQueryClient()
+  return useMutation<
+    { data: { message: string } },
+    Error,
+    { id: number; payload: UpdateCustomerTierRequest }
+  >({
+    mutationFn: ({ id, payload }) => adminCustomerService.updateTier(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: customerKeys.all })
+    }
+  })
+}
+
+export function useUpdateAdminCustomerPoints() {
+  const qc = useQueryClient()
+  return useMutation<
+    { data: { message: string } },
+    Error,
+    { id: number; payload: UpdateCustomerPointsRequest }
+  >({
+    mutationFn: ({ id, payload }) => adminCustomerService.updatePoints(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: customerKeys.all })
     }

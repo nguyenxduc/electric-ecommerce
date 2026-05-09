@@ -2,6 +2,20 @@ import { prisma } from "../lib/db.js";
 import { earnPointsForOrder } from "./loyalty.controller.js";
 import { writeAuditLog } from "./audit.controller.js";
 
+const TIER_AUTO_DISCOUNT_RATE = {
+  BRONZE: 0,
+  SILVER: 0.02,
+  GOLD: 0.05,
+  PLATINUM: 0.08,
+};
+
+const getTierFromPoints = (points = 0) => {
+  if (points >= 5000) return "PLATINUM";
+  if (points >= 2000) return "GOLD";
+  if (points >= 500) return "SILVER";
+  return "BRONZE";
+};
+
 export const createOrder = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -79,12 +93,31 @@ export const createOrder = async (req, res) => {
       orderItemColors.push(colorVal);
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: BigInt(userId) },
+      select: { segment: true, loyalty_points: true },
+    });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userTier = user.segment || getTierFromPoints(user.loyalty_points || 0);
+    const tierDiscountRate = TIER_AUTO_DISCOUNT_RATE[userTier] || 0;
+    const tierDiscount = Number(totalAmount) * tierDiscountRate;
+    const amountAfterTierDiscount = Math.max(0, Number(totalAmount) - tierDiscount);
+
     // apply coupon if provided (optional)
     let couponId = null;
     let couponDiscount = 0;
+    let appliedCoupon = null;
     if (coupon_code) {
       const coupon = await prisma.coupon.findFirst({
         where: { code: coupon_code, deleted_at: null },
+        include: {
+          users: {
+            select: { id: true },
+          },
+        },
       });
 
       // Validate coupon
@@ -102,24 +135,39 @@ export const createOrder = async (req, res) => {
       ) {
         return res.status(400).json({ message: "Coupon usage limit reached" });
       }
-      if (coupon.min_order && Number(totalAmount) < Number(coupon.min_order)) {
+      if (
+        coupon.min_order &&
+        Number(amountAfterTierDiscount) < Number(coupon.min_order)
+      ) {
         return res
           .status(400)
           .json({ message: "Order does not meet minimum amount" });
+      }
+      // Personal voucher: must belong to current user
+      if (
+        Array.isArray(coupon.users) &&
+        coupon.users.length > 0 &&
+        !coupon.users.some((u) => u.id.toString() === String(userId))
+      ) {
+        return res.status(403).json({ message: "Voucher does not belong to this user" });
       }
 
       // Compute discount
       if (coupon.discount_type === "percent") {
         couponDiscount =
-          (Number(totalAmount) * Number(coupon.discount_value)) / 100;
+          (Number(amountAfterTierDiscount) * Number(coupon.discount_value)) / 100;
       } else {
         couponDiscount = Number(coupon.discount_value);
       }
 
       couponId = coupon.id;
+      appliedCoupon = coupon;
     }
 
-    const finalAmount = Math.max(0, Number(totalAmount) - couponDiscount);
+    const finalAmount = Math.max(
+      0,
+      Number(amountAfterTierDiscount) - couponDiscount
+    );
 
     // Parse shipping_address if it's a string
     let parsedShippingAddress = shipping_address;
@@ -174,7 +222,7 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      // Cộng điểm tạm thời khi tạo đơn (có thể sửa thành chỉ cộng khi delivered nếu muốn)
+      // Cộng điểm khi tạo đơn (có thể chuyển sang lúc delivered nếu cần)
       await earnPointsForOrder(
         tx,
         BigInt(userId),
@@ -182,13 +230,13 @@ export const createOrder = async (req, res) => {
         createdOrder.total_amount
       );
 
-      // Cộng điểm tạm thời khi tạo đơn
-      await earnPointsForOrder(
-        tx,
-        BigInt(userId),
-        createdOrder.id,
-        createdOrder.total_amount
-      );
+      // Mark coupon usage after order is created successfully.
+      if (appliedCoupon?.id) {
+        await tx.coupon.update({
+          where: { id: appliedCoupon.id },
+          data: { used_count: { increment: 1 } },
+        });
+      }
 
       return createdOrder;
     });
@@ -201,12 +249,23 @@ export const createOrder = async (req, res) => {
       resourceId: created.id,
       ip: req.ip,
       userAgent: req.headers["user-agent"],
-      metadata: { totalAmount, finalAmount },
+      metadata: {
+        totalAmount,
+        userTier,
+        tierDiscountRate,
+        tierDiscount,
+        couponDiscount,
+        finalAmount,
+      },
     });
 
     res.status(201).json({
       message: "Order created successfully",
       order: created,
+      subtotal: Number(totalAmount),
+      amountAfterTierDiscount,
+      tierDiscount,
+      tierDiscountRate,
       discount: couponDiscount,
       finalAmount,
     });

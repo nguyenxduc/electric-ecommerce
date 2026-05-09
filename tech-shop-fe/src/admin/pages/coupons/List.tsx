@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Edit3, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -10,17 +10,15 @@ import {
 } from '../../hooks/useCoupons'
 import Modal from '../../components/common/Modal'
 import SkeletonTable from '../../components/common/SkeletonTable'
+import AdminPagination from '../../components/common/AdminPagination'
 import { DiscountType, UpdateCouponRequest } from '../../types'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
+import { useListQueryParams } from '../../hooks/useListQueryParams'
 
 export default function AdminCouponsList() {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const [limit] = useState(10)
-
-  // Get parameters from URL
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const query = searchParams.get('q') || ''
+  const { page, q: query, setPage, setQ: setQuery } = useListQueryParams()
 
   const { data, isLoading } = useAdminCoupons({
     page,
@@ -37,25 +35,6 @@ export default function AdminCouponsList() {
     () => Math.max(1, data?.data.pagination.total_pages || 1),
     [data]
   )
-
-  // Update URL when page changes
-  const setPage = (newPage: number) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', newPage.toString())
-    setSearchParams(params)
-  }
-
-  // Update URL when query changes
-  const setQuery = (newQuery: string) => {
-    const params = new URLSearchParams(searchParams)
-    if (newQuery) {
-      params.set('q', newQuery)
-    } else {
-      params.delete('q')
-    }
-    params.set('page', '1') // Reset to first page when searching
-    setSearchParams(params)
-  }
 
   const onDelete = (id: number) => setConfirmId(id)
   const [confirmId, setConfirmId] = useState<number | null>(null)
@@ -156,37 +135,12 @@ export default function AdminCouponsList() {
               </tbody>
             </table>
 
-            <div className="flex items-center justify-between p-3 border-t text-sm">
-              <button
-                className="px-3 py-1.5 border rounded"
-                disabled={page <= 1}
-                onClick={() => setPage(Math.max(1, page - 1))}
-              >
-                Previous
-              </button>
-              <div className="space-x-1">
-                {Array.from({ length: pages }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    className={`px-3 py-1.5 rounded border ${
-                      n === (data?.data.pagination.current_page || 1)
-                        ? 'bg-green-600 text-white border-green-600'
-                        : ''
-                    }`}
-                    onClick={() => setPage(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="px-3 py-1.5 border rounded"
-                disabled={page >= pages}
-                onClick={() => setPage(Math.min(pages, page + 1))}
-              >
-                Next
-              </button>
-            </div>
+            <AdminPagination
+              page={data?.data.pagination.current_page || page}
+              totalPages={pages}
+              onPageChange={setPage}
+              totalItems={data?.data.pagination.total_count}
+            />
           </>
         )}
       </div>

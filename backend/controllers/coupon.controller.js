@@ -1,5 +1,12 @@
 import { prisma } from "../lib/db.js";
 
+const computeCouponDiscount = (coupon, amount) => {
+  if (coupon.discount_type === "percent") {
+    return (Number(amount) * Number(coupon.discount_value)) / 100;
+  }
+  return Number(coupon.discount_value);
+};
+
 export const createCoupon = async (req, res) => {
   try {
     const {
@@ -69,12 +76,7 @@ export const validateCoupon = async (req, res) => {
         .json({ message: "Order does not meet minimum amount" });
     }
 
-    let discount = 0;
-    if (coupon.discount_type === "percent") {
-      discount = (Number(amount) * Number(coupon.discount_value)) / 100;
-    } else {
-      discount = Number(coupon.discount_value);
-    }
+    const discount = computeCouponDiscount(coupon, amount);
 
     res.json({
       valid: true,
@@ -86,6 +88,99 @@ export const validateCoupon = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to validate coupon", error: error.message });
+  }
+};
+
+export const getMyCoupons = async (req, res) => {
+  try {
+    const userId = BigInt(req.user.id);
+    const now = new Date();
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        coupons: {
+          where: {
+            deleted_at: null,
+          },
+          orderBy: { created_at: "desc" },
+        },
+      },
+    });
+
+    const coupons = (user?.coupons || []).map((coupon) => {
+      const isExpired = !!(coupon.expires_at && now > coupon.expires_at);
+      const isExhausted =
+        coupon.usage_limit != null &&
+        coupon.used_count != null &&
+        coupon.used_count >= coupon.usage_limit;
+      return {
+        ...coupon,
+        is_expired: isExpired,
+        is_exhausted: isExhausted,
+        is_usable: !isExpired && !isExhausted,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        coupons,
+      },
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to get my vouchers", error: error.message });
+  }
+};
+
+export const validateMyCoupon = async (req, res) => {
+  try {
+    const userId = BigInt(req.user.id);
+    const { code, amount } = req.body;
+
+    const coupon = await prisma.coupon.findFirst({
+      where: {
+        code,
+        deleted_at: null,
+        users: { some: { id: userId } },
+      },
+    });
+
+    if (!coupon) {
+      return res.status(404).json({ message: "Voucher not found in your warehouse" });
+    }
+
+    const now = new Date();
+    if (coupon.expires_at && now > coupon.expires_at) {
+      return res.status(400).json({ message: "Coupon has expired" });
+    }
+    if (
+      coupon.usage_limit !== null &&
+      coupon.used_count !== null &&
+      coupon.used_count >= coupon.usage_limit
+    ) {
+      return res.status(400).json({ message: "Coupon usage limit reached" });
+    }
+    if (coupon.min_order && Number(amount) < Number(coupon.min_order)) {
+      return res
+        .status(400)
+        .json({ message: "Order does not meet minimum amount" });
+    }
+
+    const discount = computeCouponDiscount(coupon, amount);
+
+    return res.json({
+      valid: true,
+      coupon,
+      discount,
+      finalAmount: Number(amount) - discount,
+    });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Failed to validate my voucher", error: error.message });
   }
 };
 

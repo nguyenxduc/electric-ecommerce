@@ -2,6 +2,8 @@ import express from "express";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 import {
   validateCoupon,
+  validateMyCoupon,
+  getMyCoupons,
   createCoupon,
   getAllCoupons,
   getCouponById,
@@ -13,6 +15,8 @@ const router = express.Router();
 
 // Public routes
 router.post("/validate", validateCoupon);
+router.post("/validate-my", protectRoute, validateMyCoupon);
+router.get("/my", protectRoute, getMyCoupons);
 
 // Admin routes
 router.get("/", protectRoute, adminRoute, getAllCoupons);

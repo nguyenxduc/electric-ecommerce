@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner'
 import { useAdminNotifications, useCreateNotification } from '../../hooks/useNotifications'
 import SkeletonTable from '../../components/common/SkeletonTable'
+import AdminPagination from '../../components/common/AdminPagination'
 import type { Notification } from '../../services/notificationService'
 
 // ─── Type config ──────────────────────────────────────────────────────────────
@@ -325,45 +326,12 @@ export default function AdminNotificationsList() {
               </tbody>
             </table>
 
-            {/* Pagination */}
-            <div className="flex items-center justify-between p-3 border-t text-sm">
-              <span className="text-gray-400 text-xs">
-                Page {pagination?.page ?? 1} of {pages} — {pagination?.total.toLocaleString()} total
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  className="px-3 py-1.5 border rounded disabled:opacity-40"
-                  disabled={page <= 1}
-                  onClick={() => setPage(page - 1)}
-                >
-                  Previous
-                </button>
-                {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
-                  const n = page <= 4 ? i + 1
-                    : page >= pages - 3 ? pages - 6 + i
-                    : page - 3 + i
-                  if (n < 1 || n > pages) return null
-                  return (
-                    <button
-                      key={n}
-                      onClick={() => setPage(n)}
-                      className={`px-3 py-1.5 rounded border ${
-                        n === page ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  )
-                })}
-                <button
-                  className="px-3 py-1.5 border rounded disabled:opacity-40"
-                  disabled={page >= pages}
-                  onClick={() => setPage(page + 1)}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <AdminPagination
+              page={pagination?.page ?? page}
+              totalPages={pages}
+              onPageChange={setPage}
+              totalItems={pagination?.total}
+            />
           </>
         )}
       </div>

@@ -28,3 +28,11 @@ export type UpdateCustomerRequest = Partial<{
   phone: string
   address: string
 }>
+
+export type UpdateCustomerTierRequest = {
+  segment: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM'
+}
+
+export type UpdateCustomerPointsRequest = {
+  loyalty_points: number
+}

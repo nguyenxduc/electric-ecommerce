@@ -17,16 +17,24 @@ export const createVnpayPayment = async (payload: CreatePaymentPayload) => {
 type CreateBankTransferQRPayload = {
   amount: number
   orderInfo?: string
-  accountName?: string
+}
+
+type CreateMomoPaymentPayload = CreateBankTransferQRPayload & {
+  // Link MoMo payment to our internal order for IPN updates.
+  orderId?: number
+  orderNumber?: string
 }
 
 export type BankTransferQRResponse = {
-  qrUrl: string
+  qrUrl?: string
+  payUrl?: string
+  deeplink?: string
   orderId: string
+  requestId?: string
   amount: number
-  accountNo: string
-  accountName: string
-  bankId: string
+  partnerCode?: string
+  resultCode?: number
+  message?: string
   orderInfo: string
 }
 
@@ -35,6 +43,11 @@ export const createBankTransferQR = async (payload: CreateBankTransferQRPayload)
     '/payments/bank-transfer-qr',
     payload
   )
+  return data
+}
+
+export const createMomoPayment = async (payload: CreateMomoPaymentPayload) => {
+  const { data } = await axiosClient.post<BankTransferQRResponse>('/payments/momo', payload)
   return data
 }
 

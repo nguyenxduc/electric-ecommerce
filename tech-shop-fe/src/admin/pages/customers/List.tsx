@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Edit3, Trash2, Search, Star } from 'lucide-react'
 import {
   useAdminCustomers,
@@ -8,6 +8,8 @@ import {
 } from '../../hooks'
 import Modal from '../../components/common/Modal'
 import SkeletonTable from '../../components/common/SkeletonTable'
+import AdminPagination from '../../components/common/AdminPagination'
+import { useListQueryParams } from '../../hooks/useListQueryParams'
 import type { CustomerListResponse } from '../../types'
 
 const TIER_STYLE: Record<string, { bg: string; text: string; label: string; icon: string }> = {
@@ -25,12 +27,8 @@ const getTierFromPoints = (points: number) => {
 }
 
 export default function AdminCustomersList() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const [limit] = useState(10)
-
-  // Get parameters from URL
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const q = searchParams.get('q') || ''
+  const { page, q, setPage, setQ } = useListQueryParams()
 
   const { data, isLoading, refetch } = useAdminCustomers({
     page,
@@ -47,25 +45,6 @@ export default function AdminCustomersList() {
     [data]
   )
 
-  // Update URL when page changes
-  const setPage = (newPage: number) => {
-    const params = new URLSearchParams(searchParams)
-    params.set('page', newPage.toString())
-    setSearchParams(params)
-  }
-
-  // Update URL when query changes
-  const setQ = (newQuery: string) => {
-    const params = new URLSearchParams(searchParams)
-    if (newQuery) {
-      params.set('q', newQuery)
-    } else {
-      params.delete('q')
-    }
-    params.set('page', '1') // Reset to first page when searching
-    setSearchParams(params)
-  }
-
   const onDelete = (id: number) => {
     if (confirm('Delete this customer?')) del.mutate(id)
   }
@@ -75,6 +54,12 @@ export default function AdminCustomersList() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Customers</h1>
         <div className="flex items-center gap-2">
+          <Link
+            to="/admin/customers/tiers"
+            className="px-3 py-2 border border-blue-200 text-blue-700 rounded text-sm hover:bg-blue-50"
+          >
+            Manage points
+          </Link>
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
@@ -159,37 +144,12 @@ export default function AdminCustomersList() {
               </tbody>
             </table>
 
-            <div className="flex items-center justify-between p-3 border-t text-sm">
-              <button
-                className="px-3 py-1.5 border rounded"
-                disabled={page <= 1}
-                onClick={() => setPage(Math.max(1, page - 1))}
-              >
-                Previous
-              </button>
-              <div className="space-x-1">
-                {Array.from({ length: pages }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    className={`px-3 py-1.5 rounded border ${
-                      n === (data?.data.pagination.current_page || 1)
-                        ? 'bg-green-600 text-white border-green-600'
-                        : ''
-                    }`}
-                    onClick={() => setPage(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="px-3 py-1.5 border rounded"
-                disabled={page >= pages}
-                onClick={() => setPage(Math.min(pages, page + 1))}
-              >
-                Next
-              </button>
-            </div>
+            <AdminPagination
+              page={data?.data.pagination.current_page || page}
+              totalPages={pages}
+              onPageChange={setPage}
+              totalItems={data?.data.pagination.total_count}
+            />
           </>
         )}
       </div>

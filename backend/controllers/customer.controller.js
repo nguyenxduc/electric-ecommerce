@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { grantUpgradeVouchers, getTierByPoints } from "./loyalty.controller.js";
 
 export const listCustomers = async (req, res) => {
   try {
@@ -27,6 +28,8 @@ export const listCustomers = async (req, res) => {
           role: true,
           phone: true,
           address: true,
+          loyalty_points: true,
+          segment: true,
           created_at: true,
         },
         skip,
@@ -62,6 +65,8 @@ export const getCustomer = async (req, res) => {
         role: true,
         phone: true,
         address: true,
+        loyalty_points: true,
+        segment: true,
         created_at: true,
       },
     });
@@ -93,6 +98,8 @@ export const updateCustomer = async (req, res) => {
         role: true,
         phone: true,
         address: true,
+        loyalty_points: true,
+        segment: true,
         created_at: true,
       },
     });
@@ -101,6 +108,117 @@ export const updateCustomer = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to update customer", error: error.message });
+  }
+};
+
+const TIER_MIN_POINTS = {
+  BRONZE: 0,
+  SILVER: 500,
+  GOLD: 2000,
+  PLATINUM: 5000,
+};
+
+export const updateCustomerTier = async (req, res) => {
+  try {
+    const id = BigInt(req.params.id);
+    const nextTier = String(req.body?.segment || "").toUpperCase();
+    if (!["BRONZE", "SILVER", "GOLD", "PLATINUM"].includes(nextTier)) {
+      return res.status(400).json({ message: "Invalid tier segment" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, loyalty_points: true },
+    });
+    if (!user) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const minPoints = TIER_MIN_POINTS[nextTier];
+    const currentPoints = user.loyalty_points || 0;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const fromTier = user.segment || getTierByPoints(currentPoints).key;
+      const nextPoints = currentPoints < minPoints ? minPoints : currentPoints;
+
+      await grantUpgradeVouchers(tx, id, fromTier, nextTier);
+
+      return tx.user.update({
+        where: { id },
+        data: {
+          segment: nextTier,
+          // Keep consistency: when set higher tier, points are lifted to tier floor.
+          loyalty_points: nextPoints,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          address: true,
+          loyalty_points: true,
+          segment: true,
+          created_at: true,
+        },
+      });
+    });
+
+    return res.json({ message: "Customer tier updated successfully", user: updated });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Failed to update customer tier", error: error.message });
+  }
+};
+
+export const updateCustomerPoints = async (req, res) => {
+  try {
+    const id = BigInt(req.params.id);
+    const rawPoints = req.body?.loyalty_points;
+    const nextPoints = Number.parseInt(rawPoints, 10);
+    if (!Number.isInteger(nextPoints) || nextPoints < 0) {
+      return res.status(400).json({ message: "Invalid loyalty points" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, loyalty_points: true, segment: true },
+    });
+    if (!user) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const fromTier = user.segment || getTierByPoints(user.loyalty_points || 0).key;
+    const toTier = getTierByPoints(nextPoints).key;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await grantUpgradeVouchers(tx, id, fromTier, toTier);
+      return tx.user.update({
+        where: { id },
+        data: {
+          loyalty_points: nextPoints,
+          segment: toTier,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          phone: true,
+          address: true,
+          loyalty_points: true,
+          segment: true,
+          created_at: true,
+        },
+      });
+    });
+
+    return res.json({ message: "Customer points updated successfully", user: updated });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ message: "Failed to update customer points", error: error.message });
   }
 };
 

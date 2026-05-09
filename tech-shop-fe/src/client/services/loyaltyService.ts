@@ -17,6 +17,29 @@ export type LoyaltySummary = {
     loyalty_points: number
     segment: string | null
   }
+  tier?: {
+    key: string
+    label: string
+    min: number
+    max: number
+    multiplier: number
+    benefits: string[]
+  }
+  point_policy?: {
+    unit_amount: number
+    points_per_unit: number
+    min_redeem_points: number
+  }
+  reward_vouchers?: Array<{
+    id: string | number
+    code: string
+    description?: string | null
+    discount_type: string
+    discount_value: number
+    min_order?: number | null
+    expires_at?: string | null
+    created_at: string
+  }>
   transactions: LoyaltyTransaction[]
 }
 

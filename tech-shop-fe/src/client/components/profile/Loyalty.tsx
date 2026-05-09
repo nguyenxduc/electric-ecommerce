@@ -21,10 +21,40 @@ const TIER_BADGE: Record<
   string,
   { className: string }
 > = {
-  BRONZE: { className: 'bg-amber-50 text-amber-800 ring-amber-200/60' },
+  BRONZE: { className: 'bg-orange-100 text-orange-900 ring-orange-300/70' },
   SILVER: { className: 'bg-slate-100 text-slate-700 ring-slate-200/80' },
-  GOLD: { className: 'bg-yellow-50 text-yellow-800 ring-yellow-200/70' },
+  GOLD: { className: 'bg-yellow-100 text-yellow-900 ring-yellow-300/80' },
   PLATINUM: { className: 'bg-violet-50 text-violet-800 ring-violet-200/70' }
+}
+
+const TIER_CARD_STYLE: Record<
+  string,
+  { iconWrap: string; title: string; sub: string; activeBg: string }
+> = {
+  BRONZE: {
+    iconWrap: 'bg-orange-100 text-orange-800 ring-orange-300/70',
+    title: 'text-orange-800',
+    sub: 'text-orange-700/80',
+    activeBg: 'from-orange-50 to-white'
+  },
+  SILVER: {
+    iconWrap: 'bg-slate-100 text-slate-700 ring-slate-300/70',
+    title: 'text-slate-700',
+    sub: 'text-slate-600/80',
+    activeBg: 'from-slate-50 to-white'
+  },
+  GOLD: {
+    iconWrap: 'bg-yellow-100 text-yellow-800 ring-yellow-300/80',
+    title: 'text-yellow-800',
+    sub: 'text-yellow-700/80',
+    activeBg: 'from-yellow-50 to-white'
+  },
+  PLATINUM: {
+    iconWrap: 'bg-violet-100 text-violet-700 ring-violet-300/80',
+    title: 'text-violet-700',
+    sub: 'text-violet-700/80',
+    activeBg: 'from-violet-50 to-white'
+  }
 }
 
 export default function Loyalty() {
@@ -57,10 +87,14 @@ export default function Loyalty() {
   }
 
   const { user, transactions } = data
+  const rewardVouchers = data.reward_vouchers ?? []
   const points = user.loyalty_points ?? 0
+  const minRedeemPoints = data.point_policy?.min_redeem_points ?? 50
   const tierInfo =
-    user.segment && TIERS.some(t => t.key === user.segment)
-      ? TIERS.find(t => t.key === user.segment)!
+    data.tier?.key && TIERS.some(t => t.key === data.tier?.key)
+      ? TIERS.find(t => t.key === data.tier?.key)!
+      : user.segment && TIERS.some(t => t.key === user.segment)
+        ? TIERS.find(t => t.key === user.segment)!
       : getTierInfo(points)
   const nextTier = getNextTier(points)
   const progress = nextTier
@@ -79,6 +113,10 @@ export default function Loyalty() {
     const pts = parseInt(redeemAmount)
     if (!pts || pts <= 0) {
       toast.error('Please enter a valid number of points')
+      return
+    }
+    if (pts < minRedeemPoints) {
+      toast.error(`Minimum redeem is ${minRedeemPoints} points`)
       return
     }
     if (pts > points) {
@@ -123,7 +161,7 @@ export default function Loyalty() {
             </p>
             <div className="flex items-center gap-2 justify-end">
               <Star
-                className="w-6 h-6 text-blue-500 fill-blue-500"
+                className="w-6 h-6 text-black"
                 aria-hidden
               />
               <span className="text-3xl font-bold tracking-tight text-gray-900">
@@ -178,31 +216,76 @@ export default function Loyalty() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {TIERS.map(t => {
             const active = tierInfo.key === t.key
-            const tb = TIER_BADGE[t.key] ?? TIER_BADGE['BRONZE']
+            const tierStyle = TIER_CARD_STYLE[t.key] ?? TIER_CARD_STYLE['BRONZE']
             return (
               <div
                 key={t.key}
                 className={`rounded-xl p-3 border text-center transition-shadow ${
                   active
-                    ? 'border-blue-400 bg-blue-50 shadow-sm ring-2 ring-blue-100'
+                    ? `border-blue-400 bg-gradient-to-b ${tierStyle.activeBg} shadow-sm ring-2 ring-blue-100`
                     : 'border-gray-100 bg-gray-50/80 hover:border-gray-200'
                 }`}
               >
                 <div
-                  className={`inline-flex rounded-full p-1.5 mx-auto mb-2 ring-1 ${tb.className}`}
+                  className={`inline-flex rounded-full p-1.5 mx-auto mb-2 ring-1 ${tierStyle.iconWrap}`}
                 >
                   <Award className="w-4 h-4" aria-hidden />
                 </div>
-                <div className={`text-sm font-bold ${t.color}`}>{t.label}</div>
+                <div className={`text-sm font-bold ${tierStyle.title}`}>{t.label}</div>
                 <div className="text-xs text-gray-500 mt-1">
                   {t.max === Infinity
                     ? `${t.min.toLocaleString()}+ pts`
                     : `${t.min.toLocaleString()}–${t.max.toLocaleString()} pts`}
                 </div>
+                <div className={`text-[11px] mt-1.5 ${tierStyle.sub}`}>
+                  Earn x{t.multiplier}
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-4">
+                  {t.benefits[0]}
+                </p>
+                <p className="text-[11px] text-blue-700 mt-1 leading-4 font-medium">
+                  {t.key === 'SILVER' && 'Upgrade gift: 5% voucher'}
+                  {t.key === 'GOLD' && 'Upgrade gift: 10% voucher'}
+                  {t.key === 'PLATINUM' && 'Upgrade gift: 15% voucher'}
+                  {t.key === 'BRONZE' && 'Upgrade gift starts from Silver'}
+                </p>
               </div>
             )
           })}
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h3 className="font-semibold text-gray-900 text-sm mb-4">
+          Tier upgrade vouchers
+        </h3>
+        {rewardVouchers.length === 0 ? (
+          <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl px-4 py-5 bg-gray-50/60">
+            You will receive voucher rewards when reaching Silver, Gold, or Platinum.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {rewardVouchers.map(v => (
+              <div
+                key={v.id}
+                className="rounded-xl border border-blue-100 bg-blue-50/40 px-4 py-3 flex items-center justify-between gap-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">{v.code}</p>
+                  <p className="text-xs text-gray-600">
+                    {v.discount_type === 'percent'
+                      ? `Discount ${v.discount_value}%`
+                      : `Discount ${v.discount_value.toLocaleString()} VND`}
+                    {v.min_order ? ` • Min order ${Number(v.min_order).toLocaleString()} VND` : ''}
+                  </p>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Exp: {v.expires_at ? new Date(v.expires_at).toLocaleDateString('en-GB') : 'N/A'}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Redeem */}
@@ -233,12 +316,12 @@ export default function Loyalty() {
               </label>
               <input
                 type="number"
-                min={1}
+                min={minRedeemPoints}
                 max={points}
                 value={redeemAmount}
                 onChange={e => setRedeemAmount(e.target.value)}
                 className="w-full border-2 border-blue-100 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-0"
-                placeholder={`Max: ${points.toLocaleString()} pts`}
+                placeholder={`Min: ${minRedeemPoints} • Max: ${points.toLocaleString()} pts`}
               />
             </div>
             <div>
@@ -281,7 +364,7 @@ export default function Loyalty() {
             <span className="font-semibold text-gray-900">
               {points.toLocaleString()} pts
             </span>{' '}
-            available to redeem.
+            available to redeem. Minimum redeem: {minRedeemPoints} pts.
           </p>
         )}
       </div>
