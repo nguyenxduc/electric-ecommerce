@@ -1,0 +1,53 @@
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ecommerce
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ngx-ecommerce-backend
+    working_dir: /app
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/ecommerce?schema=public'
+      ACCESS_TOKEN_SECRET: change-me
+      FRONTEND_URL: 'http://localhost:5173'
+      AI_HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      HTTP_PROXY: ''
+    depends_on:
+      - db
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: ngx-ecommerce-frontend
+    working_dir: /app
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_BASE_URL: 'http://localhost:3000/api'
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  db_data:

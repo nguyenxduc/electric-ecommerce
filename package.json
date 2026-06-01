@@ -4,9 +4,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --env-file=.env --experimental-strip-types backend/server.js",
-    "start": "node ./src/server.js",
-    "seed": "node --watch --env-file=.env --experimental-strip-types backend/seed/index.js"
+    "dev": "node scripts/dev.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "npm --prefix backend run seed"
   },
   "keywords": [],
   "author": "",

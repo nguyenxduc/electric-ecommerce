@@ -1,11 +1,14 @@
 import "dotenv/config";
 import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
 
 import { Prisma } from "@prisma/client";
-import { prisma } from "../lib/db.js";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { prisma } from "../lib/db.js";
+
+dns.setDefaultResultOrder("ipv4first");
 
 const EMBED_MODEL =
   process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
@@ -22,16 +25,18 @@ if (AI_PROXY_URL) {
   setGlobalDispatcher(new ProxyAgent(AI_PROXY_URL));
 }
 
-const buildContent = (p) => {
-  const specs = Array.isArray(p.specs_detail) ? p.specs_detail : [];
+const buildContent = (product) => {
+  const specs = Array.isArray(product.specs_detail)
+    ? product.specs_detail
+    : [];
   const specsText = specs
-    .map((s) => `${s.label ?? ""}: ${JSON.stringify(s.value ?? "")}`)
+    .map((spec) => `${spec.label ?? ""}: ${JSON.stringify(spec.value ?? "")}`)
     .join(" | ");
-  const price = p.price ? p.price.toString() : "";
-  return `Tên: ${p.name} | Giá: ${price} | Specs: ${specsText}`;
+  const price = product.price ? product.price.toString() : "";
+  return `Name: ${product.name} | Price: ${price} | Specs: ${specsText}`;
 };
 
-async function main() {
+export async function embedProducts({ force = false } = {}) {
   if (!EMBED_API_KEY) {
     throw new Error("Missing GEMINI_API_KEY (or GOOGLE_API_KEY)");
   }
@@ -47,24 +52,40 @@ async function main() {
       name: true,
       price: true,
       specs_detail: true,
+      updated_at: true,
+      embedding: {
+        select: {
+          updated_at: true,
+        },
+      },
     },
     where: { deleted_at: null },
   });
 
-  console.log(`Found ${products.length} products to embed`);
+  const productsToEmbed = force
+    ? products
+    : products.filter(
+        (product) =>
+          !product.embedding ||
+          product.updated_at > product.embedding.updated_at
+      );
 
-  for (let i = 0; i < products.length; i += BATCH_SIZE) {
-    const batch = products.slice(i, i + BATCH_SIZE);
+  console.log(
+    `Found ${productsToEmbed.length}/${products.length} products to embed`
+  );
+
+  for (let i = 0; i < productsToEmbed.length; i += BATCH_SIZE) {
+    const batch = productsToEmbed.slice(i, i + BATCH_SIZE);
     const contents = batch.map(buildContent);
     const embeddings = await embedder.embedDocuments(contents);
 
-    const upserts = batch.map((p, idx) => {
-      const emb = embeddings[idx];
-      const vector = Prisma.raw(`'[${emb.join(",")}]'::vector`);
-      const content = contents[idx];
+    const upserts = batch.map((product, index) => {
+      const embedding = embeddings[index];
+      const vector = Prisma.raw(`'[${embedding.join(",")}]'::vector`);
+      const content = contents[index];
       return prisma.$executeRaw`
         INSERT INTO product_embeddings (product_id, content, embedding, updated_at)
-        VALUES (${BigInt(p.id)}, ${content}, ${vector}, NOW())
+        VALUES (${BigInt(product.id)}, ${content}, ${vector}, NOW())
         ON CONFLICT (product_id)
         DO UPDATE SET content = EXCLUDED.content, embedding = EXCLUDED.embedding, updated_at = NOW();
       `;
@@ -73,7 +94,7 @@ async function main() {
     await Promise.all(upserts);
     console.log(
       `Upserted ${batch.length} products (${i + batch.length}/${
-        products.length
+        productsToEmbed.length
       })`
     );
   }
@@ -81,11 +102,17 @@ async function main() {
   console.log("Done embedding products");
 }
 
-main()
-  .catch((err) => {
-    console.error("Embed error:", err);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+const isDirectRun =
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isDirectRun) {
+  embedProducts({ force: process.argv.includes("--force") })
+    .catch((error) => {
+      console.error("Embed error:", error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

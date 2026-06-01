@@ -64,6 +64,8 @@ import loyaltyRoutes from "./routes/loyalty.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import auditRoutes from "./routes/audit.route.js";
 import behaviorRoutes from "./routes/behavior.route.js";
+import { startDailyJobsScheduler } from "./jobs/scheduler.js";
+import { startStartupTasks } from "./jobs/startupTasks.js";
 
 import cors from "cors";
 
@@ -297,4 +299,6 @@ io.on("connection", (socket) => {
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  startStartupTasks();
+  startDailyJobsScheduler();
 });

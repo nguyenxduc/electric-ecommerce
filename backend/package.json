@@ -9,6 +9,8 @@
     "dev": "nodemon server.js",
     "seed": "node seed/index.js",
     "embed:products": "node scripts/embed-products.js",
+    "embed:products:force": "node scripts/embed-products.js --force",
+    "startup:tasks": "node scripts/run-startup-tasks.js",
     "setup:similarity": "node scripts/setup_similarity.js",
     "job:cf-similarity": "node jobs/computeProductSimilarity.js",
     "job:offline-user-recommendation": "node jobs/computeUserRecommendations.js",

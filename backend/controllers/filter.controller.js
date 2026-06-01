@@ -161,9 +161,14 @@ export const syncFilterOptionsFromProducts = async (req, res) => {
       specsDetail.forEach((category) => {
         if (!category || typeof category !== "object") return;
 
+        // Keep flat specs_detail entries compatible with the admin product form.
+        if (!Array.isArray(category.items)) {
+          processSpec(category, product.category_id, filterMap);
+          return;
+        }
+
         // Process items within each category
-        const items = Array.isArray(category.items) ? category.items : [];
-        items.forEach((item) => {
+        category.items.forEach((item) => {
           if (!item || typeof item !== "object") return;
           processSpec(item, product.category_id, filterMap);
         });
