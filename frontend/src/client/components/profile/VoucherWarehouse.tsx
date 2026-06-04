@@ -13,25 +13,6 @@ export default function VoucherWarehouse() {
     staleTime: 60 * 1000
   })
 
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 animate-pulse space-y-3">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="h-16 bg-gray-100 rounded-xl" />
-        ))}
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
-        <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
-        <p className="text-sm text-gray-500">Cannot load voucher warehouse now.</p>
-      </div>
-    )
-  }
-
   const vouchers = data?.coupons ?? []
   const filterStats = useMemo(() => {
     const usable = vouchers.filter(v => v.is_usable).length
@@ -51,6 +32,25 @@ export default function VoucherWarehouse() {
     if (filter === 'expired') return vouchers.filter(v => v.is_expired)
     return vouchers
   }, [filter, vouchers])
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 animate-pulse space-y-3">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-16 bg-gray-100 rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+        <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-2" />
+        <p className="text-sm text-gray-500">Cannot load voucher warehouse now.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -124,9 +124,9 @@ export default function VoucherWarehouse() {
                 <p className="text-xs text-gray-600 mt-1">
                   {v.discount_type === 'percent'
                     ? `Discount ${v.discount_value}%`
-                    : `Discount ${Number(v.discount_value).toLocaleString()} VND`}
+                    : `Discount $${Number(v.discount_value).toLocaleString('en-US')}`}
                   {v.min_order
-                    ? ` • Min order ${Number(v.min_order).toLocaleString()} VND`
+                    ? ` • Min order $${Number(v.min_order).toLocaleString('en-US')}`
                     : ''}
                 </p>
                 {v.is_exhausted && (

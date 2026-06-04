@@ -1,5 +1,9 @@
 import { VNPay, ProductCode } from "vnpay";
 import { prisma } from "../lib/db.js";
+import {
+  resolveGatewayVndAmount,
+  usdToGatewayVnd,
+} from "../lib/gatewayAmount.js";
 import crypto from "crypto";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
@@ -69,6 +73,19 @@ export const createVnpayPayment = async (req, res) => {
       return res.status(400).json({ message: "Invalid amount" });
     }
 
+    let vndAmount;
+    try {
+      vndAmount = resolveGatewayVndAmount(numericAmount);
+    } catch (err) {
+      return res.status(err.status || 400).json({
+        message: err.message,
+        code: err.code,
+        minVnd: err.minVnd,
+        minUsd: err.minUsd,
+        amountVnd: err.amountVnd,
+      });
+    }
+
     const orderId = Date.now().toString();
     const clientIp = buildClientIp(req);
     const returnUrl =
@@ -77,7 +94,7 @@ export const createVnpayPayment = async (req, res) => {
 
     const vnpay = vnpayInstance();
     const paymentUrl = vnpay.buildPaymentUrl({
-      amount: Math.round(numericAmount * 100), // VNPAY expects amount in VND x 100
+      amount: Math.round(vndAmount * 100),
       bankCode: bankCode || undefined,
       orderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
       orderType: ProductCode.Other,
@@ -104,6 +121,19 @@ export const createMomoPayment = async (req, res) => {
 
     if (!numericAmount || numericAmount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
+    }
+
+    let vndAmount;
+    try {
+      vndAmount = resolveGatewayVndAmount(numericAmount);
+    } catch (err) {
+      return res.status(err.status || 400).json({
+        message: err.message,
+        code: err.code,
+        minVnd: err.minVnd,
+        minUsd: err.minUsd,
+        amountVnd: err.amountVnd,
+      });
     }
 
     const partnerCode =
@@ -135,7 +165,7 @@ export const createMomoPayment = async (req, res) => {
 
     const rawSignature =
       `accessKey=${accessKey}` +
-      `&amount=${Math.round(numericAmount)}` +
+      `&amount=${vndAmount}` +
       `&extraData=${extraData}` +
       `&ipnUrl=${ipnUrl}` +
       `&orderId=${momoOrderId}` +
@@ -154,7 +184,7 @@ export const createMomoPayment = async (req, res) => {
       partnerCode,
       accessKey,
       requestId,
-      amount: `${Math.round(numericAmount)}`,
+      amount: `${vndAmount}`,
       orderId: momoOrderId,
       orderInfo: finalOrderInfo,
       redirectUrl,
@@ -186,7 +216,7 @@ export const createMomoPayment = async (req, res) => {
           order_id: BigInt(internalOrderId),
           provider: "momo",
           amount: numericAmount,
-          currency: "VND",
+          currency: "USD",
           status: "pending",
           momo_order_id: momoOrderId,
           momo_request_id: requestId,
@@ -215,6 +245,12 @@ export const createMomoPayment = async (req, res) => {
       message: momoData.message,
     });
   } catch (error) {
+    if (error?.status === 400) {
+      return res.status(400).json({
+        message: error.message,
+        code: error.code,
+      });
+    }
     res.status(500).json({
       message: "Failed to create MoMo payment",
       error: error?.message,

@@ -10,6 +10,30 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ecommerce']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ngx-ecommerce-backend
+    working_dir: /app
+    environment:
+      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/ecommerce?schema=public'
+      SHIPPING_FEE: '9.99'
+      FREE_SHIPPING_THRESHOLD: '199'
+    command: ['sh', '-c', 'npx prisma migrate deploy && npm run seed']
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    restart: 'no'
 
   backend:
     build:
@@ -23,11 +47,21 @@ services:
       DATABASE_URL: 'postgresql://postgres:postgres@db:5432/ecommerce?schema=public'
       ACCESS_TOKEN_SECRET: change-me
       FRONTEND_URL: 'http://localhost:5173'
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_CHAT_MODEL: 'gemini-3.1-flash-lite'
+      GEMINI_EMBED_MODEL: 'gemini-embedding-001'
+      IMAGE_SEARCH_MODEL: 'gemini-3.1-flash-lite'
+      SHIPPING_FEE: '9.99'
+      FREE_SHIPPING_THRESHOLD: '199'
+      USD_TO_VND_RATE: '25000'
       AI_HTTP_PROXY: ''
       HTTPS_PROXY: ''
       HTTP_PROXY: ''
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -42,6 +76,7 @@ services:
       - '5173:5173'
     environment:
       VITE_API_BASE_URL: 'http://localhost:3000/api'
+      VITE_USD_TO_VND_RATE: '25000'
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     depends_on:
       - backend

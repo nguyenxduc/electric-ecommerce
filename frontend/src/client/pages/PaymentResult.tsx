@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CheckCircle, XCircle, RotateCcw, Loader2 } from 'lucide-react'
+import { formatUsd } from '../utils/formatMoney'
+
+const USD_TO_VND = Number(import.meta.env.VITE_USD_TO_VND_RATE || 25000)
 
 const PaymentResult = () => {
   const location = useLocation()
@@ -35,13 +38,13 @@ const PaymentResult = () => {
         : responseCode === '00'
 
   const amountDisplay = amountParam
-    ? `${Number(amountParam).toLocaleString('en-US')} VND`
+    ? formatUsd(amountParam)
     : vnpAmount
-      ? `${(Number(vnpAmount) / 100).toLocaleString('en-US')} VND`
+      ? formatUsd(Number(vnpAmount) / 100 / USD_TO_VND)
       : '-'
 
   const formatMoney = (value: string | null) =>
-    value != null ? `${Number(value).toLocaleString('en-US')} VND` : '-'
+    value != null ? formatUsd(value) : '-'
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">

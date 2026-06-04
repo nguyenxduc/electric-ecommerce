@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
 import Payment from './Payment'
 import TechnicalDetail from './TechnicalDetail'
+import ProductDescription from './ProductDescription'
+import ProductImage from './ProductImage'
 
 import type { Product } from '../../types/product'
 import { useSimilarProducts } from '../../hooks/useProducts'
@@ -68,7 +70,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
             {/* Image Gallery */}
             <div className="lg:col-span-1 space-y-4">
               <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
-                <img
+                <ProductImage
                   src={mainImage}
                   alt={product.name}
                   className="w-full h-full object-contain p-4"
@@ -86,7 +88,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <img
+                      <ProductImage
                         src={image}
                         alt={`${product.name} ${index + 1}`}
                         className="w-full h-full object-cover"
@@ -239,16 +241,19 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
           </nav>
           <div className="mt-8">
             {selectedInfo === 'description' && (
-              <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Product Description
-                </h3>
-                <div className="prose prose-gray max-w-none">
-                  <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-                    {product.description ||
-                      'No description available for this product.'}
-                  </p>
+              <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    Product Description
+                  </h3>
+                  <span className="text-sm text-gray-500">
+                    Detailed overview with photos
+                  </span>
                 </div>
+                <ProductDescription
+                  description={product.description}
+                  productName={product.name}
+                />
               </div>
             )}
             {selectedInfo === 'technical' && (

@@ -1,4 +1,7 @@
 import axiosClient from '../../lib/axios'
+import {
+  normalizeListProductRes
+} from '../utils/normalizeProductList'
 import type {
   ImageOverviewRes,
   ImageSearchRes,
@@ -6,6 +9,8 @@ import type {
   Product,
   RecommendationRes
 } from '../types/product'
+
+export const COLLECTION_PAGE_SIZE = 9
 import type { ReviewRes } from '../types/review'
 
 export const fetchNewProducts = async (): Promise<ListProductRes> => {
@@ -51,7 +56,7 @@ export const fetchCollectionProducts = async (
   const { data } = await axiosClient.get<ListProductRes>('/products', {
     params
   })
-  return data
+  return normalizeListProductRes(data, limit)
 }
 
 export const fetchProductById = async (id: number): Promise<Product> => {
@@ -114,17 +119,22 @@ export const searchProducts = async (
       ? { query: params }
       : { sort: 'newest', page: 1, limit: 20, ...params }
 
+  const limit = normalized.limit ?? COLLECTION_PAGE_SIZE
   const { data } = await axiosClient.get<ListProductRes>('/products/search', {
     params: normalized
   })
-  return data
+  return normalizeListProductRes(data, limit)
 }
 
 export const fetchProductsByCategory = async (
-  categoryId: number
+  categoryId: number,
+  page = 1,
+  limit = 20,
+  sort = 'newest'
 ): Promise<ListProductRes> => {
   const { data } = await axiosClient.get<ListProductRes>(
-    `/products/category/${categoryId}`
+    `/products/category/${categoryId}`,
+    { params: { page, limit, sort } }
   )
   return data
 }

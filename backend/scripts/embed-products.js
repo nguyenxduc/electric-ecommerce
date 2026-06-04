@@ -6,14 +6,14 @@ import { ProxyAgent, setGlobalDispatcher } from "undici";
 
 import { Prisma } from "@prisma/client";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { GEMINI_API_KEY } from "../ai/geminiConfig.js";
 import { prisma } from "../lib/db.js";
 
 dns.setDefaultResultOrder("ipv4first");
 
 const EMBED_MODEL =
   process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
-const EMBED_API_KEY =
-  process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+const EMBED_API_KEY = GEMINI_API_KEY;
 const BATCH_SIZE = 25;
 const AI_PROXY_URL =
   process.env.AI_HTTP_PROXY ||

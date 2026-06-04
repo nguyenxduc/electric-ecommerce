@@ -180,20 +180,20 @@ function Modal({
 
   return (
     <div
-      className={`fixed inset-0 flex justify-center items-start pt-20 transition-colors ${
-        open ? 'visible bg-black/30 backdrop-blur-sm' : 'invisible'
+      className={`fixed inset-0 z-50 flex justify-center items-start p-4 sm:pt-16 sm:pb-8 overflow-y-auto transition-colors ${
+        open ? 'visible bg-black/30 backdrop-blur-sm' : 'invisible pointer-events-none'
       }`}
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-[90%] max-w-3xl transition-all ${
+        className={`bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[min(90vh,calc(100vh-2rem))] my-auto transition-all ${
           open
             ? 'scale-100 opacity-100 translate-y-0'
             : 'scale-105 opacity-0 -translate-y-4'
         }`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-gray-100">
+        <div className="flex-shrink-0 p-6 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-blue-50">
               <img src={SearchIcon} alt="Search" className="h-5 w-5" />
@@ -274,91 +274,116 @@ function Modal({
           )}
         </div>
 
-        <div className="p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6">
           {imageData && (
-            <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
-              <p className="text-sm font-semibold text-emerald-800">
-                AI image analysis
-              </p>
-              <p className="text-xs text-gray-700">
-                Type:{' '}
-                <span className="font-medium">
-                  {imageData.detected.product_type || 'Unknown'}
-                </span>{' '}
-                | Brand:{' '}
-                <span className="font-medium">
-                  {imageData.detected.brand || 'Unknown'}
-                </span>{' '}
-                | Model:{' '}
-                <span className="font-medium">
-                  {imageData.detected.line_or_model || 'Not clearly detected'}
-                </span>
-              </p>
-              <p className="text-xs text-gray-700">{imageData.notice}</p>
-              {overviewLoading && (
-                <p className="text-xs text-emerald-700 inline-flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Updating product overview...
+            <div className="mb-6 space-y-4">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
+                <p className="text-sm font-semibold text-emerald-800">
+                  AI image analysis
                 </p>
-              )}
-              {Array.isArray(imageData.suggested_queries) &&
-                imageData.suggested_queries.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {imageData.suggested_queries.map(query => (
+                <p className="text-xs text-gray-700">
+                  Type:{' '}
+                  <span className="font-medium">
+                    {imageData.detected.product_type || 'Unknown'}
+                  </span>{' '}
+                  | Brand:{' '}
+                  <span className="font-medium">
+                    {imageData.detected.brand || 'Unknown'}
+                  </span>{' '}
+                  | Model:{' '}
+                  <span className="font-medium">
+                    {imageData.detected.line_or_model || 'Not clearly detected'}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-700">{imageData.notice}</p>
+                {overviewLoading && (
+                  <p className="text-xs text-emerald-700 inline-flex items-center gap-1.5">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Updating product overview...
+                  </p>
+                )}
+                {Array.isArray(imageData.suggested_queries) &&
+                  imageData.suggested_queries.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {imageData.suggested_queries.map(query => (
+                        <button
+                          key={query}
+                          type="button"
+                          onClick={() => onChange(query)}
+                          className="px-2.5 py-1 rounded-full text-xs border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50"
+                        >
+                          {query}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              <section aria-labelledby="image-related-products-heading">
+                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+                  <h3
+                    id="image-related-products-heading"
+                    className="text-sm font-semibold text-gray-900"
+                  >
+                    Related products
+                  </h3>
+                  <span className="text-xs text-gray-500">
+                    Sản phẩm liên quan trong cửa hàng
+                    {formattedImageResults.length > 0
+                      ? ` · ${formattedImageResults.length} item${
+                          formattedImageResults.length === 1 ? '' : 's'
+                        }`
+                      : ''}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Gợi ý dựa trên ảnh bạn tải lên — không phải khớp chính xác
+                  100%.
+                </p>
+                {formattedImageResults.length > 0 ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {formattedImageResults.map(item => (
                       <button
-                        key={query}
+                        key={`img-${item.id}`}
                         type="button"
-                        onClick={() => onChange(query)}
-                        className="px-2.5 py-1 rounded-full text-xs border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50"
+                        onClick={() => onSelectProduct(item.id, item.name)}
+                        className="flex items-center gap-4 p-3 border border-gray-200 rounded-xl hover:border-emerald-300 hover:shadow-sm transition text-left bg-white"
                       >
-                        {query}
+                        <img
+                          src={
+                            item.thumb ||
+                            'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+                          }
+                          alt={item.name}
+                          className="h-16 w-16 object-contain rounded-lg bg-gray-50 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 line-clamp-2">
+                            {item.name}
+                          </p>
+                          <p className="text-sm text-emerald-700 font-semibold mt-1">
+                            ${Number(item.price).toLocaleString('en-US')}
+                          </p>
+                        </div>
                       </button>
                     ))}
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+                    No related products found in the shop.
+                  </p>
                 )}
-              {formattedImageResults.length > 0 ? (
-                <div className="grid gap-3 sm:grid-cols-2 pt-2">
-                  {formattedImageResults.map(item => (
-                    <button
-                      key={`img-${item.id}`}
-                      type="button"
-                      onClick={() => onSelectProduct(item.id, item.name)}
-                      className="flex items-center gap-4 p-3 border border-emerald-100 rounded-xl hover:border-emerald-300 hover:shadow-sm transition text-left bg-white"
-                    >
-                      <img
-                        src={
-                          item.thumb ||
-                          'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
-                        }
-                        alt={item.name}
-                        className="h-16 w-16 object-contain rounded-lg bg-gray-50"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800 line-clamp-2">
-                          {item.name}
-                        </p>
-                        <p className="text-sm text-emerald-700 font-semibold mt-1">
-                          ${Number(item.price).toLocaleString('en-US')}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-600">
-                  No related products found in shop.
-                </p>
-              )}
+              </section>
             </div>
           )}
 
-          {!searchTerm.trim() && (
+          {!searchTerm.trim() && !imageData && (
             <p className="text-sm text-gray-500">
               Enter keywords to start searching for products.
             </p>
           )}
 
-          {searchTerm.trim() && (
+          {searchTerm.trim() && !imageData && (
             <div className="space-y-3">
               {isFetching && (
                 <div className="space-y-2">
@@ -377,8 +402,7 @@ function Modal({
                 </p>
               )}
 
-              {!imageData &&
-                !isFetching &&
+              {!isFetching &&
                 !isError &&
                 formattedResults.length === 0 && (
                   <p className="text-sm text-gray-500">

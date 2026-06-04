@@ -1,3 +1,5 @@
+import { formatUsd } from '../../utils/formatMoney'
+
 interface Order {
   id: number
   orderNumber?: string
@@ -65,8 +67,8 @@ const OrderDetails = ({ order }: OrderDetail) => {
             <dt className="text-black font-normal w-1/2">Amount Paid</dt>
             <dd className="text-gray-700 w-1/2 font-light text-left">
               {order.amountPaid !== undefined
-                ? `${Number(order.amountPaid).toLocaleString('en-US')} `
-                : `${Number(order.total).toLocaleString('en-US')} `}
+                ? formatUsd(order.amountPaid)
+                : formatUsd(order.total)}
             </dd>
           </div>
         </dl>
@@ -117,12 +119,12 @@ const OrderDetails = ({ order }: OrderDetail) => {
               <div className="text-right">
                 {originalVal !== undefined && !Number.isNaN(originalVal) && (
                   <p className="text-sm text-gray-400 line-through">
-                    {originalVal.toLocaleString('en-US')}
+                    {formatUsd(originalVal)}
                   </p>
                 )}
                 {priceVal !== undefined && !Number.isNaN(priceVal) ? (
                   <p className="font-semibold">
-                    {priceVal.toLocaleString('en-US')}
+                    {formatUsd(priceVal)}
                   </p>
                 ) : (
                   <p className="font-semibold text-gray-500">—</p>

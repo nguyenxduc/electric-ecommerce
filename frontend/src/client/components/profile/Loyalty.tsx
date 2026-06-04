@@ -275,8 +275,10 @@ export default function Loyalty() {
                   <p className="text-xs text-gray-600">
                     {v.discount_type === 'percent'
                       ? `Discount ${v.discount_value}%`
-                      : `Discount ${v.discount_value.toLocaleString()} VND`}
-                    {v.min_order ? ` • Min order ${Number(v.min_order).toLocaleString()} VND` : ''}
+                      : `Discount $${Number(v.discount_value).toLocaleString('en-US')}`}
+                    {v.min_order
+                      ? ` • Min order $${Number(v.min_order).toLocaleString('en-US')}`
+                      : ''}
                   </p>
                 </div>
                 <p className="text-xs text-gray-500">

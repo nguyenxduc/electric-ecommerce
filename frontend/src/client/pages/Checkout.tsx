@@ -28,6 +28,8 @@ import {
   getMyCoupons,
   type MyVoucher
 } from '../services/couponService'
+import { formatUsd } from '../utils/formatMoney'
+import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
 
 const Checkout = () => {
   const navigate = useNavigate()
@@ -83,12 +85,10 @@ const Checkout = () => {
 
     const freeShippingThreshold =
       settingsData?.settings?.free_shipping_threshold
-    console.log('hello')
-    console.log(shippingCostValue)
     const baseShippingCost = shippingCostValue ? Number(shippingCostValue) : 1
     const threshold = freeShippingThreshold
       ? Number(freeShippingThreshold)
-      : 500000
+      : 199
 
     const orderTotal = cart?.total_price || 0
     const shipmentCost = orderTotal >= threshold ? 0 : baseShippingCost
@@ -194,12 +194,32 @@ const Checkout = () => {
     }
 
     // MoMo Wallet: create order first, then create MoMo payment and redirect to payUrl.
+    const momoPayAmount =
+      couponResult?.finalAmount ?? amountAfterTierDiscount
+    if (!canPayWithMomo(momoPayAmount)) {
+      toast.error(
+        `MoMo requires at least ~$${momoMinOrderUsd()} (1,000₫). Use COD or add more items.`
+      )
+      return
+    }
+
     try {
       setProcessing(true)
       const orderResult = await createOrderFromCart('momo')
+      const serverPayAmount =
+        orderResult.finalAmount ??
+        Number(orderResult.order.total_amount) ??
+        momoPayAmount
+
+      if (!canPayWithMomo(serverPayAmount)) {
+        toast.error(
+          `Order total is too low for MoMo (min ~$${momoMinOrderUsd()}). Use COD instead.`
+        )
+        return
+      }
 
       const momoData = await createMomoPayment({
-        amount: displayTotal,
+        amount: serverPayAmount,
         orderInfo: `Order payment - ${name} - ${phone}`,
         orderId: orderResult.order.id,
         orderNumber: orderResult.order.order_number
@@ -507,7 +527,7 @@ const Checkout = () => {
                   <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
                 </div>
                 <div className="text-sm font-semibold">
-                  {(item.final_price * item.quantity).toLocaleString('en-US')} VND
+                  {formatUsd(item.final_price * item.quantity)}
                 </div>
               </div>
             ))}
@@ -542,7 +562,7 @@ const Checkout = () => {
                 Applied: <span className="font-medium">{appliedCoupon}</span>
                 {couponResult && (
                   <span className="text-xs text-gray-600">
-                    (-{couponResult.discount.toLocaleString('en-US')} VND)
+                    (-{formatUsd(couponResult.discount)})
                   </span>
                 )}
                 <button
@@ -558,12 +578,12 @@ const Checkout = () => {
           <div className="border-t mt-4 pt-4 space-y-2 text-sm text-gray-600">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span>{totals.subtotal.toLocaleString('en-US')} VND</span>
+              <span>{formatUsd(totals.subtotal)}</span>
             </div>
             {totals.discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Discount</span>
-                <span>-{totals.discount.toLocaleString('en-US')} VND</span>
+                <span>-{formatUsd(totals.discount)}</span>
               </div>
             )}
             {tierDiscountRate > 0 && (
@@ -571,13 +591,13 @@ const Checkout = () => {
                 <span>
                   Tier discount ({Math.round(tierDiscountRate * 100)}%)
                 </span>
-                <span>-{tierDiscountAmount.toLocaleString('en-US')} VND</span>
+                <span>-{formatUsd(tierDiscountAmount)}</span>
               </div>
             )}
             {couponResult && couponResult.discount > 0 && (
               <div className="flex justify-between text-green-700">
                 <span>Voucher</span>
-                <span>-{couponResult.discount.toLocaleString('en-US')} VND</span>
+                <span>-{formatUsd(couponResult.discount)}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -589,7 +609,7 @@ const Checkout = () => {
               >
                 {totals.isFreeShipping
                   ? 'Free!'
-                  : `${totals.shipmentCost.toLocaleString('en-US')} VND`}
+                  : formatUsd(totals.shipmentCost)}
               </span>
             </div>
             {totals.isFreeShipping && (
@@ -601,15 +621,15 @@ const Checkout = () => {
             {!totals.isFreeShipping && (
               <div className="text-xs text-gray-500">
                 Add{' '}
-                {(
+                {formatUsd(
                   totals.freeShippingThreshold - (cart?.total_price || 0)
-                ).toLocaleString('en-US')}{' '}
-                VND more for free shipping
+                )}{' '}
+                more for free shipping
               </div>
             )}
             <div className="flex justify-between font-semibold text-gray-900 pt-2 border-t">
               <span>Total</span>
-              <span>{displayTotal.toLocaleString('en-US')} VND</span>
+              <span>{formatUsd(displayTotal)}</span>
             </div>
           </div>
         </div>
@@ -662,7 +682,7 @@ const Checkout = () => {
                       Total Amount
                     </p>
                     <p className="text-2xl font-bold text-blue-700">
-                      {qrData.amount.toLocaleString('en-US')} VND
+                      {formatUsd(qrData.amount)}
                     </p>
                   </div>
 
@@ -792,7 +812,7 @@ const Checkout = () => {
               </h3>
               <p className="text-sm text-gray-500 mb-4">
                 Order value after tier discount:{' '}
-                {amountAfterTierDiscount.toLocaleString('en-US')} VND
+                {formatUsd(amountAfterTierDiscount)}
               </p>
 
               {voucherLoading ? (
@@ -831,9 +851,9 @@ const Checkout = () => {
                           <p className="text-xs text-gray-600 mt-1">
                             {v.discount_type === 'percent'
                               ? `Discount ${v.discount_value}%`
-                              : `Discount ${Number(v.discount_value).toLocaleString('en-US')} VND`}
+                              : `Discount $${Number(v.discount_value).toLocaleString('en-US')}`}
                             {minOrder
-                              ? ` - Min ${minOrder.toLocaleString('en-US')} VND`
+                              ? ` · Min order $${minOrder.toLocaleString('en-US')}`
                               : ''}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatUsd } from '../../utils/formatMoney'
 
 interface Order {
   id: number
@@ -43,7 +44,7 @@ const OrderCard = ({ order, onClick }: OrderDetail) => {
         </div>
         <div className="flex flex-col items-center justify-between">
           <p className="text-sm mb-1 font-semibold">Total</p>
-          <p className="font-light">{order.total.toLocaleString('en-US')} </p>
+          <p className="font-light">{formatUsd(order.total)}</p>
         </div>
         {order.delivered && (
           <div className="flex flex-col items-center justify-between">

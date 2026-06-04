@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
+import ProductImage from '../products/ProductImage'
+import { descriptionPreview } from '../../utils/descriptionPreview'
 
 interface ProductCardProps {
   product: Product
@@ -83,7 +85,7 @@ const ProductCard = ({
         )}
         <div className="w-full h-48 bg-gray-50 rounded-lg overflow-hidden">
           {product.img && product.img.length > 0 ? (
-            <img
+            <ProductImage
               src={product.img[0]}
               alt={product.name}
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
@@ -98,9 +100,7 @@ const ProductCard = ({
       <h3 className="text-sm text-gray-700 mb-2 truncate">{product.name}</h3>
       {product.description && (
         <p className="text-xs text-gray-500 mb-2 line-clamp-2 leading-relaxed">
-          {product.description.length > 80
-            ? `${product.description.substring(0, 80)}...`
-            : product.description}
+          {descriptionPreview(product.description, 100)}
         </p>
       )}
       <div className="flex items-center gap-2 mb-2">

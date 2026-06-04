@@ -1,21 +1,9 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
-import { HttpsProxyAgent } from "https-proxy-agent";
-
-const PRODUCT_BASE_URL =
-  process.env.FRONTEND_BASE_URL || "http://localhost:5173";
-const OPENROUTER_BASE_URL =
-  process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-const AI_PROXY_URL =
-  process.env.AI_HTTP_PROXY ||
-  process.env.HTTPS_PROXY ||
-  process.env.HTTP_PROXY ||
-  "";
-
-const OPENROUTER_HTTP_AGENT = AI_PROXY_URL
-  ? new HttpsProxyAgent(AI_PROXY_URL)
-  : undefined;
+import {
+  createGeminiChatModel,
+  GEMINI_CHAT_MODEL,
+  hasGeminiApiKey,
+} from "./geminiConfig.js";
 
 const MODERATION_ENABLED_RAW = String(
   process.env.REVIEW_MODERATION_ENABLED ?? "true"
@@ -25,8 +13,8 @@ const MODERATION_ENABLED = !["0", "false", "off", "no"].includes(
 );
 const MODERATION_MODEL =
   process.env.REVIEW_MODERATION_MODEL ||
-  process.env.OPENROUTER_MODEL ||
-  "openai/gpt-oss-120b:free";
+  process.env.GEMINI_CHAT_MODEL ||
+  GEMINI_CHAT_MODEL;
 const MODERATION_TIMEOUT_MS = Number(
   process.env.REVIEW_MODERATION_TIMEOUT_MS || 6000
 );
@@ -49,20 +37,10 @@ const parseJsonObjectFromText = (text) => {
 };
 
 const createModerationModel = () =>
-  new ChatOpenAI({
+  createGeminiChatModel({
     model: MODERATION_MODEL,
     temperature: 0,
-    apiKey: OPENROUTER_KEY,
-    timeout: MODERATION_TIMEOUT_MS,
     maxRetries: 1,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-      httpAgent: OPENROUTER_HTTP_AGENT,
-      defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || PRODUCT_BASE_URL,
-        "X-Title": process.env.OPENROUTER_APP_NAME || "Tech Shop Assistant",
-      },
-    },
   });
 
 export const moderateReviewComment = async (comment) => {
@@ -77,7 +55,7 @@ export const moderateReviewComment = async (comment) => {
     };
   }
 
-  if (!MODERATION_ENABLED || !OPENROUTER_KEY) {
+  if (!MODERATION_ENABLED || !hasGeminiApiKey()) {
     return {
       allowed: true,
       reason: "",
@@ -102,7 +80,12 @@ export const moderateReviewComment = async (comment) => {
       new HumanMessage(`Bình luận cần kiểm duyệt:\n${clean}`),
     ];
 
-    const response = await createModerationModel().invoke(messages);
+    const response = await Promise.race([
+      createModerationModel().invoke(messages),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("MODERATION_TIMEOUT")), MODERATION_TIMEOUT_MS)
+      ),
+    ]);
     const parsed = parseJsonObjectFromText(response?.content);
 
     const allowed = Boolean(parsed?.allowed);
@@ -129,7 +112,6 @@ export const moderateReviewComment = async (comment) => {
       model: MODERATION_MODEL,
     });
 
-    // Fail-open: do not block review flow when AI moderation is unavailable.
     return {
       allowed: true,
       reason: "",

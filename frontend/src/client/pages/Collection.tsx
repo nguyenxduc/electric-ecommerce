@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import CategoryNav from '../components/collection/CategoryNav'
 import FilterTagsBar from '../components/collection/FilterTagsBar'
 import SidebarFilters from '../components/collection/SidebarFilters'
@@ -15,6 +15,8 @@ import { useCollectionProducts, useSearchProducts } from '../hooks/useProducts'
 import { useCategories, useCategoryBySlug } from '../hooks/useCategories'
 import { useFilters } from '../hooks/useFilters'
 import { ListProductRes, Product } from '../types/product'
+import { COLLECTION_PAGE_SIZE } from '../services/productService'
+import { shouldShowPagination } from '../utils/normalizeProductList'
 
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 
@@ -205,12 +207,29 @@ const Collection = () => {
   const compareIds = compareProducts
     .map(product => Number(product.id))
     .filter(id => Number.isSafeInteger(id) && id > 0)
+  const compareCategoryId = compareProducts[0]?.category_id
+
+  const productsFetchCategory = useMemo(() => {
+    if (compareIds.length > 0 && compareCategoryId != null) {
+      return String(compareCategoryId)
+    }
+    return collectionParam || 'all'
+  }, [compareIds.length, compareCategoryId, collectionParam])
+
+  const compareCategoryName = useMemo(() => {
+    if (compareCategoryId == null || !categoriesData?.length) return null
+    const match = categoriesData.find(
+      cat => Number(cat.id) === Number(compareCategoryId)
+    )
+    return match?.name ?? null
+  }, [compareCategoryId, categoriesData])
+
   const { data: allProducts, isLoading } = useCollectionProducts(
-    collectionParam || 'all',
+    productsFetchCategory,
     sortBy,
     filterString,
     currentPage,
-    12,
+    COLLECTION_PAGE_SIZE,
     !!collectionParam // enable query only if collectionParam exists
   )
 
@@ -219,8 +238,11 @@ const Collection = () => {
     {
       sort: mappedSort as any,
       page: currentPage,
-      limit: 15,
-      category_id: categoryId
+      limit: COLLECTION_PAGE_SIZE,
+      category_id:
+        compareIds.length > 0 && compareCategoryId != null
+          ? compareCategoryId
+          : categoryId
     }
   )
   const navigate = useNavigate()
@@ -266,6 +288,21 @@ const Collection = () => {
     params.set('page', newPage.toString())
     setSearchParams(params)
   }
+
+  const prevCompareCountRef = useRef(compareIds.length)
+  useEffect(() => {
+    const hadSelection = prevCompareCountRef.current > 0
+    const hasSelection = compareIds.length > 0
+    if (hadSelection !== hasSelection) {
+      const page = parseInt(searchParams.get('page') || '1', 10)
+      if (page !== 1) {
+        const params = new URLSearchParams(searchParams)
+        params.set('page', '1')
+        setSearchParams(params)
+      }
+    }
+    prevCompareCountRef.current = compareIds.length
+  }, [compareIds.length, searchParams, setSearchParams])
 
   // Update URL when sort changes
   const setSortBy = (newSort: string) => {
@@ -432,6 +469,11 @@ const Collection = () => {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <span className="font-semibold">{compareIds.length}</span> products selected for comparison.
+                    <p className="mt-1 text-xs text-blue-800">
+                      {compareCategoryName
+                        ? `Showing ${compareCategoryName} products only. Deselect all to see every category.`
+                        : 'Showing products in the same category for comparison.'}
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -491,8 +533,8 @@ const Collection = () => {
                   />
 
                   {products.pagination &&
-                    products.pagination.total_pages > 1 && (
-                      <div className="mt-8 pt-6 border-t border-gray-200">
+                    shouldShowPagination(products.pagination) && (
+                      <div className="mt-8 border-t border-gray-200 pt-6">
                         <Pagination
                           currentPage={currentPage}
                           totalPages={products.pagination.total_pages}

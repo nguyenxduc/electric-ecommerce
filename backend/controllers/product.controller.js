@@ -38,6 +38,37 @@ const calculateProductPrices = (product) => {
   };
 };
 
+const parsePagination = (page, limit) => {
+  const currentPage = Math.max(1, Number(page) || 1);
+  const perPage = Math.min(100, Math.max(1, Number(limit) || 20));
+  return {
+    currentPage,
+    perPage,
+    skip: (currentPage - 1) * perPage,
+  };
+};
+
+const buildPaginationMeta = (currentPage, perPage, total) => ({
+  current_page: currentPage,
+  per_page: perPage,
+  total_count: total,
+  total_pages: total === 0 ? 0 : Math.ceil(total / perPage),
+});
+
+const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
+  const [total_count, products] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      orderBy,
+      skip,
+      take,
+      include: { product_colors: true },
+    }),
+  ]);
+  return { total_count, products };
+};
+
 const normalizeText = (value) =>
   String(value || "")
     .toLowerCase()
@@ -316,30 +347,20 @@ export const getAllProducts = async (req, res) => {
     else if (sort === "newest") orderBy = { created_at: "desc" };
     else if (sort === "popular") orderBy = { sold: "desc" };
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
-
-    const allProducts = await prisma.product.findMany({
-      where: { ...where, deleted_at: null },
-      orderBy,
-      include: { product_colors: true },
-    });
+    const { currentPage, perPage, skip } = parsePagination(page, limit);
+    const baseWhere = { ...where, deleted_at: null };
 
     if (Object.keys(filterParams).length === 0) {
-      const total = allProducts.length;
-      const paginatedProducts = allProducts.slice(skip, skip + take);
-      const productsWithCalculations = paginatedProducts.map(
-        calculateProductPrices
+      const { total_count, products } = await fetchPaginatedProducts(
+        baseWhere,
+        orderBy,
+        skip,
+        perPage
       );
 
       return res.json({
-        products: productsWithCalculations,
-        pagination: {
-          current_page: Number(page),
-          per_page: Number(limit),
-          total_count: total,
-          total_pages: Math.ceil(total / Number(limit)),
-        },
+        products: products.map(calculateProductPrices),
+        pagination: buildPaginationMeta(currentPage, perPage, total_count),
       });
     }
 
@@ -530,40 +551,28 @@ export const getAllProducts = async (req, res) => {
       }
     }
 
-    // Convert back to BigInt for database query
     const productIdsArray = Array.from(filteredProductIds).map((id) =>
       BigInt(id)
     );
 
-    // Filter products based on the filtered IDs
-    let finalProducts;
-    if (productIdsArray.length > 0) {
-      finalProducts = allProducts.filter((product) =>
-        productIdsArray.some((id) => id.toString() === product.id.toString())
-      );
-    } else if (Object.keys(filterParams).length > 0) {
-      // No products match the filters
-      finalProducts = [];
-    } else {
-      // No filters applied
-      finalProducts = allProducts;
+    if (productIdsArray.length === 0) {
+      return res.json({
+        products: [],
+        pagination: buildPaginationMeta(currentPage, perPage, 0),
+      });
     }
 
-    // Apply pagination to final results
-    const total = finalProducts.length;
-    const paginatedProducts = finalProducts.slice(skip, skip + take);
-    const productsWithCalculations = paginatedProducts.map(
-      calculateProductPrices
+    const filteredWhere = { ...baseWhere, id: { in: productIdsArray } };
+    const { total_count, products } = await fetchPaginatedProducts(
+      filteredWhere,
+      orderBy,
+      skip,
+      perPage
     );
 
     res.json({
-      products: productsWithCalculations,
-      pagination: {
-        current_page: Number(page),
-        per_page: Number(limit),
-        total_count: total,
-        total_pages: Math.ceil(total / Number(limit)),
-      },
+      products: products.map(calculateProductPrices),
+      pagination: buildPaginationMeta(currentPage, perPage, total_count),
     });
   } catch (error) {
     res
@@ -778,29 +787,18 @@ export const searchProducts = async (req, res) => {
     else if (sort === "rating") orderBy = { rating: "desc" };
     else if (sort === "popular") orderBy = { sold: "desc" };
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { currentPage, perPage, skip } = parsePagination(page, limit);
 
-    const [total_count, products] = await Promise.all([
-      prisma.product.count({ where }),
-      prisma.product.findMany({
-        where,
-        orderBy,
-        skip,
-        take,
-      }),
-    ]);
-
-    const productsWithCalculations = products.map(calculateProductPrices);
+    const { total_count, products } = await fetchPaginatedProducts(
+      where,
+      orderBy,
+      skip,
+      perPage
+    );
 
     res.json({
-      products: productsWithCalculations,
-      pagination: {
-        current_page: Number(page),
-        per_page: Number(limit),
-        total_count: total_count,
-        total_pages: Math.max(1, Math.ceil(total_count / Number(limit))),
-      },
+      products: products.map(calculateProductPrices),
+      pagination: buildPaginationMeta(currentPage, perPage, total_count),
     });
   } catch (error) {
     res
@@ -1077,24 +1075,30 @@ export const getImageSearchOverview = async (req, res) => {
 
 export const getProductsByCategory = async (req, res) => {
   try {
-    const products = await prisma.product.findMany({
-      where: {
-        category_id: BigInt(req.params.categoryId),
-        deleted_at: null,
-      },
-      orderBy: { created_at: "desc" },
-    });
+    const { page = 1, limit = 20, sort = "newest" } = req.query;
+    const { currentPage, perPage, skip } = parsePagination(page, limit);
 
-    const productsWithCalculations = products.map(calculateProductPrices);
+    let orderBy = { created_at: "desc" };
+    if (sort === "price-asc") orderBy = { price: "asc" };
+    else if (sort === "price-desc") orderBy = { price: "desc" };
+    else if (sort === "rating") orderBy = { rating: "desc" };
+    else if (sort === "popular") orderBy = { sold: "desc" };
+
+    const where = {
+      category_id: BigInt(req.params.categoryId),
+      deleted_at: null,
+    };
+
+    const { total_count, products } = await fetchPaginatedProducts(
+      where,
+      orderBy,
+      skip,
+      perPage
+    );
 
     res.json({
-      products: productsWithCalculations,
-      pagination: {
-        current_page: 1,
-        per_page: products.length,
-        total_count: products.length,
-        total_pages: 1,
-      },
+      products: products.map(calculateProductPrices),
+      pagination: buildPaginationMeta(currentPage, perPage, total_count),
     });
   } catch (error) {
     res.status(500).json({

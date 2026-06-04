@@ -172,61 +172,56 @@ function ProductPreviewCard({ entry, isUser }: { entry: ProductEntry; isUser: bo
   if (!slug) return null
 
   const title = product?.name || prettifyProductName(slug)
-  const finalPrice = product?.final_price || product?.price
-  const priceNumber = finalPrice
-    ? new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(finalPrice * 25000)
-    : null
+  const price = Number(product?.price) || 0
+  const finalPrice = Number(product?.final_price) || price
+  const displayPrice = (finalPrice > 0 ? finalPrice : price).toFixed(2)
+  const rating = Number(product?.rating) || 0
 
   const wrapClass = isUser
-    ? 'rounded-lg border border-emerald-300/60 bg-white/5 p-2.5 sm:p-3'
-    : 'rounded-lg border border-gray-200 bg-white p-2.5 sm:p-3'
-  const titleClass = isUser ? 'text-white' : 'text-gray-900'
-  const subClass = isUser ? 'text-emerald-100/90' : 'text-gray-600'
+    ? 'rounded-lg bg-white/10 ring-1 ring-white/20'
+    : 'rounded-lg bg-gray-50/80 ring-1 ring-gray-200/70'
 
   return (
     <a
       href={entry.link}
-      className={`${wrapClass} block !w-full min-w-0`}
+      className={`${wrapClass} flex gap-2.5 p-2 transition hover:opacity-95`}
       target="_blank"
       rel="noopener noreferrer"
     >
-      <div className="overflow-hidden rounded-md bg-gray-100">
-        <div className="aspect-[4/3] w-full">
-          <FallbackImage
-            src={entry.image || product?.img?.[0]}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
-        </div>
+      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md bg-gray-100">
+        <FallbackImage
+          src={entry.image || product?.img?.[0]}
+          alt={title}
+          className="h-full w-full object-cover"
+        />
       </div>
-      <div className="mt-2 min-w-0">
-        <p className={`line-clamp-2 text-base font-semibold leading-snug sm:text-[1.1rem] ${titleClass}`}>
+      <div className="min-w-0 flex-1">
+        <p
+          className={`line-clamp-2 text-xs font-medium leading-snug ${
+            isUser ? 'text-white' : 'text-gray-900'
+          }`}
+        >
           {title}
         </p>
-        <p className="mt-1 text-base font-bold leading-tight text-red-500 sm:text-lg">
-          {isLoading ? (
-            'Loading...'
-          ) : priceNumber ? (
-            <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
-              <span>{priceNumber}</span>
-              <span className="shrink-0">VND</span>
-            </span>
-          ) : (
-            'Contact us'
-          )}
-        </p>
-        <div className={`mt-1 flex items-center gap-1 text-sm ${subClass}`}>
-          <Star className="h-4 w-4 fill-orange-400 text-orange-400" />
-          <span>{product?.rating?.toFixed?.(1) ?? '0.0'}</span>
+        <div
+          className={`mt-1 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs ${
+            isUser ? 'text-blue-50' : 'text-gray-600'
+          }`}
+        >
+          <span className={`font-semibold ${isUser ? 'text-white' : 'text-gray-900'}`}>
+            {isLoading ? '…' : `$${displayPrice}`}
+          </span>
+          <span className="inline-flex items-center gap-0.5">
+            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+            {rating.toFixed(1)}
+          </span>
         </div>
         <span
-          className={
-            isUser
-              ? 'mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-emerald-300/70 px-2 py-2 text-xs font-medium text-emerald-50 whitespace-nowrap sm:text-sm'
-              : 'mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-gray-300 px-2 py-2 text-xs font-medium text-gray-700 whitespace-nowrap sm:text-sm'
-          }
+          className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium ${
+            isUser ? 'text-blue-100' : 'text-blue-600'
+          }`}
         >
-          <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <ShoppingBag className="h-3 w-3" />
           View product
         </span>
       </div>
@@ -241,8 +236,8 @@ export default function AiMessageMarkdown({ text, variant }: Props) {
   const displayText = stripRawMediaLines(text)
 
   const linkClass = isUser
-    ? 'text-emerald-100 underline break-all hover:text-white'
-    : 'text-emerald-700 underline break-all hover:text-emerald-900'
+    ? 'text-blue-100 underline break-all hover:text-white'
+    : 'text-blue-600 underline break-all hover:text-blue-800'
 
   const components: Components = {
     a: ({ node: _n, className, children, href, ...rest }) => {
@@ -286,11 +281,7 @@ export default function AiMessageMarkdown({ text, variant }: Props) {
       )}
 
       {productEntries.length > 0 && (
-        <div
-          className={`mt-3 w-full grid grid-cols-1 gap-3 [&>*]:w-full ${
-            productEntries.length > 1 ? 'sm:grid-cols-2' : ''
-          }`}
-        >
+        <div className="mt-2 space-y-2">
           {productEntries.map(entry => (
             <ProductPreviewCard key={entry.link} entry={entry} isUser={isUser} />
           ))}

@@ -1,8 +1,10 @@
-const GEMINI_KEY =
-  process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
-const GEMINI_BASE_URL =
-  process.env.GEMINI_BASE_URL ||
-  "https://generativelanguage.googleapis.com/v1beta";
+import {
+  GEMINI_API_KEY,
+  GEMINI_BASE_URL,
+  IMAGE_SEARCH_FALLBACK_MODEL,
+  IMAGE_SEARCH_MODEL,
+  normalizeGeminiModelName,
+} from "./geminiConfig.js";
 
 const IMAGE_SEARCH_ENABLED_RAW = String(
   process.env.IMAGE_SEARCH_ENABLED ?? "true"
@@ -10,10 +12,6 @@ const IMAGE_SEARCH_ENABLED_RAW = String(
 const IMAGE_SEARCH_ENABLED = !["0", "false", "off", "no"].includes(
   IMAGE_SEARCH_ENABLED_RAW
 );
-const IMAGE_SEARCH_MODEL =
-  process.env.IMAGE_SEARCH_MODEL || "gemini-3.1-flash-lite-preview";
-const IMAGE_SEARCH_FALLBACK_MODEL =
-  process.env.IMAGE_SEARCH_FALLBACK_MODEL || "";
 const IMAGE_SEARCH_TIMEOUT_MS = Number(
   process.env.IMAGE_SEARCH_TIMEOUT_MS || 60000
 );
@@ -23,17 +21,10 @@ const IMAGE_SEARCH_RETRY_COUNT = Number(
 
 const normalizeStr = (value) => String(value || "").trim();
 
-const normalizeGeminiModelName = (model) => {
-  const raw = normalizeStr(model);
-  if (!raw) return "gemini-2.5-flash";
-  const noProvider = raw.includes("/") ? raw.split("/").pop() : raw;
-  return noProvider.replace(/:free$/i, "");
-};
-
 const buildEndpointForModel = (modelName) =>
   `${GEMINI_BASE_URL}/models/${encodeURIComponent(
     normalizeGeminiModelName(modelName)
-  )}:generateContent?key=${encodeURIComponent(GEMINI_KEY)}`;
+  )}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
 
 const sanitizeAssistantText = (value, maxLen = 220) =>
   normalizeStr(String(value || ""))
@@ -173,11 +164,24 @@ const fallbackDetection = (text) => {
   };
 };
 
+const imageSearchEndpoints = () => {
+  const primary = buildEndpointForModel(IMAGE_SEARCH_MODEL);
+  const fallbackName = IMAGE_SEARCH_FALLBACK_MODEL
+    ? normalizeGeminiModelName(IMAGE_SEARCH_FALLBACK_MODEL)
+    : "";
+  const primaryName = normalizeGeminiModelName(IMAGE_SEARCH_MODEL);
+  const fallback =
+    fallbackName && fallbackName !== primaryName
+      ? buildEndpointForModel(IMAGE_SEARCH_FALLBACK_MODEL)
+      : "";
+  return [primary, ...(fallback ? [fallback] : [])];
+};
+
 export const buildGeneralProductOverview = async ({
   detected = {},
   productName = "",
 } = {}) => {
-  if (!IMAGE_SEARCH_ENABLED || !GEMINI_KEY) return "";
+  if (!IMAGE_SEARCH_ENABLED || !GEMINI_API_KEY) return "";
   const topic = [
     productName ? `Tên sản phẩm: ${productName}` : "",
     detected?.product_type ? `Loại: ${detected.product_type}` : "",
@@ -206,21 +210,14 @@ export const buildGeneralProductOverview = async ({
 
 export const detectProductFromImage = async ({ buffer, mimeType }) => {
   if (!IMAGE_SEARCH_ENABLED) throw new Error("IMAGE_SEARCH_DISABLED");
-  if (!GEMINI_KEY) throw new Error("MISSING_GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) throw new Error("MISSING_GEMINI_API_KEY");
 
-  const endpointPrimary = buildEndpointForModel(IMAGE_SEARCH_MODEL);
-  const endpointFallback =
-    IMAGE_SEARCH_FALLBACK_MODEL &&
-    normalizeGeminiModelName(IMAGE_SEARCH_FALLBACK_MODEL) !==
-      normalizeGeminiModelName(IMAGE_SEARCH_MODEL)
-      ? buildEndpointForModel(IMAGE_SEARCH_FALLBACK_MODEL)
-      : "";
-  const endpoints = [endpointPrimary, ...(endpointFallback ? [endpointFallback] : [])];
+  const endpoints = imageSearchEndpoints();
   const base64 = buffer.toString("base64");
 
   const prompt = [
     "Bạn là hệ thống nhận diện sản phẩm điện tử từ hình ảnh.",
-    "Trả về đúng 6 dòng key:value, không thêm text khác:",
+    "Phân tích ảnh đính kèm (vision) và trả về đúng 6 dòng key:value, không thêm text khác:",
     "product_type: ...",
     "brand: ...",
     "line_or_model: ...",
@@ -255,3 +252,7 @@ export const detectProductFromImage = async ({ buffer, mimeType }) => {
 
   return fallbackDetection(output);
 };
+
+/** Resolved model id (for logs / health checks). */
+export const getImageSearchModel = () =>
+  normalizeGeminiModelName(IMAGE_SEARCH_MODEL);

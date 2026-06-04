@@ -110,8 +110,16 @@ const Pagination = ({
     }
   }, [])
 
+  const safeTotalPages = Math.max(1, totalPages)
+
   return (
-    <div className="flex justify-center mt-8 mb-8">
+    <nav
+      className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between"
+      aria-label="Product pages"
+    >
+      <p className="text-sm text-gray-500">
+        Page {currentPage} of {safeTotalPages}
+      </p>
       <AntPagination
         current={currentPage}
         total={totalItems}
@@ -119,11 +127,11 @@ const Pagination = ({
         onChange={onPageChange}
         showSizeChanger={false}
         showQuickJumper={false}
-        showPrevNextJumpers={true}
+        showPrevNextJumpers
         showTitle={false}
         className="custom-pagination"
       />
-    </div>
+    </nav>
   )
 }
 

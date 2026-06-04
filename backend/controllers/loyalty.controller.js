@@ -1,6 +1,6 @@
 import { prisma } from "../lib/db.js";
 
-// Quy tắc tích điểm đơn giản: 1 điểm cho mỗi 100.000 VND (hoặc 100 USD tuỳ cấu hình)
+// Earn rule: POINTS_PER_UNIT per UNIT_AMOUNT spent (USD, same as order totals)
 const POINTS_PER_UNIT = Number(process.env.LOYALTY_POINTS_PER_UNIT || 1);
 const UNIT_AMOUNT = Number(process.env.LOYALTY_UNIT_AMOUNT || 100); // đơn vị tiền (cùng currency với order.total_amount)
 const MIN_REDEEM_POINTS = Number(process.env.LOYALTY_MIN_REDEEM_POINTS || 50);
@@ -45,10 +45,11 @@ export const getTierByPoints = (points) =>
 
 const getTierIndex = (tierKey) => TIERS.findIndex((tier) => tier.key === tierKey);
 
-const UPGRADE_VOUCHERS = {
-  SILVER: { discount_type: "percent", discount_value: 5, min_order: 300000, expires_in_days: 30 },
-  GOLD: { discount_type: "percent", discount_value: 10, min_order: 500000, expires_in_days: 45 },
-  PLATINUM: { discount_type: "percent", discount_value: 15, min_order: 700000, expires_in_days: 60 },
+/** Min order uses same currency as catalog/checkout (USD in seed). */
+export const UPGRADE_VOUCHERS = {
+  SILVER: { discount_type: "percent", discount_value: 5, min_order: 300, expires_in_days: 30 },
+  GOLD: { discount_type: "percent", discount_value: 10, min_order: 500, expires_in_days: 45 },
+  PLATINUM: { discount_type: "percent", discount_value: 15, min_order: 700, expires_in_days: 60 },
 };
 
 export const grantUpgradeVouchers = async (tx, userIdBigInt, fromTierKey, toTierKey) => {
@@ -71,9 +72,10 @@ export const grantUpgradeVouchers = async (tx, userIdBigInt, fromTierKey, toTier
     });
 
     let couponId = existingCoupon?.id;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + rewardCfg.expires_in_days);
+
     if (!couponId) {
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + rewardCfg.expires_in_days);
       const created = await tx.coupon.create({
         data: {
           code,
@@ -86,6 +88,16 @@ export const grantUpgradeVouchers = async (tx, userIdBigInt, fromTierKey, toTier
         },
       });
       couponId = created.id;
+    } else {
+      await tx.coupon.update({
+        where: { id: couponId },
+        data: {
+          discount_type: rewardCfg.discount_type,
+          discount_value: rewardCfg.discount_value,
+          min_order: rewardCfg.min_order,
+          expires_at: expiresAt,
+        },
+      });
     }
 
     await tx.user.update({
@@ -179,8 +191,16 @@ export const getLoyaltySummary = async (req, res) => {
           points_per_unit: POINTS_PER_UNIT,
           min_redeem_points: MIN_REDEEM_POINTS,
         },
-        reward_vouchers: user.coupons,
-        transactions,
+        reward_vouchers: user.coupons.map((c) => ({
+          ...c,
+          id: c.id?.toString?.() ?? c.id,
+        })),
+        transactions: transactions.map((t) => ({
+          ...t,
+          id: t.id?.toString?.() ?? t.id,
+          user_id: t.user_id?.toString?.() ?? t.user_id,
+          order_id: t.order_id?.toString?.() ?? t.order_id,
+        })),
       },
     });
   } catch (error) {

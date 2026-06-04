@@ -39,12 +39,18 @@ export type AiProductComparison = {
   form_version: string
   summary: string
   recommendation: string
+  key_differences?: string[]
+  product_overviews?: {
+    product_id: number
+    overview: string
+  }[]
   best_choice: {
     product_id: number
     reason: string
   }
   product_assessments: {
     product_id: number
+    verdict?: string
     strengths: string[]
     limitations: string[]
     best_for: string
@@ -52,6 +58,7 @@ export type AiProductComparison = {
   rows: {
     feature: string
     insight: string
+    winner_product_id?: number | null
     values: {
       product_id: number
       value: string

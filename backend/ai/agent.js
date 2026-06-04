@@ -3,16 +3,18 @@ import {
   HumanMessage,
   SystemMessage,
 } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
-import { HttpsProxyAgent } from "https-proxy-agent";
+import {
+  assertGeminiApiKey,
+  createGeminiChatModel,
+  GEMINI_API_KEY,
+  GEMINI_CHAT_MODEL,
+  hasGeminiApiKey,
+} from "./geminiConfig.js";
 
-const OPENROUTER_MODEL =
-  process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free";
 const EMBED_MODEL =
   process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
-const EMBED_API_KEY =
-  process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+const EMBED_API_KEY = GEMINI_API_KEY;
 const SYSTEM_PROMPT = [
   "Bạn là trợ lý mua sắm cho cửa hàng đồ điện tử. Trả lời ngắn gọn, rõ ràng, ưu tiên tiếng Việt.",
   "Khi đề cập đến sản phẩm trong ngữ cảnh được cung cấp, hãy đưa đúng URL sản phẩm (dạng http://.../product/<slug>) ở một dòng riêng để hệ thống tự render thành card.",
@@ -21,17 +23,6 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 const PRODUCT_BASE_URL =
   process.env.FRONTEND_BASE_URL || "http://localhost:5173";
-const OPENROUTER_BASE_URL =
-  process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1";
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-const AI_PROXY_URL =
-  process.env.AI_HTTP_PROXY ||
-  process.env.HTTPS_PROXY ||
-  process.env.HTTP_PROXY ||
-  "";
-const OPENROUTER_HTTP_AGENT = AI_PROXY_URL
-  ? new HttpsProxyAgent(AI_PROXY_URL)
-  : undefined;
 
 const slugify = (str) =>
   (str || "")
@@ -196,24 +187,14 @@ const normalizePhrase = (value) =>
     .trim();
 
 const createResearchModel = () =>
-  new ChatOpenAI({
-    model: OPENROUTER_MODEL,
+  createGeminiChatModel({
+    model: GEMINI_CHAT_MODEL,
     temperature: 0,
-    apiKey: process.env.OPENROUTER_API_KEY,
-    timeout: 12000,
     maxRetries: 1,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-      httpAgent: OPENROUTER_HTTP_AGENT,
-      defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || PRODUCT_BASE_URL,
-        "X-Title": process.env.OPENROUTER_APP_NAME || "Tech Shop Assistant",
-      },
-    },
   });
 
 const classifyConversationMode = async ({ latestUserText, recentMessages }) => {
-  if (!OPENROUTER_KEY || !latestUserText) return null;
+  if (!hasGeminiApiKey() || !latestUserText) return null;
   try {
     const transcript = (recentMessages || [])
       .map((m, idx) => `${idx + 1}. ${m.role}: ${m.content}`)
@@ -270,7 +251,7 @@ const expandSemanticTokens = async (prisma, question, baseTokens) => {
   const expanded = new Set(baseTokens);
   let focusTerms = [];
   let strictFocus = false;
-  if (!OPENROUTER_KEY || !question) {
+  if (!hasGeminiApiKey() || !question) {
     return { tokens: Array.from(expanded), focusTerms, strictFocus };
   }
 
@@ -395,21 +376,11 @@ const rankAndSliceCandidates = (
   return focused.slice(0, topN);
 };
 
-const createOpenRouterModel = () =>
-  new ChatOpenAI({
-    model: OPENROUTER_MODEL,
+const createChatModel = () =>
+  createGeminiChatModel({
+    model: GEMINI_CHAT_MODEL,
     temperature: 0.2,
-    apiKey: process.env.OPENROUTER_API_KEY,
-    timeout: 30000,
     maxRetries: 2,
-    configuration: {
-      baseURL: OPENROUTER_BASE_URL,
-      httpAgent: OPENROUTER_HTTP_AGENT,
-      defaultHeaders: {
-        "HTTP-Referer": process.env.OPENROUTER_SITE_URL || PRODUCT_BASE_URL,
-        "X-Title": process.env.OPENROUTER_APP_NAME || "Tech Shop Assistant",
-      },
-    },
   });
 
 const retrieveContext = async (prisma, question) => {
@@ -501,9 +472,7 @@ const retrieveContext = async (prisma, question) => {
 
 export const runAgent = async (prisma, chatId) => {
   try {
-    if (!OPENROUTER_KEY) {
-      throw new Error("Missing OPENROUTER_API_KEY");
-    }
+    assertGeminiApiKey();
 
     const fullHistory = await prisma.aiMessage.findMany({
       where: { ai_chat_id: BigInt(chatId) },
@@ -572,15 +541,15 @@ export const runAgent = async (prisma, chatId) => {
       ),
     ];
 
-    const response = await createOpenRouterModel().invoke(messages);
+    const response = await createChatModel().invoke(messages);
     return response.content;
   } catch (err) {
     logDebugError("runAgent invoke error:", err, {
       chatId: String(chatId),
-      model: OPENROUTER_MODEL,
+      model: GEMINI_CHAT_MODEL,
       embedModel: EMBED_MODEL,
-      provider: "openrouter",
-      hasOpenRouterKey: Boolean(OPENROUTER_KEY),
+      provider: "google-ai-studio",
+      hasGeminiKey: hasGeminiApiKey(),
       hasEmbeddingKey: Boolean(EMBED_API_KEY),
     });
     throw err;
