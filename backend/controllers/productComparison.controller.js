@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
 import { compareProductsWithAi } from "../ai/productComparison.js";
 
+/** Keep in sync with frontend/src/client/constants/compare.ts */
 const MIN_PRODUCTS = 2;
 const MAX_PRODUCTS = 4;
 

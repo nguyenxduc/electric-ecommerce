@@ -3,6 +3,7 @@ import ProductCard from '../collection/ProductCard'
 import type { ListProductRes, Product } from '../../types/product'
 import { ProductGridSkeleton, SectionSkeleton } from '../common/LoadingSkeleton'
 import { makeProductSlug } from '../../utils/productSlug'
+import { MAX_COMPARE_PRODUCTS } from '../../constants/compare'
 
 interface ListProductProps {
   title: string
@@ -62,7 +63,9 @@ const ListProduct = ({
               key={product.id}
               slug={makeProductSlug(product.name, product.id)}
               compareSelected={selectedCompareIds.includes(product.id)}
-              compareDisabled={selectedCompareIds.length >= 4}
+              compareDisabled={
+                selectedCompareIds.length >= MAX_COMPARE_PRODUCTS
+              }
               onCompareToggle={onCompareToggle}
             />
           ))}

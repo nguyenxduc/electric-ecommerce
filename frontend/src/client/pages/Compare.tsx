@@ -4,10 +4,12 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useAiProductComparison, useCompareProducts } from '../hooks/useProducts'
 import { ProductDetailSkeleton } from '../components/common/LoadingSkeleton'
 import { getProductColors } from '../utils/productColors'
+import { descriptionPreview } from '../utils/descriptionPreview'
 import type { AiProductComparison, Product } from '../types/product'
-
-const MIN_COMPARE_PRODUCTS = 2
-const MAX_COMPARE_PRODUCTS = 4
+import {
+  MAX_COMPARE_PRODUCTS,
+  MIN_COMPARE_PRODUCTS,
+} from '../constants/compare'
 
 const parseIds = (idsParam: string | null) => {
   if (!idsParam) return []
@@ -18,7 +20,7 @@ const parseIds = (idsParam: string | null) => {
         .map(id => Number(id.trim()))
         .filter(id => Number.isFinite(id) && id > 0)
     )
-  )
+  ).slice(0, MAX_COMPARE_PRODUCTS)
 }
 
 const formatPrice = (value: unknown) => {
@@ -234,7 +236,9 @@ const CompareContent = ({ products, comparison, onBack }: CompareContentProps) =
                 comparison.product_overviews?.find(
                   item => item.product_id === product.id
                 )?.overview ||
-                product.description?.slice(0, 320) ||
+                (product.description
+                  ? descriptionPreview(product.description, 320)
+                  : '') ||
                 '—'
               const isPick = product.id === bestChoiceId
 
@@ -271,12 +275,6 @@ const CompareContent = ({ products, comparison, onBack }: CompareContentProps) =
                   <p className="mt-4 text-sm leading-7 text-gray-700">
                     {overview}
                   </p>
-                  {product.description &&
-                    overview !== product.description && (
-                      <p className="mt-3 text-xs leading-6 text-gray-500 line-clamp-4">
-                        {product.description}
-                      </p>
-                    )}
                   <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-gray-100 pt-4 text-xs">
                     <div>
                       <dt className="text-gray-500">Rating</dt>

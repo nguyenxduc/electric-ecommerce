@@ -17,6 +17,10 @@ import { useFilters } from '../hooks/useFilters'
 import { ListProductRes, Product } from '../types/product'
 import { COLLECTION_PAGE_SIZE } from '../services/productService'
 import { shouldShowPagination } from '../utils/normalizeProductList'
+import {
+  MAX_COMPARE_PRODUCTS,
+  MIN_COMPARE_PRODUCTS,
+} from '../constants/compare'
 
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
 
@@ -253,8 +257,8 @@ const Collection = () => {
         return prev.filter(item => item.id !== product.id)
       }
 
-      if (prev.length >= 4) {
-        toast.error('You can compare up to 4 products.')
+      if (prev.length >= MAX_COMPARE_PRODUCTS) {
+        toast.error(`You can compare up to ${MAX_COMPARE_PRODUCTS} products.`)
         return prev
       }
 
@@ -272,12 +276,14 @@ const Collection = () => {
   }
 
   const handleCompareNow = () => {
-    if (compareIds.length < 2) {
-      toast.error('Select at least 2 products to compare.')
+    if (compareIds.length < MIN_COMPARE_PRODUCTS) {
+      toast.error(
+        `Select at least ${MIN_COMPARE_PRODUCTS} products to compare.`
+      )
       return
     }
     const params = new URLSearchParams({
-      ids: compareIds.join(',')
+      ids: compareIds.slice(0, MAX_COMPARE_PRODUCTS).join(','),
     })
     navigate(`/compare?${params.toString()}`)
   }
@@ -468,11 +474,14 @@ const Collection = () => {
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <span className="font-semibold">{compareIds.length}</span> products selected for comparison.
+                    <span className="font-semibold">
+                      {compareIds.length}/{MAX_COMPARE_PRODUCTS}
+                    </span>{' '}
+                    products selected (min {MIN_COMPARE_PRODUCTS}).
                     <p className="mt-1 text-xs text-blue-800">
                       {compareCategoryName
-                        ? `Showing ${compareCategoryName} products only. Deselect all to see every category.`
-                        : 'Showing products in the same category for comparison.'}
+                        ? `Showing ${compareCategoryName} only — same category, max ${MAX_COMPARE_PRODUCTS} items.`
+                        : `Same category only · up to ${MAX_COMPARE_PRODUCTS} products.`}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -486,7 +495,7 @@ const Collection = () => {
                     <button
                       type="button"
                       onClick={handleCompareNow}
-                      disabled={compareIds.length < 2}
+                      disabled={compareIds.length < MIN_COMPARE_PRODUCTS}
                       className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white transition disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700"
                     >
                       Compare now

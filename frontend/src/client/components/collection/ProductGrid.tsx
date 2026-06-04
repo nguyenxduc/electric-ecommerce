@@ -1,6 +1,7 @@
 import ProductCard from './ProductCard';
 import type { Product } from '../../types/product';
 import { makeProductSlug } from '../../utils/productSlug';
+import { MAX_COMPARE_PRODUCTS } from '../../constants/compare';
 
 interface ProductGridProps {
   products: Product[];
@@ -21,12 +22,12 @@ const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle }
           slug={makeProductSlug(product.name, product.id)}
           compareSelected={selectedCompareIds.includes(product.id)}
           compareDisabled={
-            selectedCompareIds.length >= 4 ||
+            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS ||
             (selectedCategoryId !== undefined && product.category_id !== selectedCategoryId)
           }
           compareDisabledReason={
-            selectedCompareIds.length >= 4
-              ? 'You can compare up to 4 products'
+            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS
+              ? `You can compare up to ${MAX_COMPARE_PRODUCTS} products`
               : 'Only products from the same category can be compared'
           }
           onCompareToggle={onCompareToggle}
@@ -39,12 +40,12 @@ const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle }
           slug={makeProductSlug(product.name, product.id)}
           compareSelected={selectedCompareIds.includes(product.id)}
           compareDisabled={
-            selectedCompareIds.length >= 4 ||
+            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS ||
             (selectedCategoryId !== undefined && product.category_id !== selectedCategoryId)
           }
           compareDisabledReason={
-            selectedCompareIds.length >= 4
-              ? 'You can compare up to 4 products'
+            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS
+              ? `You can compare up to ${MAX_COMPARE_PRODUCTS} products`
               : 'Only products from the same category can be compared'
           }
           onCompareToggle={onCompareToggle}
