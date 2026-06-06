@@ -17,6 +17,7 @@ export const useRedeemPoints = () => {
     mutationFn: redeemPointsSvc,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loyalty', 'summary'] })
+      qc.invalidateQueries({ queryKey: ['coupons', 'my'] })
     }
   })
 }
@@ -81,5 +82,10 @@ export const getTierInfo = (points: number) => {
 
 export const getNextTier = (points: number) => {
   const idx = TIERS.findIndex(t => points >= t.min && points <= t.max)
+  return idx >= 0 && idx < TIERS.length - 1 ? TIERS[idx + 1] : null
+}
+
+export const getNextTierByKey = (tierKey: string) => {
+  const idx = TIERS.findIndex(t => t.key === tierKey)
   return idx >= 0 && idx < TIERS.length - 1 ? TIERS[idx + 1] : null
 }

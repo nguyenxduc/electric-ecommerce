@@ -3,7 +3,7 @@ import { prisma } from "../lib/db.js";
 // Earn rule: POINTS_PER_UNIT per UNIT_AMOUNT spent (USD, same as order totals)
 const POINTS_PER_UNIT = Number(process.env.LOYALTY_POINTS_PER_UNIT || 1);
 const UNIT_AMOUNT = Number(process.env.LOYALTY_UNIT_AMOUNT || 100); // đơn vị tiền (cùng currency với order.total_amount)
-const MIN_REDEEM_POINTS = Number(process.env.LOYALTY_MIN_REDEEM_POINTS || 50);
+const MIN_REDEEM_POINTS = Number(process.env.LOYALTY_MIN_REDEEM_POINTS || 100);
 
 export const TIERS = [
   {
@@ -167,7 +167,10 @@ export const getLoyaltySummary = async (req, res) => {
     }
 
     const points = user.loyalty_points || 0;
-    const tier = getTierByPoints(points);
+    // Tier is determined by stored segment (set only when earning points, never decremented on redeem)
+    // Fall back to points-based calculation only if segment hasn't been set yet
+    const tierFromSegment = user.segment ? TIERS.find(t => t.key === user.segment) : null;
+    const tier = tierFromSegment || getTierByPoints(points);
 
     return res.json({
       success: true,
@@ -176,7 +179,7 @@ export const getLoyaltySummary = async (req, res) => {
           id: user.id.toString(),
           name: user.name,
           loyalty_points: points,
-          segment: user.segment || tier.key,
+          segment: tier.key,
         },
         tier: {
           key: tier.key,
@@ -212,11 +215,14 @@ export const getLoyaltySummary = async (req, res) => {
   }
 };
 
-// Đổi điểm lấy quà / voucher (logic đơn giản: trừ điểm)
+// Tỉ lệ quy đổi: REDEEM_POINTS_PER_DOLLAR điểm = $1 giảm giá
+const REDEEM_POINTS_PER_DOLLAR = Number(process.env.LOYALTY_REDEEM_POINTS_PER_DOLLAR || 100);
+
+// Đổi điểm lấy voucher giảm giá
 export const redeemPoints = async (req, res) => {
   try {
     const userId = BigInt(req.user.id);
-    const { points: rawPoints, description } = req.body || {};
+    const { points: rawPoints } = req.body || {};
     const points = Number.parseInt(rawPoints, 10);
 
     if (!Number.isInteger(points) || points <= 0) {
@@ -228,7 +234,13 @@ export const redeemPoints = async (req, res) => {
     if (points < MIN_REDEEM_POINTS) {
       return res.status(400).json({
         success: false,
-        error: `Phai doi toi thieu ${MIN_REDEEM_POINTS} diem`,
+        error: `Minimum redeem is ${MIN_REDEEM_POINTS} points`,
+      });
+    }
+    if (points % REDEEM_POINTS_PER_DOLLAR !== 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Points must be a multiple of ${REDEEM_POINTS_PER_DOLLAR}`,
       });
     }
 
@@ -238,10 +250,7 @@ export const redeemPoints = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
     if (user.loyalty_points < points) {
@@ -251,33 +260,67 @@ export const redeemPoints = async (req, res) => {
       });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const discountValue = Math.floor(points / REDEEM_POINTS_PER_DOLLAR);
+    if (discountValue <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cần ít nhất ${REDEEM_POINTS_PER_DOLLAR} điểm để đổi $1 giảm giá`,
+      });
+    }
+
+    const userIdText = userId.toString();
+    const timestamp = Date.now();
+    const couponCode = `RD-${userIdText}-${timestamp}`;
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const coupon = await tx.coupon.create({
+        data: {
+          code: couponCode,
+          description: `Redeemed ${points} pts — $${discountValue} off`,
+          discount_type: "fixed",
+          discount_value: discountValue,
+          min_order: 0,
+          usage_limit: 1,
+          expires_at: expiresAt,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { coupons: { connect: { id: coupon.id } } },
+      });
+
       await tx.loyaltyPointTransaction.create({
         data: {
           user_id: userId,
           points: -points,
           type: "REDEEM",
-          description: description?.trim() || "Redeem reward",
+          description: `Redeemed ${points} pts for voucher ${couponCode} ($${discountValue} off)`,
         },
       });
 
-      const nextPoints = user.loyalty_points - points;
-      const nextTier = getTierByPoints(nextPoints);
-
-      return tx.user.update({
+      // Tier is based on lifetime earned points, not current balance — do NOT downgrade on redeem
+      const updatedUser = await tx.user.update({
         where: { id: userId },
-        data: {
-          loyalty_points: { decrement: points },
-          segment: nextTier.key,
-        },
+        data: { loyalty_points: { decrement: points } },
       });
+
+      return { updatedUser, coupon };
     });
 
     return res.json({
       success: true,
-      message: "Đổi điểm thành công",
+      message: `Points redeemed! A $${discountValue} off voucher has been added to your warehouse.`,
       data: {
-        loyalty_points: updated.loyalty_points,
+        loyalty_points: result.updatedUser.loyalty_points,
+        voucher: {
+          code: couponCode,
+          discount_value: discountValue,
+          discount_type: "fixed",
+          expires_at: expiresAt,
+        },
       },
     });
   } catch (error) {

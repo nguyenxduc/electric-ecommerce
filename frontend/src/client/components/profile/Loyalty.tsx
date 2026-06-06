@@ -12,7 +12,7 @@ import {
   useLoyaltySummary,
   useRedeemPoints,
   getTierInfo,
-  getNextTier,
+  getNextTierByKey,
   TIERS
 } from '../../hooks/useLoyalty'
 
@@ -62,8 +62,8 @@ export default function Loyalty() {
   const redeemMutation = useRedeemPoints()
 
   const [redeemAmount, setRedeemAmount] = useState('')
-  const [redeemDesc, setRedeemDesc] = useState('')
   const [showRedeemForm, setShowRedeemForm] = useState(false)
+  const [redeemResult, setRedeemResult] = useState<{ code: string; discount_value: number } | null>(null)
 
   if (isLoading) {
     return (
@@ -96,14 +96,10 @@ export default function Loyalty() {
       : user.segment && TIERS.some(t => t.key === user.segment)
         ? TIERS.find(t => t.key === user.segment)!
       : getTierInfo(points)
-  const nextTier = getNextTier(points)
+  // Next tier based on current tier key (not current points balance) so redeeming points doesn't affect progress display
+  const nextTier = getNextTierByKey(tierInfo.key)
   const progress = nextTier
-    ? Math.min(
-        100,
-        Math.round(
-          ((points - tierInfo.min) / (nextTier.min - tierInfo.min)) * 100
-        )
-      )
+    ? Math.min(100, Math.round((points / nextTier.min) * 100))
     : 100
 
   const badgeStyle =
@@ -119,19 +115,24 @@ export default function Loyalty() {
       toast.error(`Minimum redeem is ${minRedeemPoints} points`)
       return
     }
+    if (pts % 100 !== 0) {
+      toast.error('Points must be a multiple of 100')
+      return
+    }
     if (pts > points) {
       toast.error('Not enough points')
       return
     }
     try {
-      await redeemMutation.mutateAsync({
-        points: pts,
-        description: redeemDesc || 'Redeem reward'
-      })
-      toast.success(`Successfully redeemed ${pts} points!`)
+      const res = await redeemMutation.mutateAsync({ points: pts })
+      const voucher = res?.data?.voucher
       setRedeemAmount('')
-      setRedeemDesc('')
       setShowRedeemForm(false)
+      if (voucher) {
+        setRedeemResult({ code: voucher.code, discount_value: voucher.discount_value })
+      } else {
+        toast.success(`Đổi ${pts} điểm thành công!`)
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'Failed to redeem points')
     }
@@ -190,9 +191,9 @@ export default function Loyalty() {
               </div>
               <p className="text-xs text-gray-600 mt-2">
                 <span className="font-semibold text-gray-800">
-                  {(nextTier.min - points).toLocaleString()} pts
+                  {points.toLocaleString()} / {nextTier.min.toLocaleString()} pts
                 </span>{' '}
-                more to reach{' '}
+                earned to reach{' '}
                 <span className="font-semibold text-blue-700">
                   {nextTier.label}
                 </span>
@@ -290,6 +291,46 @@ export default function Loyalty() {
         )}
       </div>
 
+      {/* Voucher nhận được sau khi đổi điểm */}
+      {redeemResult && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-emerald-800 mb-1">
+                A ${redeemResult.discount_value} off voucher has been added to your warehouse!
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="font-mono text-sm tracking-widest bg-white border-2 border-dashed border-emerald-300 text-emerald-700 px-3 py-1.5 rounded-lg select-all">
+                  {redeemResult.code}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(redeemResult.code)
+                    toast.success('Voucher code copied!')
+                  }}
+                  className="text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="text-xs text-emerald-600 mt-2">
+                Use this code at checkout. Valid for 30 days.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRedeemResult(null)}
+              className="text-emerald-400 hover:text-emerald-600 text-lg leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Redeem */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
@@ -312,6 +353,9 @@ export default function Loyalty() {
 
         {showRedeemForm ? (
           <div className="space-y-3">
+            <p className="text-xs text-gray-500">
+              100 pts = $1 off. The voucher will be added to your voucher warehouse automatically.
+            </p>
             <div>
               <label className="block text-xs font-medium text-blue-700 mb-1.5">
                 Points to redeem
@@ -320,23 +364,18 @@ export default function Loyalty() {
                 type="number"
                 min={minRedeemPoints}
                 max={points}
+                step={100}
                 value={redeemAmount}
                 onChange={e => setRedeemAmount(e.target.value)}
                 className="w-full border-2 border-blue-100 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-0"
-                placeholder={`Min: ${minRedeemPoints} • Max: ${points.toLocaleString()} pts`}
+                placeholder={`Multiples of 100 • Max: ${points.toLocaleString()} pts`}
               />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-blue-700 mb-1.5">
-                Note (optional)
-              </label>
-              <input
-                type="text"
-                value={redeemDesc}
-                onChange={e => setRedeemDesc(e.target.value)}
-                className="w-full border-2 border-blue-100 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-0"
-                placeholder="e.g. Redeem for discount voucher"
-              />
+              {redeemAmount && parseInt(redeemAmount) >= minRedeemPoints && (
+                <p className="text-xs text-blue-600 mt-1.5">
+                  → You will receive a{' '}
+                  <strong>${Math.floor(parseInt(redeemAmount) / 100)}</strong> off voucher
+                </p>
+              )}
             </div>
             <div className="flex gap-2 pt-1">
               <button
@@ -352,7 +391,6 @@ export default function Loyalty() {
                 onClick={() => {
                   setShowRedeemForm(false)
                   setRedeemAmount('')
-                  setRedeemDesc('')
                 }}
                 className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors"
               >
@@ -365,8 +403,8 @@ export default function Loyalty() {
             You have{' '}
             <span className="font-semibold text-gray-900">
               {points.toLocaleString()} pts
-            </span>{' '}
-            available to redeem. Minimum redeem: {minRedeemPoints} pts.
+            </span>
+            . Redeem points for discount vouchers — 100 pts = $1. Minimum: {minRedeemPoints} pts.
           </p>
         )}
       </div>

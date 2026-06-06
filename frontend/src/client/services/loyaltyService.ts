@@ -50,14 +50,19 @@ export const getLoyaltySummary = async (): Promise<LoyaltySummary> => {
   return data.data
 }
 
-export const redeemPoints = async (payload: {
-  points: number
-  description?: string
-}) => {
+export const redeemPoints = async (payload: { points: number }) => {
   const { data } = await axiosClient.post<{
     success: boolean
     message: string
-    data: { loyalty_points: number }
+    data: {
+      loyalty_points: number
+      voucher?: {
+        code: string
+        discount_value: number
+        discount_type: string
+        expires_at: string
+      }
+    }
   }>('/loyalty/redeem', payload)
   return data
 }
