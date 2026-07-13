@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "./shop.controller.js";
 
 const computeCouponDiscount = (coupon, amount) => {
   if (coupon.discount_type === "percent") {
@@ -6,6 +7,8 @@ const computeCouponDiscount = (coupon, amount) => {
   }
   return Number(coupon.discount_value);
 };
+
+const couponShopSelect = { id: true, name: true, slug: true };
 
 export const createCoupon = async (req, res) => {
   try {
@@ -54,6 +57,7 @@ export const validateCoupon = async (req, res) => {
 
     const coupon = await prisma.coupon.findFirst({
       where: { code, deleted_at: null },
+      include: { shop: { select: couponShopSelect } },
     });
     if (!coupon) {
       return res.status(404).json({ message: "Invalid coupon code" });
@@ -146,6 +150,7 @@ export const validateMyCoupon = async (req, res) => {
         deleted_at: null,
         users: { some: { id: userId } },
       },
+      include: { shop: { select: couponShopSelect } },
     });
 
     if (!coupon) {
@@ -305,5 +310,134 @@ export const deleteCoupon = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to delete coupon", error: error.message });
+  }
+};
+
+// GET /api/coupons/shop/:slug — public: a shop's usable vouchers (shop page display)
+export const getShopCoupons = async (req, res) => {
+  try {
+    const now = new Date();
+    const coupons = await prisma.coupon.findMany({
+      where: {
+        deleted_at: null,
+        shop: {
+          slug: req.params.slug,
+          status: SHOP_STATUS.ACTIVE,
+          deleted_at: null,
+        },
+        OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+        // personal vouchers (assigned to users) are not publicly listed
+        users: { none: {} },
+      },
+      orderBy: { created_at: "desc" },
+      take: 10,
+    });
+
+    const usable = coupons.filter(
+      (c) =>
+        c.usage_limit == null ||
+        c.used_count == null ||
+        c.used_count < c.usage_limit
+    );
+
+    res.json({ success: true, data: { coupons: usable } });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to get shop coupons", error: error.message });
+  }
+};
+
+// GET /api/coupons/shop/mine/list — seller: own shop's vouchers
+export const getMyShopCoupons = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(400).json({ message: "No shop attached to this account" });
+    }
+    const coupons = await prisma.coupon.findMany({
+      where: { shop_id: req.shop.id, deleted_at: null },
+      orderBy: { created_at: "desc" },
+    });
+    res.json({ coupons });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to get shop coupons", error: error.message });
+  }
+};
+
+// POST /api/coupons/shop — seller creates a voucher for their own shop
+export const createShopCoupon = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(400).json({ message: "No shop attached to this account" });
+    }
+    const {
+      code,
+      description,
+      discount_type = "percent",
+      discount_value,
+      min_order,
+      usage_limit = 100,
+      expires_at,
+    } = req.body;
+
+    if (!code || !discount_value) {
+      return res
+        .status(400)
+        .json({ message: "code and discount_value are required" });
+    }
+
+    const existingCoupon = await prisma.coupon.findFirst({
+      where: { code, deleted_at: null },
+    });
+    if (existingCoupon) {
+      return res.status(400).json({ message: "Coupon code already exists" });
+    }
+
+    const savedCoupon = await prisma.coupon.create({
+      data: {
+        code: String(code).toUpperCase().trim(),
+        description,
+        discount_type,
+        discount_value,
+        min_order,
+        usage_limit,
+        shop_id: req.shop.id,
+        expires_at: expires_at ? new Date(expires_at) : null,
+      },
+    });
+    res.status(201).json({
+      message: "Shop voucher created successfully",
+      coupon: savedCoupon,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to create shop voucher", error: error.message });
+  }
+};
+
+// DELETE /api/coupons/shop/:id — seller deletes their own shop's voucher
+export const deleteShopCoupon = async (req, res) => {
+  try {
+    if (!req.shop) {
+      return res.status(400).json({ message: "No shop attached to this account" });
+    }
+    const coupon = await prisma.coupon.findFirst({
+      where: { id: BigInt(req.params.id), deleted_at: null },
+    });
+    if (!coupon || coupon.shop_id?.toString() !== req.shop.id.toString()) {
+      return res.status(404).json({ message: "Coupon not found" });
+    }
+    await prisma.coupon.update({
+      where: { id: coupon.id },
+      data: { deleted_at: new Date() },
+    });
+    res.json({ message: "Shop voucher deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Failed to delete shop voucher", error: error.message });
   }
 };

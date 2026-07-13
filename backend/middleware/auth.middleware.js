@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/db.js";
+import { ROLES } from "../constants/roles.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -65,14 +66,49 @@ export const protectRoute = async (req, res, next) => {
 };
 
 export const adminRoute = (req, res, next) => {
-  // if (req.user && req.user.role === "admin") {
-  //   next();
-  // } else {
-  //   return res.status(403).json({
-  //     success: false,
-  //     error: "Access denied - Admin only",
-  //   });
-  // }
+  if (req.user && req.user.role === ROLES.ADMIN) {
+    return next();
+  }
+  return res.status(403).json({
+    success: false,
+    error: "Access denied - Admin only",
+  });
+};
 
-  next();
+// Requires the caller to be a seller (or admin). For sellers, loads their
+// shop and attaches it as req.shop. Does not require the shop to be active —
+// a pending/rejected seller still needs to reach their own shop profile.
+export const sellerRoute = async (req, res, next) => {
+  try {
+    if (
+      !req.user ||
+      (req.user.role !== ROLES.SELLER && req.user.role !== ROLES.ADMIN)
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Access denied - Seller only",
+      });
+    }
+
+    if (req.user.role === ROLES.SELLER) {
+      const shop = await prisma.shop.findUnique({
+        where: { owner_id: BigInt(req.user.id) },
+      });
+      if (!shop || shop.deleted_at) {
+        return res.status(403).json({
+          success: false,
+          error: "No shop found for this account",
+        });
+      }
+      req.shop = shop;
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in sellerRoute middleware:", error.message);
+    return res.status(500).json({
+      success: false,
+      error: "Authorization check failed",
+    });
+  }
 };

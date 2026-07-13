@@ -4,6 +4,17 @@ import {
   buildGeneralProductOverview,
   detectProductFromImage,
 } from "../ai/imageSearch.js";
+import { ROLES } from "../constants/roles.js";
+import { SHOP_STATUS } from "./shop.controller.js";
+import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
+
+const shopSelect = { id: true, name: true, slug: true, status: true };
+
+// Buyers only see products from active shops; admins see everything.
+const buyerVisibilityWhere = (req) =>
+  req?.user?.role === ROLES.ADMIN
+    ? {}
+    : { shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null } };
 
 // Helper function to calculate final_price and discount_percentage
 const calculateProductPrices = (product) => {
@@ -38,22 +49,17 @@ const calculateProductPrices = (product) => {
   };
 };
 
-const parsePagination = (page, limit) => {
-  const currentPage = Math.max(1, Number(page) || 1);
-  const perPage = Math.min(100, Math.max(1, Number(limit) || 20));
-  return {
-    currentPage,
-    perPage,
-    skip: (currentPage - 1) * perPage,
-  };
+// Maps the public `sort` query param to a Prisma orderBy clause.
+const SORT_ORDER_BY = {
+  "price-asc": { price: "asc" },
+  "price-desc": { price: "desc" },
+  rating: { rating: "desc" },
+  popular: { sold: "desc" },
+  newest: { created_at: "desc" },
 };
 
-const buildPaginationMeta = (currentPage, perPage, total) => ({
-  current_page: currentPage,
-  per_page: perPage,
-  total_count: total,
-  total_pages: total === 0 ? 0 : Math.ceil(total / perPage),
-});
+const resolveOrderBy = (sort) =>
+  SORT_ORDER_BY[sort] || { created_at: "desc" };
 
 const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
   const [total_count, products] = await Promise.all([
@@ -63,7 +69,7 @@ const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
       orderBy,
       skip,
       take,
-      include: { product_colors: true },
+      include: { product_colors: true, shop: { select: shopSelect } },
     }),
   ]);
   return { total_count, products };
@@ -210,6 +216,26 @@ export const createProduct = async (req, res) => {
       return BigInt(num);
     };
 
+    // Sellers always create under their own shop (client-supplied shop_id is
+    // ignored); admins must name the target shop explicitly.
+    let shopId;
+    if (req.user.role === ROLES.ADMIN) {
+      shopId = parseBigIntOrUndefined(req.body.shop_id);
+      if (!shopId) {
+        return res.status(400).json({
+          message: "shop_id is required when creating a product as admin",
+        });
+      }
+      const targetShop = await prisma.shop.findUnique({
+        where: { id: shopId },
+      });
+      if (!targetShop || targetShop.deleted_at) {
+        return res.status(404).json({ message: "Shop not found" });
+      }
+    } else {
+      shopId = req.shop.id;
+    }
+
     // ✅ đảm bảo JSON đúng kiểu
     const specsJson = parseJsonArray(specs);
     const specsDetailJson = parseJsonArray(specs_detail);
@@ -241,6 +267,7 @@ export const createProduct = async (req, res) => {
           specs: specsJson, // ✅ JSON
           specs_detail: specsDetailJson, // ✅ JSON
           color: colorJson, // ✅ JSON
+          shop_id: shopId,
           category_id: parseBigIntOrUndefined(category_id),
           sub_category_id: parseSubCategory(sub_category_id),
           description: String(description),
@@ -292,6 +319,7 @@ export const getAllProducts = async (req, res) => {
       "search",
       "category_id",
       "sub_category_id",
+      "shop_id",
       "in_stock",
       "price_min",
       "price_max",
@@ -305,6 +333,7 @@ export const getAllProducts = async (req, res) => {
       search,
       category_id,
       sub_category_id,
+      shop_id,
       in_stock,
       price_min,
       price_max,
@@ -332,6 +361,7 @@ export const getAllProducts = async (req, res) => {
     if (search) where.name = { contains: String(search), mode: "insensitive" };
     if (category_id) where.category_id = BigInt(category_id);
     if (sub_category_id) where.sub_category_id = BigInt(sub_category_id);
+    if (shop_id) where.shop_id = BigInt(shop_id);
     if (in_stock === "true") where.quantity = { gt: 0 };
     if (discount === "true") where.discount = { gt: 0 };
     if (price_min || price_max) {
@@ -340,15 +370,10 @@ export const getAllProducts = async (req, res) => {
       if (price_max) where.price.lte = Number(price_max);
     }
 
-    let orderBy = { created_at: "desc" };
-    if (sort === "price-asc") orderBy = { price: "asc" };
-    else if (sort === "price-desc") orderBy = { price: "desc" };
-    else if (sort === "rating") orderBy = { rating: "desc" };
-    else if (sort === "newest") orderBy = { created_at: "desc" };
-    else if (sort === "popular") orderBy = { sold: "desc" };
+    const orderBy = resolveOrderBy(sort);
 
     const { currentPage, perPage, skip } = parsePagination(page, limit);
-    const baseWhere = { ...where, deleted_at: null };
+    const baseWhere = { ...where, deleted_at: null, ...buyerVisibilityWhere(req) };
 
     if (Object.keys(filterParams).length === 0) {
       const { total_count, products } = await fetchPaginatedProducts(
@@ -585,12 +610,27 @@ export const getProductById = async (req, res) => {
   try {
     const product = await prisma.product.findFirst({
       where: { id: BigInt(req.params.id), deleted_at: null },
-      include: { product_colors: true },
+      include: {
+        product_colors: true,
+        shop: { select: { ...shopSelect, owner_id: true } },
+      },
     });
-    if (!product) {
+
+    const isAdmin = req.user?.role === ROLES.ADMIN;
+    const isShopOwner =
+      req.user && product?.shop?.owner_id?.toString() === req.user.id;
+    if (
+      !product ||
+      (product.shop?.status !== SHOP_STATUS.ACTIVE && !isAdmin && !isShopOwner)
+    ) {
       return res.status(404).json({ message: "Product not found" });
     }
-    const productWithCalculations = calculateProductPrices(product);
+
+    const { owner_id, ...publicShop } = product.shop || {};
+    const productWithCalculations = calculateProductPrices({
+      ...product,
+      shop: publicShop,
+    });
     const in_stock = Number(productWithCalculations.quantity) > 0;
     res.json({ ...productWithCalculations, in_stock });
   } catch (error) {
@@ -770,7 +810,7 @@ export const searchProducts = async (req, res) => {
       limit = 20,
     } = req.query;
 
-    const where = { deleted_at: null };
+    const where = { deleted_at: null, ...buyerVisibilityWhere(req) };
     if (query) where.name = { contains: String(query), mode: "insensitive" };
     if (category_id) where.category_id = BigInt(category_id);
     if (sub_category_id) where.sub_category_id = BigInt(sub_category_id);
@@ -781,11 +821,7 @@ export const searchProducts = async (req, res) => {
     }
     if (rating_min) where.rating = { gte: Number(rating_min) };
 
-    let orderBy = { created_at: "desc" };
-    if (sort === "price-asc") orderBy = { price: "asc" };
-    else if (sort === "price-desc") orderBy = { price: "desc" };
-    else if (sort === "rating") orderBy = { rating: "desc" };
-    else if (sort === "popular") orderBy = { sold: "desc" };
+    const orderBy = resolveOrderBy(sort);
 
     const { currentPage, perPage, skip } = parsePagination(page, limit);
 
@@ -849,9 +885,10 @@ export const searchProductsByImage = async (req, res) => {
       exactCandidates = await prisma.product.findMany({
         where: {
           deleted_at: null,
+          ...buyerVisibilityWhere(req),
           name: { contains: detected.line_or_model, mode: "insensitive" },
         },
-        include: { product_colors: true },
+        include: { product_colors: true, shop: { select: shopSelect } },
         take: 16,
       });
 
@@ -885,12 +922,13 @@ export const searchProductsByImage = async (req, res) => {
       relatedCandidates = await prisma.product.findMany({
         where: {
           deleted_at: null,
+          ...buyerVisibilityWhere(req),
           OR: queryTokens.flatMap((token) => [
             { name: { contains: token, mode: "insensitive" } },
             { description: { contains: token, mode: "insensitive" } },
           ]),
         },
-        include: { product_colors: true },
+        include: { product_colors: true, shop: { select: shopSelect } },
         take: 40,
       });
     }
@@ -1078,15 +1116,12 @@ export const getProductsByCategory = async (req, res) => {
     const { page = 1, limit = 20, sort = "newest" } = req.query;
     const { currentPage, perPage, skip } = parsePagination(page, limit);
 
-    let orderBy = { created_at: "desc" };
-    if (sort === "price-asc") orderBy = { price: "asc" };
-    else if (sort === "price-desc") orderBy = { price: "desc" };
-    else if (sort === "rating") orderBy = { rating: "desc" };
-    else if (sort === "popular") orderBy = { sold: "desc" };
+    const orderBy = resolveOrderBy(sort);
 
     const where = {
       category_id: BigInt(req.params.categoryId),
       deleted_at: null,
+      ...buyerVisibilityWhere(req),
     };
 
     const { total_count, products } = await fetchPaginatedProducts(
@@ -1108,14 +1143,90 @@ export const getProductsByCategory = async (req, res) => {
   }
 };
 
+// GET /api/shops/:slug/products — public product listing for a shop page
 export const getProductsByShop = async (req, res) => {
   try {
-    return res
-      .status(400)
-      .json({ message: "Shop filter not supported in current schema" });
+    const { page = 1, limit = 20, sort = "newest", search } = req.query;
+    const { currentPage, perPage, skip } = parsePagination(page, limit);
+
+    const shop = await prisma.shop.findFirst({
+      where: {
+        slug: req.params.slug,
+        status: SHOP_STATUS.ACTIVE,
+        deleted_at: null,
+      },
+      select: { id: true },
+    });
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    const orderBy = resolveOrderBy(sort);
+
+    const where = {
+      shop_id: shop.id,
+      deleted_at: null,
+      ...(search && {
+        name: { contains: String(search), mode: "insensitive" },
+      }),
+    };
+
+    const { total_count, products } = await fetchPaginatedProducts(
+      where,
+      orderBy,
+      skip,
+      perPage
+    );
+
+    res.json({
+      products: products.map(calculateProductPrices),
+      pagination: buildPaginationMeta(currentPage, perPage, total_count),
+    });
   } catch (error) {
     res.status(500).json({
       message: "Failed to get products by shop",
+      error: error.message,
+    });
+  }
+};
+
+// GET /api/products/shop/mine — seller dashboard list (own shop, any status)
+export const getMyShopProducts = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, sort = "newest", search } = req.query;
+    const { currentPage, perPage, skip } = parsePagination(page, limit);
+
+    // Admins have no shop of their own; they use GET /api/products?shop_id=...
+    if (!req.shop) {
+      return res.status(400).json({
+        message: "No shop attached to this account; use ?shop_id= filter instead",
+      });
+    }
+
+    const orderBy = resolveOrderBy(sort);
+
+    const where = {
+      shop_id: req.shop.id,
+      deleted_at: null,
+      ...(search && {
+        name: { contains: String(search), mode: "insensitive" },
+      }),
+    };
+
+    const { total_count, products } = await fetchPaginatedProducts(
+      where,
+      orderBy,
+      skip,
+      perPage
+    );
+
+    res.json({
+      products: products.map(calculateProductPrices),
+      pagination: buildPaginationMeta(currentPage, perPage, total_count),
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to get shop products",
       error: error.message,
     });
   }
@@ -1299,8 +1410,9 @@ export const getSimilarProducts = async (req, res) => {
           category_id: currentProduct.category_id,
           id: { not: BigInt(id) },
           deleted_at: null,
+          ...buyerVisibilityWhere(req),
         },
-        include: { product_colors: true },
+        include: { product_colors: true, shop: { select: shopSelect } },
         orderBy: { rating: "desc" },
         take: Number(limit),
       });
@@ -1328,7 +1440,7 @@ export const getSimilarProducts = async (req, res) => {
     // Find similar products using trigram similarity
     // similarity() function returns a value between 0 and 1, where 1 is identical
     const similarProducts = await prisma.$queryRaw`
-      SELECT 
+      SELECT
         p.id,
         p.name,
         p.price,
@@ -1338,6 +1450,7 @@ export const getSimilarProducts = async (req, res) => {
         p.specs,
         p.specs_detail,
         p.color,
+        p.shop_id,
         p.category_id,
         p.sub_category_id,
         p.rating,
@@ -1349,8 +1462,11 @@ export const getSimilarProducts = async (req, res) => {
           currentProduct.description
         }) as similarity_score
       FROM products p
+      JOIN shops s ON s.id = p.shop_id
       WHERE p.id != ${BigInt(id)}
         AND p.deleted_at IS NULL
+        AND s.status = 'active'
+        AND s.deleted_at IS NULL
         AND p.description IS NOT NULL
         AND p.description != ''
         AND similarity(p.description, ${currentProduct.description}) > 0.1
@@ -1365,8 +1481,9 @@ export const getSimilarProducts = async (req, res) => {
           category_id: currentProduct.category_id,
           id: { not: BigInt(id) },
           deleted_at: null,
+          ...buyerVisibilityWhere(req),
         },
-        include: { product_colors: true },
+        include: { product_colors: true, shop: { select: shopSelect } },
         orderBy: { rating: "desc" },
         take: Number(limit),
       });

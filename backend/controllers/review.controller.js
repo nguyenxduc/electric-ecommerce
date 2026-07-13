@@ -24,6 +24,31 @@ export const createReview = async (req, res) => {
     const { productId, rating, comment } = req.body;
     const userId = req.user.id;
 
+    const product = await prisma.product.findUnique({
+      where: { id: BigInt(productId) },
+    });
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // Only buyers who actually received the product may review it
+    const purchased = await prisma.orderItem.findFirst({
+      where: {
+        product_id: BigInt(productId),
+        order: {
+          user_id: BigInt(userId),
+          status: "delivered",
+          deleted_at: null,
+        },
+      },
+      select: { id: true },
+    });
+    if (!purchased) {
+      return res.status(403).json({
+        message: "You can only review products from your delivered orders",
+      });
+    }
+
     const existingReview = await prisma.review.findFirst({
       where: { user_id: BigInt(userId), product_id: BigInt(productId) },
     });
@@ -31,13 +56,6 @@ export const createReview = async (req, res) => {
       return res
         .status(400)
         .json({ message: "You have already reviewed this product" });
-    }
-
-    const product = await prisma.product.findUnique({
-      where: { id: BigInt(productId) },
-    });
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
     }
 
     if (rating < 1 || rating > 5) {

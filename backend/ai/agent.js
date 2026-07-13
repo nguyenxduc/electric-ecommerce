@@ -16,7 +16,8 @@ const EMBED_MODEL =
   process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const EMBED_API_KEY = GEMINI_API_KEY;
 const SYSTEM_PROMPT = [
-  "Bạn là trợ lý mua sắm cho cửa hàng đồ điện tử. Trả lời ngắn gọn, rõ ràng, ưu tiên tiếng Việt.",
+  "Bạn là trợ lý mua sắm cho sàn thương mại điện tử đa gian hàng (nhiều shop cùng bán đồ điện tử). Trả lời ngắn gọn, rõ ràng, ưu tiên tiếng Việt.",
+  "Khi ngữ cảnh có tên gian hàng (shop) bán sản phẩm, hãy nhắc đến gian hàng đó (ví dụ: 'bán bởi Tech World').",
   "Khi đề cập đến sản phẩm trong ngữ cảnh được cung cấp, hãy đưa đúng URL sản phẩm (dạng http://.../product/<slug>) ở một dòng riêng để hệ thống tự render thành card.",
   "Không cần liệt kê URL ảnh hay lặp lại nhiều link ảnh — frontend sẽ tự lấy ảnh từ link sản phẩm.",
   "Không bịa link, chỉ dùng đúng các URL trong ngữ cảnh. Nếu chưa đủ thông tin, hãy hỏi lại.",
@@ -235,6 +236,7 @@ const buildAICatalogHints = async (prisma) => {
     `
     SELECT p.name, COALESCE(pe.content, '') AS content
     FROM products p
+    JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
     LEFT JOIN product_embeddings pe ON p.id = pe.product_id
     WHERE p.deleted_at IS NULL
     ORDER BY p.updated_at DESC NULLS LAST
@@ -404,6 +406,7 @@ const retrieveContext = async (prisma, question) => {
         `
         SELECT p.id, p.name, p.price, p.img, COALESCE(pe.content, '') AS content
         FROM products p
+        JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
         LEFT JOIN product_embeddings pe ON p.id = pe.product_id
         WHERE p.deleted_at IS NULL
           AND (${keywordClause})
@@ -438,6 +441,7 @@ const retrieveContext = async (prisma, question) => {
       SELECT p.id, p.name, p.price, p.img, pe.content
       FROM product_embeddings pe
       JOIN products p ON p.id = pe.product_id
+      JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
       WHERE p.deleted_at IS NULL
       ORDER BY pe.embedding <-> '${vectorLiteral}'::vector
       LIMIT ${candidateLimit};

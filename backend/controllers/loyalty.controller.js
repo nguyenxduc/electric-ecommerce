@@ -372,3 +372,48 @@ export const earnPointsForOrder = async (tx, userIdBigInt, orderIdBigInt, amount
   });
 };
 
+// Hàm dùng nội bộ: thu hồi điểm đã cộng khi đơn bị hủy/trả hàng.
+// Idempotent: nếu đơn đã bị thu hồi điểm rồi thì bỏ qua.
+// (Voucher thăng hạng đã tặng thì không thu hồi - chấp nhận được.)
+export const revertPointsForOrder = async (tx, userIdBigInt, orderIdBigInt) => {
+  const [earned, alreadyReverted] = await Promise.all([
+    tx.loyaltyPointTransaction.aggregate({
+      _sum: { points: true },
+      where: { order_id: orderIdBigInt, user_id: userIdBigInt, type: "EARN" },
+    }),
+    tx.loyaltyPointTransaction.findFirst({
+      where: { order_id: orderIdBigInt, user_id: userIdBigInt, type: "ADJUST" },
+    }),
+  ]);
+
+  const earnedPoints = earned._sum.points || 0;
+  if (earnedPoints <= 0 || alreadyReverted) return;
+
+  const user = await tx.user.findUnique({
+    where: { id: userIdBigInt },
+    select: { loyalty_points: true },
+  });
+  if (!user) return;
+
+  const deduct = Math.min(earnedPoints, user.loyalty_points || 0);
+  const nextPoints = (user.loyalty_points || 0) - deduct;
+
+  await tx.loyaltyPointTransaction.create({
+    data: {
+      user_id: userIdBigInt,
+      order_id: orderIdBigInt,
+      points: -deduct,
+      type: "ADJUST",
+      description: "Revert points from cancelled/returned order",
+    },
+  });
+
+  await tx.user.update({
+    where: { id: userIdBigInt },
+    data: {
+      loyalty_points: nextPoints,
+      segment: getTierByPoints(nextPoints).key,
+    },
+  });
+};
+

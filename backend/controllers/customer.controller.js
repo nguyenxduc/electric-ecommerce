@@ -1,5 +1,6 @@
 import { prisma } from "../lib/db.js";
 import { grantUpgradeVouchers, getTierByPoints } from "./loyalty.controller.js";
+import { VALID_ROLES } from "../constants/roles.js";
 
 export const listCustomers = async (req, res) => {
   try {
@@ -83,6 +84,11 @@ export const updateCustomer = async (req, res) => {
   try {
     const id = BigInt(req.params.id);
     const { name, role, phone, address } = req.body;
+    if (role !== undefined && role !== null && !VALID_ROLES.includes(role)) {
+      return res.status(400).json({
+        message: `Invalid role. Allowed values: ${VALID_ROLES.join(", ")}`,
+      });
+    }
     const updated = await prisma.user.update({
       where: { id },
       data: {

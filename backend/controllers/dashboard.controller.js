@@ -1,11 +1,15 @@
 import { prisma } from "../lib/db.js";
+import { getSettingNumber } from "../lib/settings.js";
 
-// Get dashboard statistics
-export const getDashboardStats = async (_req, res) => {
+// Get dashboard statistics.
+// shopId (optional) scopes orders/products to one shop (seller dashboard).
+const buildDashboardStats = async (res, shopId = null) => {
   try {
+    const shopScope = shopId ? { shop_id: shopId } : {};
     const whereActive = { deleted_at: null };
-    const whereActiveOrders = { deleted_at: null };
-    
+    const whereActiveOrders = { deleted_at: null, ...shopScope };
+    const whereActiveProducts = { deleted_at: null, ...shopScope };
+
     // Calculate date ranges
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -96,19 +100,19 @@ export const getDashboardStats = async (_req, res) => {
       }),
       // Total products
       prisma.product.count({
-        where: whereActive,
+        where: whereActiveProducts,
       }),
       // In stock products
       prisma.product.count({
         where: {
-          ...whereActive,
+          ...whereActiveProducts,
           quantity: { gt: 0 },
         },
       }),
       // Out of stock products
       prisma.product.count({
         where: {
-          ...whereActive,
+          ...whereActiveProducts,
           quantity: { lte: 0 },
         },
       }),
@@ -129,6 +133,23 @@ export const getDashboardStats = async (_req, res) => {
     const totalSales = Number(totalSalesLast7Days._sum.total_amount || 0);
     const totalSalesPrev = Number(totalSalesPrevious7Days._sum.total_amount || 0);
     const revenue = Number(totalRevenue._sum.total_amount || 0);
+
+    // Seller view: show the platform commission cut and net payout amount.
+    let commission = null;
+    if (shopId) {
+      const rate = await getSettingNumber("platform_commission_rate", 0.05);
+      const fee = Math.round(revenue * rate * 100) / 100;
+      commission = {
+        rate,
+        ratePercent: `${(rate * 100).toFixed(0)}%`,
+        fee,
+        netRevenue: Math.round((revenue - fee) * 100) / 100,
+        formatted: {
+          fee: formatCurrency(fee),
+          netRevenue: formatCurrency(revenue - fee),
+        },
+      };
+    }
 
     res.json({
       success: true,
@@ -177,6 +198,7 @@ export const getDashboardStats = async (_req, res) => {
           total: revenue,
           formatted: formatCurrency(revenue),
         },
+        ...(commission && { commission }),
       },
     });
   } catch (error) {
@@ -189,11 +211,25 @@ export const getDashboardStats = async (_req, res) => {
   }
 };
 
-// Get top products
-export const getTopProducts = async (req, res) => {
+// Platform-wide stats (admin)
+export const getDashboardStats = (_req, res) => buildDashboardStats(res);
+
+// Own-shop stats (seller dashboard)
+export const getShopDashboardStats = (req, res) => {
+  if (!req.shop) {
+    return res
+      .status(400)
+      .json({ success: false, error: "No shop attached to this account" });
+  }
+  return buildDashboardStats(res, req.shop.id);
+};
+
+// Get top products.
+// shopId (optional) scopes to one shop (seller dashboard).
+const buildTopProducts = async (req, res, shopId = null) => {
   try {
     const limit = Number(req.query.limit) || 4;
-    const whereActive = { deleted_at: null };
+    const whereActive = { deleted_at: null, ...(shopId && { shop_id: shopId }) };
 
     const topProducts = await prisma.product.findMany({
       where: {
@@ -241,6 +277,19 @@ export const getTopProducts = async (req, res) => {
       details: error.message,
     });
   }
+};
+
+// Platform-wide top products (admin)
+export const getTopProducts = (req, res) => buildTopProducts(req, res);
+
+// Own-shop top products (seller dashboard)
+export const getShopTopProducts = (req, res) => {
+  if (!req.shop) {
+    return res
+      .status(400)
+      .json({ success: false, error: "No shop attached to this account" });
+  }
+  return buildTopProducts(req, res, req.shop.id);
 };
 
 // Helper functions

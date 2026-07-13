@@ -1,34 +1,76 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "./shop.controller.js";
 
-// Get or create chat for user
+const chatMessagesInclude = {
+  messages: {
+    include: {
+      sender: {
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          avatar: true,
+        },
+      },
+    },
+    orderBy: {
+      created_at: "asc",
+    },
+  },
+  shop: { select: { id: true, name: true, slug: true, logo_url: true } },
+};
+
+// Loads a chat together with the owning shop's owner_id for permission checks
+const loadChatForAuth = (chatId) =>
+  prisma.chat.findUnique({
+    where: { id: BigInt(chatId) },
+    include: { shop: { select: { owner_id: true } } },
+  });
+
+// The buyer, the platform admin (support chats), or the shop owner (shop chats)
+const canAccessChat = (chat, user) => {
+  if (chat.user_id.toString() === user.id) return true;
+  if (!chat.shop_id) return user.role === "admin";
+  return (
+    user.role === "admin" ||
+    chat.shop?.owner_id?.toString() === user.id
+  );
+};
+
+// Get or create chat for user. ?shop_id= opens a chat with that shop;
+// without it, the classic platform-support chat is used.
 export const getOrCreateChat = async (req, res) => {
   try {
     const userId = req.user.id;
+    const shopIdRaw = req.query.shop_id;
+    let shopId = null;
+
+    if (shopIdRaw) {
+      const shop = await prisma.shop.findFirst({
+        where: {
+          id: BigInt(shopIdRaw),
+          status: SHOP_STATUS.ACTIVE,
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+      if (!shop) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Shop not found" });
+      }
+      shopId = shop.id;
+    }
 
     // Find existing open chat
     let chat = await prisma.chat.findFirst({
       where: {
         user_id: BigInt(userId),
+        shop_id: shopId,
         status: "open",
         deleted_at: null,
       },
-      include: {
-        messages: {
-          include: {
-            sender: {
-              select: {
-                id: true,
-                name: true,
-                role: true,
-                avatar: true,
-              },
-            },
-          },
-          orderBy: {
-            created_at: "asc",
-          },
-        },
-      },
+      include: chatMessagesInclude,
       orderBy: {
         updated_at: "desc",
       },
@@ -39,25 +81,10 @@ export const getOrCreateChat = async (req, res) => {
       chat = await prisma.chat.create({
         data: {
           user_id: BigInt(userId),
+          shop_id: shopId,
           status: "open",
         },
-        include: {
-          messages: {
-            include: {
-              sender: {
-                select: {
-                  id: true,
-                  name: true,
-                  role: true,
-                  avatar: true,
-                },
-              },
-            },
-            orderBy: {
-              created_at: "asc",
-            },
-          },
-        },
+        include: chatMessagesInclude,
       });
     }
 
@@ -88,10 +115,8 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Verify chat belongs to user (for customers) or allow admin
-    const chat = await prisma.chat.findUnique({
-      where: { id: BigInt(chatId) },
-    });
+    // Verify chat belongs to user, the shop owner (shop chats), or admin
+    const chat = await loadChatForAuth(chatId);
 
     if (!chat) {
       return res.status(404).json({
@@ -100,11 +125,7 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Check permission: user must own the chat OR be admin
-    if (
-      chat.user_id.toString() !== userId &&
-      req.user.role !== "admin"
-    ) {
+    if (!canAccessChat(chat, req.user)) {
       return res.status(403).json({
         success: false,
         error: "Not authorized to send message in this chat",
@@ -159,6 +180,8 @@ export const getAllChats = async (req, res) => {
 
     const where = {
       deleted_at: null,
+      // Admin inbox = platform support chats; seller inbox = own shop's chats
+      shop_id: req.shop ? req.shop.id : null,
       ...(status && { status }),
     };
 
@@ -262,6 +285,7 @@ export const getChatById = async (req, res) => {
             avatar: true,
           },
         },
+        shop: { select: { id: true, name: true, slug: true, owner_id: true } },
         messages: {
           include: {
             sender: {
@@ -287,54 +311,27 @@ export const getChatById = async (req, res) => {
       });
     }
 
-    // Check permission
-    if (
-      chat.user_id.toString() !== userId &&
-      req.user.role !== "admin"
-    ) {
+    if (!canAccessChat(chat, req.user)) {
       return res.status(403).json({
         success: false,
         error: "Not authorized to view this chat",
       });
     }
 
-    // Mark messages as read if admin viewing (mark messages from customers)
-    if (req.user.role === "admin") {
-      await prisma.message.updateMany({
-        where: {
-          chat_id: BigInt(chatId),
-          is_read: false,
-          sender_id: {
-            not: BigInt(req.user.id), // Don't mark own messages
-          },
-          sender: {
-            role: {
-              not: "admin", // Only mark customer messages as read
-            },
-          },
+    // Viewing marks the other party's messages as read (a chat only ever has
+    // two parties: the buyer and either the platform admin or the shop owner).
+    await prisma.message.updateMany({
+      where: {
+        chat_id: BigInt(chatId),
+        is_read: false,
+        sender_id: {
+          not: BigInt(userId),
         },
-        data: {
-          is_read: true,
-        },
-      });
-    } else {
-      // If customer viewing, mark admin messages as read
-      await prisma.message.updateMany({
-        where: {
-          chat_id: BigInt(chatId),
-          is_read: false,
-          sender_id: {
-            not: BigInt(req.user.id), // Don't mark own messages
-          },
-          sender: {
-            role: "admin", // Mark admin messages as read
-          },
-        },
-        data: {
-          is_read: true,
-        },
-      });
-    }
+      },
+      data: {
+        is_read: true,
+      },
+    });
 
     res.json({
       success: true,
@@ -389,9 +386,7 @@ export const markMessagesAsRead = async (req, res) => {
     const { chatId } = req.params;
     const userId = req.user.id;
 
-    const chat = await prisma.chat.findUnique({
-      where: { id: BigInt(chatId) },
-    });
+    const chat = await loadChatForAuth(chatId);
 
     if (!chat) {
       return res.status(404).json({
@@ -400,30 +395,20 @@ export const markMessagesAsRead = async (req, res) => {
       });
     }
 
-    // Check permission
-    if (
-      chat.user_id.toString() !== userId &&
-      req.user.role !== "admin"
-    ) {
+    if (!canAccessChat(chat, req.user)) {
       return res.status(403).json({
         success: false,
         error: "Not authorized",
       });
     }
 
-    // Mark messages as read (mark messages from other users, not own messages)
-    const userRole = req.user.role;
+    // Mark the other party's messages as read (chats have exactly two parties)
     await prisma.message.updateMany({
       where: {
         chat_id: BigInt(chatId),
         is_read: false,
         sender_id: {
           not: BigInt(userId), // Don't mark own messages
-        },
-        sender: {
-          ...(userRole === "admin"
-            ? { role: { not: "admin" } } // Admin marks customer messages as read
-            : { role: "admin" }), // Customer marks admin messages as read
         },
       },
       data: {

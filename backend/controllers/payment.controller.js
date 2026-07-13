@@ -67,8 +67,31 @@ export const createVnpayPayment = async (req, res) => {
       });
     }
 
-    const { amount, orderInfo, bankCode } = req.body || {};
-    const numericAmount = Number(amount);
+    const { amount, orderInfo, bankCode, order_group_id } = req.body || {};
+
+    // Prefer deriving the amount from the checkout server-side
+    // (sum of still-active suborders - cancelled ones are not charged).
+    let numericAmount = Number(amount);
+    if (order_group_id != null && order_group_id !== "") {
+      const orderGroup = await prisma.orderGroup.findFirst({
+        where: { id: BigInt(order_group_id), deleted_at: null },
+      });
+      if (!orderGroup) {
+        return res.status(404).json({ message: "Order group not found" });
+      }
+      if (orderGroup.user_id.toString() !== req.user.id) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+      const activeAgg = await prisma.order.aggregate({
+        _sum: { total_amount: true },
+        where: {
+          order_group_id: orderGroup.id,
+          deleted_at: null,
+          status: { notIn: ["cancelled", "returned"] },
+        },
+      });
+      numericAmount = Number(activeAgg._sum.total_amount || 0);
+    }
     if (!numericAmount || numericAmount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
@@ -115,13 +138,48 @@ export const createVnpayPayment = async (req, res) => {
 
 export const createMomoPayment = async (req, res) => {
   try {
-    const { amount, orderInfo, orderId: internalOrderId, orderNumber: internalOrderNumber } =
-      req.body || {};
-    const numericAmount = Number(amount);
+    const {
+      orderInfo,
+      order_group_id: rawGroupId,
+      // legacy client field names kept as fallbacks during transition
+      orderId: legacyOrderId,
+      orderNumber: legacyOrderNumber,
+    } = req.body || {};
 
-    if (!numericAmount || numericAmount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
+    const groupId = rawGroupId ?? legacyOrderId;
+    if (groupId == null || groupId === "") {
+      return res.status(400).json({ message: "order_group_id is required" });
     }
+
+    // Amount is always derived server-side from the checkout total —
+    // never trusted from the client body.
+    const orderGroup = await prisma.orderGroup.findFirst({
+      where: { id: BigInt(groupId), deleted_at: null },
+    });
+    if (!orderGroup) {
+      return res.status(404).json({ message: "Order group not found" });
+    }
+    if (orderGroup.user_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    // Amount = sum of the checkout's still-active suborders (a cancelled
+    // suborder must not be charged).
+    const activeAgg = await prisma.order.aggregate({
+      _sum: { total_amount: true },
+      where: {
+        order_group_id: orderGroup.id,
+        deleted_at: null,
+        status: { notIn: ["cancelled", "returned"] },
+      },
+    });
+    const numericAmount = Number(activeAgg._sum.total_amount || 0);
+    if (!numericAmount || numericAmount <= 0) {
+      return res
+        .status(400)
+        .json({ message: "Nothing left to pay in this checkout" });
+    }
+    const internalOrderNumber = legacyOrderNumber || orderGroup.group_number;
 
     let vndAmount;
     try {
@@ -156,8 +214,8 @@ export const createMomoPayment = async (req, res) => {
       redirectBase.includes("?") ? "&" : "?"
     }method=momo&order=${encodeURIComponent(
       internalOrderNumber || ""
-    )}&orderDbId=${encodeURIComponent(
-      internalOrderId != null ? String(internalOrderId) : ""
+    )}&orderGroupId=${encodeURIComponent(
+      orderGroup.id.toString()
     )}&requestId=${encodeURIComponent(requestId)}`;
     const ipnUrl =
       process.env.MOMO_IPN_URL || `${process.env.BACKEND_URL || "http://localhost:3000"}/api/payments/momo-ipn`;
@@ -210,27 +268,25 @@ export const createMomoPayment = async (req, res) => {
     }
 
     // Persist payment so IPN callback can update status later.
-    if (internalOrderId != null) {
-      await prisma.payment.create({
-        data: {
-          order_id: BigInt(internalOrderId),
-          provider: "momo",
-          amount: numericAmount,
-          currency: "USD",
-          status: "pending",
-          momo_order_id: momoOrderId,
-          momo_request_id: requestId,
-          pay_url: momoData.payUrl || null,
-          deeplink: momoData.deeplink || null,
-          qr_code_url: momoData.qrCodeUrl || null,
-          signature,
-          extra_data: extraData,
-          result_code: momoData.resultCode,
-          message: momoData.message,
-          raw_response: momoData,
-        },
-      });
-    }
+    await prisma.payment.create({
+      data: {
+        order_group_id: orderGroup.id,
+        provider: "momo",
+        amount: numericAmount,
+        currency: "USD",
+        status: "pending",
+        momo_order_id: momoOrderId,
+        momo_request_id: requestId,
+        pay_url: momoData.payUrl || null,
+        deeplink: momoData.deeplink || null,
+        qr_code_url: momoData.qrCodeUrl || null,
+        signature,
+        extra_data: extraData,
+        result_code: momoData.resultCode,
+        message: momoData.message,
+        raw_response: momoData,
+      },
+    });
 
     res.json({
       qrUrl: momoData.qrCodeUrl || "",
@@ -280,7 +336,6 @@ export const momoIpnHandler = async (req, res) => {
       where: requestId
         ? { momo_request_id: String(requestId) }
         : { momo_order_id: String(momoOrderId) },
-      include: { order: true },
     });
 
     if (!payment) {
@@ -303,14 +358,15 @@ export const momoIpnHandler = async (req, res) => {
         },
       });
 
-      // When paid, move the order forward. (Avoid overriding cancelled orders.)
-      if (
-        isPaid &&
-        payment.order &&
-        ["pending", "processing"].includes(payment.order.status || "")
-      ) {
-        await tx.order.update({
-          where: { id: payment.order_id },
+      // When paid, move every shop-order of this checkout forward.
+      // (Avoid overriding cancelled/shipped orders.)
+      if (isPaid) {
+        await tx.order.updateMany({
+          where: {
+            order_group_id: payment.order_group_id,
+            status: "pending",
+            deleted_at: null,
+          },
           data: { status: "processing" },
         });
       }

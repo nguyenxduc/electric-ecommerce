@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "./shop.controller.js";
 
 export const addToCart = async (req, res) => {
   try {
@@ -15,10 +16,15 @@ export const addToCart = async (req, res) => {
     }
 
     const productDoc = await prisma.product.findFirst({
-      where: { id: BigInt(product_id), deleted_at: null },
+      where: {
+        id: BigInt(product_id),
+        deleted_at: null,
+        // Only products from active shops are purchasable
+        shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
+      },
       include: { product_colors: true },
     });
-    
+
     if (!productDoc) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -151,9 +157,24 @@ export const getCartProducts = async (req, res) => {
       });
     }
     
-    const items = await prisma.cartItem.findMany({ 
-      where: { cart_id: cart.id, deleted_at: null, product: { deleted_at: null } }, 
-      include: { product: true } 
+    const items = await prisma.cartItem.findMany({
+      where: { cart_id: cart.id, deleted_at: null, product: { deleted_at: null } },
+      include: {
+        product: {
+          include: {
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                status: true,
+                shipping_fee_override: true,
+                free_shipping_threshold_override: true,
+              },
+            },
+          },
+        },
+      },
     });
     
     const summary = await summarizeCart(cart.id);
@@ -203,7 +224,23 @@ export const getCartProducts = async (req, res) => {
         color: {
           code: colorObj.code || '',
           name: colorObj.name || ''
-        }
+        },
+        shop: product.shop
+          ? {
+              id: Number(product.shop.id),
+              name: product.shop.name,
+              slug: product.shop.slug,
+              status: product.shop.status,
+              shipping_fee_override:
+                product.shop.shipping_fee_override != null
+                  ? Number(product.shop.shipping_fee_override)
+                  : null,
+              free_shipping_threshold_override:
+                product.shop.free_shipping_threshold_override != null
+                  ? Number(product.shop.free_shipping_threshold_override)
+                  : null
+            }
+          : null
       };
     });
     

@@ -69,6 +69,7 @@ model Product {
   specs_detail    Json      @default("[]")
   color           Json      @default("[]") // legacy color list
   product_colors  ProductColor[]
+  shop_id         BigInt
   category_id     BigInt
   sub_category_id BigInt?
   rating          Decimal?  @db.Decimal(3, 2)
@@ -77,6 +78,7 @@ model Product {
   deleted_at      DateTime?
   description     String?
   // relations
+  shop         Shop         @relation(fields: [shop_id], references: [id])
   category     Category     @relation(fields: [category_id], references: [id])
   sub_category SubCategory? @relation(fields: [sub_category_id], references: [id])
   reviews      Review[]
@@ -87,11 +89,51 @@ model Product {
   filter_values ProductFilterValue[]
 
   @@index([name])
+  @@index([shop_id])
   @@index([category_id])
   @@index([sub_category_id])
   @@index([price])
   @@index([rating])
   @@map("products")
+}
+
+// A seller's storefront within the marketplace. One shop per user.
+model Shop {
+  id                BigInt    @id @default(autoincrement())
+  owner_id          BigInt    @unique
+  name              String
+  slug              String    @unique
+  description       String?
+  logo_url          String?
+  banner_url        String?
+  status            String    @default("pending") // pending | active | rejected | suspended
+  rejection_reason  String?
+  contact_email     String?
+  contact_phone     String?
+  address           String?
+
+  // Shop-level overrides for future shipping/settlement work. Not read by
+  // any pricing/shipping logic yet.
+  shipping_fee_override            Decimal? @db.Decimal(10, 2)
+  free_shipping_threshold_override Decimal? @db.Decimal(10, 2)
+
+  approved_at DateTime?
+  approved_by BigInt?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  // relations
+  owner           User            @relation("ShopOwner", fields: [owner_id], references: [id])
+  products        Product[]
+  orders          Order[]
+  coupons         Coupon[]
+  chats           Chat[]
+  return_requests ReturnRequest[]
+
+  @@index([status])
+  @@index([slug])
+  @@map("shops")
 }
 
 model ProductEmbedding {
@@ -155,14 +197,17 @@ model User {
   deleted_at      DateTime?
 
   // relations
-  orders    Order[]
-  reviews   Review[]
-  carts     Cart[]
-  wishlists Wishlist[]
-  coupons   Coupon[]   @relation("UserCoupons")
-  chats     Chat[]
-  messages  Message[]  @relation("MessageSender")
-  ai_chats  AiChat[]
+  orders          Order[]
+  order_groups    OrderGroup[]
+  reviews         Review[]
+  carts           Cart[]
+  wishlists       Wishlist[]
+  coupons         Coupon[]        @relation("UserCoupons")
+  chats           Chat[]
+  messages        Message[]       @relation("MessageSender")
+  ai_chats        AiChat[]
+  shop            Shop?           @relation("ShopOwner")
+  return_requests ReturnRequest[]
 
   @@map("users")
 }
@@ -212,11 +257,47 @@ model CartItem {
   @@map("cart_items")
 }
 
+// One buyer checkout. Splits into one Order per shop (order_group.orders),
+// but carries the checkout-level totals/shipping/payment info that don't
+// belong to any single shop.
+model OrderGroup {
+  id               BigInt    @id @default(autoincrement())
+  user_id          BigInt
+  group_number     String    @unique
+  subtotal_amount  Decimal   @db.Decimal(10, 2)
+  tier_discount    Decimal   @default(0.0) @db.Decimal(10, 2)
+  coupon_discount  Decimal   @default(0.0) @db.Decimal(10, 2)
+  shipping_fee     Decimal   @default(0.0) @db.Decimal(10, 2)
+  total_amount     Decimal   @db.Decimal(10, 2)
+  coupon_id        BigInt?
+  payment_method   String?
+  shipping_address Json?
+  receiver_name    String?
+  receiver_phone   String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  deleted_at       DateTime?
+
+  // relations
+  user     User      @relation(fields: [user_id], references: [id])
+  coupon   Coupon?   @relation(fields: [coupon_id], references: [id])
+  orders   Order[]
+  payments Payment[]
+
+  @@index([user_id, created_at])
+  @@map("order_groups")
+}
+
+// One shop's share of a buyer's checkout. Independently tracked status per
+// shop so sellers can fulfill without depending on each other.
 model Order {
   id               BigInt    @id @default(autoincrement())
   user_id          BigInt
+  shop_id          BigInt
+  order_group_id   BigInt
   order_number     String?   @unique
   total_amount     Decimal?  @db.Decimal(10, 2)
+  shipping_fee     Decimal   @default(0.0) @db.Decimal(10, 2)
   status           String?   @default("pending")
   shipping_address Json?
   receiver_name    String?
@@ -228,12 +309,39 @@ model Order {
   deleted_at       DateTime?
 
   // relations
-  user        User        @relation(fields: [user_id], references: [id])
-  order_items OrderItem[]
-  coupon      Coupon?     @relation(fields: [coupon_id], references: [id])
-  payments    Payment[]
+  user           User           @relation(fields: [user_id], references: [id])
+  shop           Shop           @relation(fields: [shop_id], references: [id])
+  order_group    OrderGroup     @relation(fields: [order_group_id], references: [id])
+  order_items    OrderItem[]
+  coupon         Coupon?        @relation(fields: [coupon_id], references: [id])
+  return_request ReturnRequest?
 
+  @@index([shop_id])
+  @@index([order_group_id])
   @@map("orders")
+}
+
+// Buyer-initiated return/refund request for a delivered shop-order.
+// One request per order; seller (or admin) approves/rejects.
+model ReturnRequest {
+  id              BigInt    @id @default(autoincrement())
+  order_id        BigInt    @unique
+  user_id         BigInt
+  shop_id         BigInt
+  reason          String
+  status          String    @default("pending") // pending | approved | rejected
+  resolution_note String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  // relations
+  order Order @relation(fields: [order_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
+  shop  Shop  @relation(fields: [shop_id], references: [id])
+
+  @@index([shop_id, status])
+  @@index([user_id])
+  @@map("return_requests")
 }
 
 // Thông báo hệ thống gửi cho người dùng
@@ -329,15 +437,20 @@ model Coupon {
   min_order      Decimal?  @db.Decimal(10, 2)
   usage_limit    Int?      @default(1)
   used_count     Int?      @default(0)
+  // null = platform-wide voucher; set = only applies to that shop's items
+  shop_id        BigInt?
   expires_at     DateTime?
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   deleted_at     DateTime?
 
   // relations
-  orders Order[]
-  users  User[]  @relation("UserCoupons")
+  shop         Shop?        @relation(fields: [shop_id], references: [id])
+  orders       Order[]
+  order_groups OrderGroup[]
+  users        User[]  @relation("UserCoupons")
 
+  @@index([shop_id])
   @@map("coupons")
 }
 
@@ -386,7 +499,7 @@ model FilterOption {
 
 model Payment {
   id              BigInt    @id @default(autoincrement())
-  order_id        BigInt
+  order_group_id  BigInt
   provider        String    @default("momo")
   amount          Decimal   @db.Decimal(10, 2)
   currency        String    @default("VND")
@@ -409,12 +522,14 @@ model Payment {
   deleted_at      DateTime?
 
   // relations
-  order Order @relation(fields: [order_id], references: [id])
+  order_group OrderGroup @relation(fields: [order_group_id], references: [id])
 
-  @@index([order_id])
+  @@index([order_group_id])
   @@map("payments")
 }
 
+// Platform-wide settings (bank account, store identity, shipping defaults).
+// Shop-specific settings live on the Shop model, not here.
 model Setting {
   id          BigInt    @id @default(autoincrement())
   key         String    @unique // e.g., 'bank_account_no', 'bank_account_name', 'shipping_fee', etc.
@@ -435,6 +550,8 @@ model Setting {
 model Chat {
   id         BigInt    @id @default(autoincrement())
   user_id    BigInt // Customer who initiated the chat
+  // null = support chat with the platform admin; set = chat with that shop
+  shop_id    BigInt?
   status     String    @default("open") // open, closed, resolved
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
@@ -442,9 +559,11 @@ model Chat {
 
   // relations
   user     User      @relation(fields: [user_id], references: [id])
+  shop     Shop?     @relation(fields: [shop_id], references: [id])
   messages Message[]
 
   @@index([user_id])
+  @@index([shop_id])
   @@index([status])
   @@map("chats")
 }

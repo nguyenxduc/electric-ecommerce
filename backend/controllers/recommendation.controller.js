@@ -1,4 +1,10 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "./shop.controller.js";
+
+// Buyers only ever see recommendations from active shops
+const activeShopWhere = {
+  shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
+};
 
 const toBigIntOrNull = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -13,6 +19,7 @@ async function getColdStartProducts(limit, categoryId = null) {
   const half = Math.ceil(limit / 2);
   const where = {
     deleted_at: null,
+    ...activeShopWhere,
     ...(categoryId ? { category_id: categoryId } : {}),
   };
   const [bestSellers, newest] = await Promise.all([
@@ -50,6 +57,7 @@ async function hydrateProductsByIds(productIds, categoryId = null, limit = 12) {
     where: {
       id: { in: ids },
       deleted_at: null,
+      ...activeShopWhere,
       ...(categoryId ? { category_id: categoryId } : {}),
     },
   });

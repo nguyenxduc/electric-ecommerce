@@ -64,6 +64,8 @@ import loyaltyRoutes from "./routes/loyalty.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import auditRoutes from "./routes/audit.route.js";
 import behaviorRoutes from "./routes/behavior.route.js";
+import shopRoutes from "./routes/shop.route.js";
+import returnRoutes from "./routes/return.route.js";
 import { startDailyJobsScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
@@ -122,6 +124,8 @@ app.use("/api/loyalty", loyaltyRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/behavior", behaviorRoutes);
+app.use("/api/shops", shopRoutes);
+app.use("/api/returns", returnRoutes);
 
 // Setup Socket.io
 const io = new Server(server, {

@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { notifyUser } from "../lib/notify.js";
 
 // Lấy danh sách thông báo cho user hiện tại
 export const listNotifications = async (req, res) => {
@@ -98,14 +99,19 @@ export const createNotification = async (req, res) => {
       });
     }
 
-    const data = {
-      title: title.trim(),
-      message: message.trim(),
+    const notification = await notifyUser({
+      userId: user_id,
+      title,
+      message,
       type: type || "SYSTEM",
-      user_id: user_id ? BigInt(user_id) : null,
-    };
+    });
 
-    const notification = await prisma.notification.create({ data });
+    if (!notification) {
+      return res.status(500).json({
+        success: false,
+        error: "Không thể tạo thông báo",
+      });
+    }
 
     return res.status(201).json({
       success: true,
