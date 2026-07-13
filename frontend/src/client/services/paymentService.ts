@@ -20,8 +20,9 @@ type CreateBankTransferQRPayload = {
 }
 
 type CreateMomoPaymentPayload = CreateBankTransferQRPayload & {
-  // Link MoMo payment to our internal order for IPN updates.
-  orderId?: number
+  // Link MoMo payment to the checkout (order group) for IPN updates.
+  // Amount is derived server-side from the order group total.
+  order_group_id?: number
   orderNumber?: string
 }
 

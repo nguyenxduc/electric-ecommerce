@@ -1,11 +1,29 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useCreateAdminProduct, useAdminCategories } from '../../hooks'
+import { useValidateToken } from '../../../client/hooks/useAuth'
+import adminShopService from '../../services/shopService'
 
-export default function AdminProductCreate() {
+export default function AdminProductCreate({
+  basePath = '/admin/products'
+}: {
+  basePath?: string
+} = {}) {
   const nav = useNavigate()
   const create = useCreateAdminProduct()
   const { data: catData } = useAdminCategories({ limit: 100 })
+  const { data: userData } = useValidateToken()
+  const isAdmin = userData?.user?.role === 'admin'
+
+  // Admins must pick which shop the product belongs to; sellers' products
+  // are automatically assigned to their own shop by the backend.
+  const { data: shopsData } = useQuery({
+    queryKey: ['admin-shops', 'picker'],
+    queryFn: () => adminShopService.list({ limit: 100 }),
+    enabled: isAdmin
+  })
+  const [shopId, setShopId] = useState<number | ''>('')
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState<number>(0)
@@ -49,6 +67,7 @@ export default function AdminProductCreate() {
       name,
       price: Number(price),
       quantity: totalQty,
+      shop_id: isAdmin && shopId !== '' ? Number(shopId) : undefined,
       category_id: Number(categoryId || 0),
       sub_category_id: subCategoryId === '' ? undefined : Number(subCategoryId),
       images,
@@ -57,7 +76,7 @@ export default function AdminProductCreate() {
       specs,
       specs_detail: specsDetail
     })
-    nav('/admin/products')
+    nav(basePath)
   }
 
   return (
@@ -85,6 +104,25 @@ export default function AdminProductCreate() {
                   onChange={e => setName(e.target.value)}
                 />
               </div>
+              {isAdmin && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">Shop</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={shopId}
+                    onChange={e =>
+                      setShopId(e.target.value ? Number(e.target.value) : '')
+                    }
+                  >
+                    <option value="">Select shop</option>
+                    {shopsData?.data?.data?.shops?.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm mb-1">Category</label>
                 <select

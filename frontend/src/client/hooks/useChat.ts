@@ -10,10 +10,10 @@ import {
   type ChatsResponse
 } from '../services/chatService'
 
-export const useChat = (enabled: boolean = true) => {
+export const useChat = (enabled: boolean = true, shopId?: number) => {
   return useQuery<ChatResponse, Error>({
-    queryKey: ['chat'],
-    queryFn: getOrCreateChat,
+    queryKey: ['chat', shopId ?? 'support'],
+    queryFn: () => getOrCreateChat(shopId),
     staleTime: 30 * 1000, // 30 seconds
     refetchInterval: 5000, // Poll every 5 seconds
     enabled,
@@ -30,10 +30,15 @@ export const useChatById = (chatId: number) => {
   })
 }
 
-export const useAllChats = (page: number = 1, limit: number = 20, status?: string) => {
+export const useAllChats = (
+  page: number = 1,
+  limit: number = 20,
+  status?: string,
+  scope: 'admin' | 'seller' = 'admin'
+) => {
   return useQuery<ChatsResponse, Error>({
-    queryKey: ['chats', 'admin', page, limit, status],
-    queryFn: () => getAllChats(page, limit, status),
+    queryKey: ['chats', scope, page, limit, status],
+    queryFn: () => getAllChats(page, limit, status, scope),
     staleTime: 10 * 1000, // 10 seconds
     refetchInterval: 5000, // Poll every 5 seconds
   })
@@ -46,7 +51,7 @@ export const useSendMessage = () => {
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['chat', variables.chatId] })
       qc.invalidateQueries({ queryKey: ['chat'] })
-      qc.invalidateQueries({ queryKey: ['chats', 'admin'] })
+      qc.invalidateQueries({ queryKey: ['chats'] })
     }
   })
 }
@@ -68,7 +73,7 @@ export const useMarkMessagesAsRead = () => {
     mutationFn: markMessagesAsRead,
     onSuccess: (_, chatId) => {
       qc.invalidateQueries({ queryKey: ['chat', chatId] })
-      qc.invalidateQueries({ queryKey: ['chats', 'admin'] })
+      qc.invalidateQueries({ queryKey: ['chats'] })
     }
   })
 }

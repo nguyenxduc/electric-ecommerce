@@ -5,7 +5,12 @@ import { useValidateToken } from '../../../client/hooks/useAuth'
 import { toast } from 'sonner'
 import { io, Socket } from 'socket.io-client'
 
-export default function AdminChatList() {
+// scope 'admin' = platform support inbox; 'seller' = own shop's buyer chats
+export default function AdminChatList({
+  scope = 'admin'
+}: {
+  scope?: 'admin' | 'seller'
+} = {}) {
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null)
   const [message, setMessage] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -13,7 +18,7 @@ export default function AdminChatList() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { data: userData } = useValidateToken()
-  const { data: chatsData, refetch: refetchChats, isLoading: chatsLoading } = useAllChats(1, 50, statusFilter || undefined)
+  const { data: chatsData, refetch: refetchChats, isLoading: chatsLoading } = useAllChats(1, 50, statusFilter || undefined, scope)
   const { data: chatData, refetch: refetchChat, isLoading: chatLoading } = useChatById(selectedChatId || 0)
   const sendMessageMutation = useSendMessage()
   const updateStatusMutation = useUpdateChatStatus()
@@ -25,7 +30,8 @@ export default function AdminChatList() {
 
   // Setup Socket.io connection
   useEffect(() => {
-    if (!userData?.user || userData.user.role !== 'admin') return
+    if (!userData?.user) return
+    if (scope === 'admin' && userData.user.role !== 'admin') return
 
     const token = localStorage.getItem('accessToken')
     if (!token) return
@@ -85,11 +91,11 @@ export default function AdminChatList() {
 
   // Mark messages as read when chat is selected
   useEffect(() => {
-    if (selectedChatId && userData?.user?.role === 'admin') {
-      // Mark customer messages as read when admin opens chat
+    if (selectedChatId) {
+      // Mark the buyer's messages as read when the operator opens the chat
       markAsReadMutation.mutate(selectedChatId)
     }
-  }, [selectedChatId, userData?.user?.role])
+  }, [selectedChatId])
 
   const handleSendMessage = async () => {
     if (!message.trim() || !selectedChatId) return
@@ -257,15 +263,21 @@ export default function AdminChatList() {
                 <p className="text-sm text-gray-500">{selectedChat.user?.email}</p>
               </div>
               <div className="flex items-center gap-2">
-                <select
-                  value={selectedChat.status}
-                  onChange={(e) => handleStatusChange(parseInt(selectedChat.id), e.target.value)}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm"
-                >
-                  <option value="open">Open</option>
-                  <option value="closed">Closed</option>
-                  <option value="resolved">Resolved</option>
-                </select>
+                {scope === 'admin' ? (
+                  <select
+                    value={selectedChat.status}
+                    onChange={(e) => handleStatusChange(parseInt(selectedChat.id), e.target.value)}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="open">Open</option>
+                    <option value="closed">Closed</option>
+                    <option value="resolved">Resolved</option>
+                  </select>
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 rounded text-sm capitalize">
+                    {selectedChat.status}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -278,7 +290,8 @@ export default function AdminChatList() {
                 </div>
               ) : (
                 messages.map((msg) => {
-                  const isOwnMessage = msg.sender.role === 'admin'
+                  const isOwnMessage =
+                    msg.sender.id?.toString() === userData?.user?.id?.toString()
                   return (
                     <div
                       key={msg.id}

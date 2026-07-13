@@ -19,6 +19,7 @@ export type Message = {
 export type Chat = {
   id: string
   user_id: string
+  shop_id?: string | null
   status: string
   created_at: string
   updated_at: string
@@ -29,6 +30,12 @@ export type Chat = {
     email: string
     avatar: string | null
   }
+  shop?: {
+    id: string
+    name: string
+    slug: string
+    logo_url?: string | null
+  } | null
   _count?: {
     messages: number
   }
@@ -53,8 +60,13 @@ export type ChatsResponse = {
   }
 }
 
-export const getOrCreateChat = async (): Promise<ChatResponse> => {
-  const { data } = await axiosClient.get<ChatResponse>('/chat')
+// shopId opens/reuses a chat with that shop; omit for platform support chat
+export const getOrCreateChat = async (
+  shopId?: number
+): Promise<ChatResponse> => {
+  const { data } = await axiosClient.get<ChatResponse>('/chat', {
+    params: shopId ? { shop_id: shopId } : undefined
+  })
   return data
 }
 
@@ -78,11 +90,13 @@ export const sendMessage = async (payload: {
 export const getAllChats = async (
   page: number = 1,
   limit: number = 20,
-  status?: string
+  status?: string,
+  scope: 'admin' | 'seller' = 'admin'
 ): Promise<ChatsResponse> => {
   const params: any = { page, limit }
   if (status) params.status = status
-  const { data } = await axiosClient.get<ChatsResponse>('/chat/admin/all', { params })
+  const url = scope === 'seller' ? '/chat/shop/mine' : '/chat/admin/all'
+  const { data } = await axiosClient.get<ChatsResponse>(url, { params })
   return data
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings, Store } from 'lucide-react'
 
 import Login from './Login'
 import Search from './Search'
@@ -97,6 +97,15 @@ const Navbar = () => {
                   title="Admin Panel"
                 >
                   <Settings className="w-5 h-5" />
+                </Link>
+              )}
+              {user?.user?.role === 'seller' && (
+                <Link
+                  to="/seller"
+                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  title="Seller Dashboard"
+                >
+                  <Store className="w-5 h-5" />
                 </Link>
               )}
               <NotificationBell />

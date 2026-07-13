@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
 import { makeProductSlug } from '../utils/productSlug'
+import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
 const Cart = () => {
   const navigate = useNavigate()
   const { data: cartData, isLoading } = useCart()
@@ -31,6 +32,9 @@ const Cart = () => {
 
   const cart = cartData?.cart
   const items = cart?.items || []
+
+  // Group items by shop - checkout will create one order per shop
+  const groupedItems = useMemo(() => groupCartItemsByShop(items), [items])
 
   const handleInc = (
     productId: number,
@@ -196,7 +200,22 @@ const Cart = () => {
                 <p className="text-lg text-gray-500">Your cart is empty</p>
               </div>
             ) : (
-              items.map(item => {
+              groupedItems.map(group => (
+                <div key={group.key} className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-700 px-1">
+                    <ShoppingCart className="w-4 h-4" />
+                    {group.shopSlug ? (
+                      <button
+                        onClick={() => navigate(`/shop/${group.shopSlug}`)}
+                        className="hover:text-blue-600 hover:underline"
+                      >
+                        {group.shopName}
+                      </button>
+                    ) : (
+                      <span>{group.shopName}</span>
+                    )}
+                  </div>
+                  {group.items.map(item => {
                 const hasDiscount = item.discount > 0
                 const imageUrl = item.image_url || ''
                 const colorName = item.color?.name || ''
@@ -331,7 +350,9 @@ const Cart = () => {
                     </div>
                   </div>
                 )
-              })
+              })}
+                </div>
+              ))
             )}
           </div>
 

@@ -77,3 +77,24 @@ export function useAdminOrderStats() {
     queryFn: () => adminOrderService.stats()
   })
 }
+
+// Seller dashboard: own shop's orders. Shares orderKeys.all so status
+// updates invalidate these lists too.
+export function useMyShopOrders(params?: {
+  page?: number
+  limit?: number
+  status?: string
+  q?: string
+}) {
+  return useQuery<{ data: OrderListResponse }, Error>({
+    queryKey: [...orderKeys.all, 'mine', params],
+    queryFn: () => adminOrderService.listMine(params)
+  })
+}
+
+export function useMyShopOrderStats() {
+  return useQuery<{ data: OrderStatsResponse }, Error>({
+    queryKey: [...orderKeys.all, 'mine', 'stats'],
+    queryFn: () => adminOrderService.shopStats()
+  })
+}

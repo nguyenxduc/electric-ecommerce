@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Camera, LogOut, X, Loader2, Ticket } from 'lucide-react'
+import { Camera, LogOut, X, Loader2, Ticket, Store } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
@@ -22,6 +22,7 @@ import Security from '../components/profile/Security'
 import ProfileContent from '../components/profile/Profile'
 import Loyalty from '../components/profile/Loyalty'
 import VoucherWarehouse from '../components/profile/VoucherWarehouse'
+import SellerTab from '../components/profile/SellerTab'
 import {
   useValidateToken,
   useLogout,
@@ -37,6 +38,7 @@ export type ProfileTabKey =
   | 'security'
   | 'loyalty'
   | 'vouchers'
+  | 'seller'
   | 'logout'
 
 interface ProfileLayoutProps {
@@ -64,6 +66,7 @@ const NAV: Array<{
   { key: 'security', label: 'Security & access', icon: 'security' },
   { key: 'loyalty', label: 'Loyalty & Rewards', icon: 'loyalty' },
   { key: 'vouchers', label: 'Voucher warehouse', icon: 'loyalty' },
+  { key: 'seller', label: 'Sell on Marketplace', icon: 'loyalty' },
   { key: 'logout', label: 'Log out', icon: 'logout' }
 ]
 
@@ -297,6 +300,26 @@ function Profile() {
                   </button>
                 )
               }
+              if (item.key === 'seller') {
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setTabActive(item.key)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                      item.key === tabActive
+                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Store
+                      className={`h-6 w-6 ${
+                        item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
+                      }`}
+                    />
+                    <span className="text-sm font-light">{item.label}</span>
+                  </button>
+                )
+              }
               return (
                 <button
                   key={item.key}
@@ -327,6 +350,7 @@ function Profile() {
           {tabActive === 'security' && <Security />}
           {tabActive === 'loyalty' && <Loyalty />}
           {tabActive === 'vouchers' && <VoucherWarehouse />}
+          {tabActive === 'seller' && <SellerTab />}
           {tabActive === 'logout' && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
               <div className="max-w-md mx-auto text-center">

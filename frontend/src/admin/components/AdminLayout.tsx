@@ -44,6 +44,7 @@ const sections: NavSection[] = [
     title: 'Main menu',
     items: [
       { to: '/admin', label: 'Dashboard', icon: Home, end: true },
+      { to: '/admin/shops', label: 'Shops', icon: Store, end: true },
       { to: '/admin/orders', label: 'Order Management', icon: ShoppingCart },
       { to: '/admin/customers', label: 'Customers', icon: Users },
       { to: '/admin/coupons', label: 'Coupon Code', icon: TicketPercent },

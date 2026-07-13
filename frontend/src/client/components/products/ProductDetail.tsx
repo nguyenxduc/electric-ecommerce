@@ -6,7 +6,8 @@ import StockIcon from '../../../assets/stock-icon.svg'
 import GuaranteeIcon from '../../../assets/guarantee-icon.svg'
 // @ts-ignore
 import DeliveryIcon from '../../../assets/delivery-icon.svg'
-import { Star } from 'lucide-react'
+import { Star, Store as StoreIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
 import Payment from './Payment'
@@ -118,6 +119,17 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     <span className="font-medium">{product.sold}</span> sold
                   </div>
                 </div>
+                {product.shop && (
+                  <Link
+                    to={`/shop/${product.shop.slug}`}
+                    className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 border rounded-lg px-3 py-2 transition"
+                  >
+                    <StoreIcon className="w-4 h-4" />
+                    Sold by{' '}
+                    <span className="font-semibold">{product.shop.name}</span>
+                    <span className="text-blue-600">Visit shop →</span>
+                  </Link>
+                )}
               </div>
 
               {/* Color Selection */}

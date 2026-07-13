@@ -15,6 +15,11 @@ const PaymentResult = () => {
   const vnpAmount = params.get('vnp_Amount')
   const method = params.get('method') // cod | momo | bank_transfer | vnpay (default)
   const order = params.get('order')
+  // One checkout may split into multiple shop-orders (comma-separated numbers)
+  const orderNumbers = (params.get('orders') || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
   const amountParam = params.get('amount')
   const subtotalParam = params.get('subtotal')
   const tierDiscountParam = params.get('tierDiscount')
@@ -92,6 +97,21 @@ const PaymentResult = () => {
             <span>Transaction ID</span>
             <span className="font-semibold">{order || txnRef || '-'}</span>
           </div>
+          {orderNumbers.length > 1 && (
+            <div>
+              <span>
+                Your purchase was split into {orderNumbers.length} orders (one
+                per shop):
+              </span>
+              <ul className="mt-1 space-y-0.5">
+                {orderNumbers.map(num => (
+                  <li key={num} className="font-semibold text-xs">
+                    #{num}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex justify-between">
             <span>Amount</span>
             <span className="font-semibold">{amountDisplay}</span>

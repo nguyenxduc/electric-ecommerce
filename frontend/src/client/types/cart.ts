@@ -15,6 +15,14 @@ export type CartItem = {
     code: string
     name: string
   }
+  shop?: {
+    id: number
+    name: string
+    slug: string
+    status: string
+    shipping_fee_override?: number | null
+    free_shipping_threshold_override?: number | null
+  } | null
 }
 
 export type Cart = {

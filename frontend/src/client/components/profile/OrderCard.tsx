@@ -4,6 +4,9 @@ import { formatUsd } from '../../utils/formatMoney'
 interface Order {
   id: number
   orderNumber?: string
+  shopName?: string
+  shopSlug?: string
+  groupNumber?: string
   placedOn: string
   total: number
   delivered?: string
@@ -33,6 +36,21 @@ interface OrderDetail {
 const OrderCard = ({ order, onClick }: OrderDetail) => {
   return (
     <div className="bg-gray-50 rounded-lg p-6 mb-4">
+      {order.shopName && (
+        <div className="mb-3 text-sm font-semibold text-gray-700">
+          🏪{' '}
+          {order.shopSlug ? (
+            <a
+              href={`/shop/${order.shopSlug}`}
+              className="hover:text-blue-600 hover:underline"
+            >
+              {order.shopName}
+            </a>
+          ) : (
+            order.shopName
+          )}
+        </div>
+      )}
       <div className="flex flex-row mx-auto mb-4 bg-gray-100 p-5 rounded-md items-center justify-between">
         <div className="flex flex-col items-center justify-between">
           <p className="text-sm mb-1 font-semibold">order code</p>

@@ -9,7 +9,8 @@ import {
   X,
   Copy,
   QrCode,
-  Loader2
+  Loader2,
+  Store
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useCart, useClearCart } from '../hooks/useCart'
@@ -30,6 +31,7 @@ import {
 } from '../services/couponService'
 import { formatUsd } from '../utils/formatMoney'
 import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
+import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
 
 const Checkout = () => {
   const navigate = useNavigate()
@@ -55,6 +57,7 @@ const Checkout = () => {
   const [couponResult, setCouponResult] = useState<{
     discount: number
     finalAmount: number
+    shopName?: string
   } | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [showVoucherModal, setShowVoucherModal] = useState(false)
@@ -78,32 +81,53 @@ const Checkout = () => {
                 ? 0.02
                 : 0
 
+  const round2 = (n: number) => Math.round(n * 100) / 100
+
+  // Group cart items by shop - checkout creates one order per shop, and each
+  // shop charges its own shipping fee (shop override, else platform default).
+  const shopGroups = useMemo(() => {
+    const platformFee = Number(settingsData?.settings?.shipping_fee ?? 9.99)
+    const platformThreshold = Number(
+      settingsData?.settings?.free_shipping_threshold ?? 199
+    )
+    return groupCartItemsByShop(items).map(group => {
+      const shop = group.items[0]?.shop
+      const fee =
+        shop?.shipping_fee_override != null
+          ? Number(shop.shipping_fee_override)
+          : platformFee
+      const threshold =
+        shop?.free_shipping_threshold_override != null
+          ? Number(shop.free_shipping_threshold_override)
+          : platformThreshold
+      const subtotal = group.items.reduce(
+        (sum, it) => sum + it.final_price * it.quantity,
+        0
+      )
+      const shipping = subtotal >= threshold ? 0 : round2(fee)
+      return { ...group, subtotal, shipping, freeShipping: shipping === 0 }
+    })
+  }, [items, settingsData])
+
   const totals = useMemo(() => {
     const subtotal = cart?.total_original_price || 0
     const discount = cart?.total_discount || 0
-    const shippingCostValue = settingsData?.settings?.shipping_fee
-
-    const freeShippingThreshold =
-      settingsData?.settings?.free_shipping_threshold
-    const baseShippingCost = shippingCostValue ? Number(shippingCostValue) : 1
-    const threshold = freeShippingThreshold
-      ? Number(freeShippingThreshold)
-      : 199
-
     const orderTotal = cart?.total_price || 0
-    const shipmentCost = orderTotal >= threshold ? 0 : baseShippingCost
-    const isFreeShipping = orderTotal >= threshold
+    const shipmentCost = round2(
+      shopGroups.reduce((sum, g) => sum + g.shipping, 0)
+    )
+    const isFreeShipping = shipmentCost === 0
 
     const grandTotal = orderTotal + shipmentCost
     return {
       subtotal,
       discount,
+      merchandiseTotal: orderTotal,
       shipmentCost,
       grandTotal,
-      isFreeShipping,
-      freeShippingThreshold: threshold
+      isFreeShipping
     }
-  }, [cart, settingsData])
+  }, [cart, shopGroups])
 
   // Autofill receiver info from logged-in user
   useEffect(() => {
@@ -150,12 +174,19 @@ const Checkout = () => {
     return result
   }
 
-  const tierDiscountAmount = Math.round(totals.grandTotal * tierDiscountRate)
+  // Tier discount applies to merchandise only (matches the backend);
+  // shipping is added on top after all discounts.
+  const tierDiscountAmount = round2(
+    totals.merchandiseTotal * tierDiscountRate
+  )
   const amountAfterTierDiscount = Math.max(
     0,
-    totals.grandTotal - tierDiscountAmount
+    totals.merchandiseTotal - tierDiscountAmount
   )
-  const displayTotal = couponResult?.finalAmount ?? amountAfterTierDiscount
+  const displayTotal = round2(
+    Math.max(0, amountAfterTierDiscount - (couponResult?.discount ?? 0)) +
+      totals.shipmentCost
+  )
 
   const handlePay = async () => {
     if (!items.length) {
@@ -179,7 +210,9 @@ const Checkout = () => {
         const result = await createOrderFromCart('cod')
         toast.success('Order placed successfully - Pay on delivery')
         navigate(
-          `/payment-result?method=cod&order=${result.order.order_number}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
+          `/payment-result?method=cod&order=${result.order_group.group_number}&orders=${encodeURIComponent(
+            result.orders.map(o => o.order_number).join(',')
+          )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
         )
       } catch (err: any) {
         if (err?.message === 'NOT_AUTHENTICATED') {
@@ -194,8 +227,7 @@ const Checkout = () => {
     }
 
     // MoMo Wallet: create order first, then create MoMo payment and redirect to payUrl.
-    const momoPayAmount =
-      couponResult?.finalAmount ?? amountAfterTierDiscount
+    const momoPayAmount = displayTotal
     if (!canPayWithMomo(momoPayAmount)) {
       toast.error(
         `MoMo requires at least ~$${momoMinOrderUsd()} (1,000₫). Use COD or add more items.`
@@ -208,7 +240,7 @@ const Checkout = () => {
       const orderResult = await createOrderFromCart('momo')
       const serverPayAmount =
         orderResult.finalAmount ??
-        Number(orderResult.order.total_amount) ??
+        Number(orderResult.order_group.total_amount) ??
         momoPayAmount
 
       if (!canPayWithMomo(serverPayAmount)) {
@@ -218,16 +250,17 @@ const Checkout = () => {
         return
       }
 
+      // One MoMo payment covers the whole checkout (all shop-orders).
       const momoData = await createMomoPayment({
         amount: serverPayAmount,
         orderInfo: `Order payment - ${name} - ${phone}`,
-        orderId: orderResult.order.id,
-        orderNumber: orderResult.order.order_number
+        order_group_id: orderResult.order_group.id,
+        orderNumber: orderResult.order_group.group_number
       })
 
       setMomoOrderMeta({
-        orderNumber: orderResult.order.order_number,
-        orderDbId: orderResult.order.id
+        orderNumber: orderResult.order_group.group_number,
+        orderDbId: orderResult.order_group.id
       })
 
       const target = momoData.payUrl || momoData.deeplink
@@ -271,7 +304,9 @@ const Checkout = () => {
       setShowQRModal(false)
       toast.success('Order created successfully. Please complete MoMo payment.')
       navigate(
-        `/payment-result?method=momo&order=${result.order.order_number}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
+        `/payment-result?method=momo&order=${result.order_group.group_number}&orders=${encodeURIComponent(
+          result.orders.map(o => o.order_number).join(',')
+        )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
       )
     } catch (err: any) {
       if (err?.message === 'NOT_AUTHENTICATED') {
@@ -284,6 +319,43 @@ const Checkout = () => {
     }
   }
 
+  // Shop vouchers only discount that shop's items - recompute the preview
+  // against the target shop group (the backend recomputes authoritatively).
+  const applyCouponPreview = (
+    res: Awaited<ReturnType<typeof validateCoupon>>,
+    code: string
+  ): boolean => {
+    const shop = res.coupon?.shop
+    if (shop) {
+      const group = shopGroups.find(g => String(g.key) === String(shop.id))
+      if (!group) {
+        toast.error(`Voucher only applies to items from ${shop.name}`)
+        return false
+      }
+      const groupAfterTier = round2(group.subtotal * (1 - tierDiscountRate))
+      if (
+        res.coupon.min_order &&
+        groupAfterTier < Number(res.coupon.min_order)
+      ) {
+        toast.error(`${shop.name} items do not meet the voucher minimum`)
+        return false
+      }
+      let discount =
+        res.coupon.discount_type === 'percent'
+          ? (groupAfterTier * Number(res.coupon.discount_value)) / 100
+          : Number(res.coupon.discount_value)
+      discount = round2(Math.min(discount, groupAfterTier))
+      setAppliedCoupon(code)
+      setCouponResult({ discount, finalAmount: 0, shopName: shop.name })
+      toast.success(`Shop voucher applied (${shop.name})`)
+      return true
+    }
+    setAppliedCoupon(code)
+    setCouponResult({ discount: res.discount, finalAmount: res.finalAmount })
+    toast.success('Voucher applied')
+    return true
+  }
+
   const handleApplyCoupon = () => {
     const code = couponInput.trim()
     if (!code) {
@@ -293,12 +365,10 @@ const Checkout = () => {
     setCouponLoading(true)
     validateCoupon(code, amountAfterTierDiscount)
       .then(res => {
-        setAppliedCoupon(code)
-        setCouponResult({
-          discount: res.discount,
-          finalAmount: res.finalAmount
-        })
-        toast.success('Voucher applied')
+        if (!applyCouponPreview(res, code)) {
+          setAppliedCoupon(null)
+          setCouponResult(null)
+        }
       })
       .catch(err => {
         toast.error(err?.response?.data?.message || 'Invalid voucher')
@@ -328,13 +398,9 @@ const Checkout = () => {
     try {
       const res = await validateMyCoupon(voucher.code, amountAfterTierDiscount)
       setCouponInput(voucher.code)
-      setAppliedCoupon(voucher.code)
-      setCouponResult({
-        discount: res.discount,
-        finalAmount: res.finalAmount
-      })
-      toast.success('Voucher applied')
-      setShowVoucherModal(false)
+      if (applyCouponPreview(res, voucher.code)) {
+        setShowVoucherModal(false)
+      }
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Voucher cannot be applied')
     } finally {
@@ -511,23 +577,49 @@ const Checkout = () => {
 
         <div className="bg-white rounded-lg shadow p-6 h-fit">
           <h3 className="text-lg font-semibold mb-4">Order summary</h3>
+          {shopGroups.length > 1 && (
+            <p className="text-xs text-gray-500 mb-3">
+              Items from {shopGroups.length} shops — your checkout will create
+              one order per shop.
+            </p>
+          )}
           <div className="space-y-4 max-h-80 overflow-auto pr-1">
-            {items.map(item => (
-              <div key={item.id} className="flex gap-3">
-                <img
-                  src={
-                    item.image_url ||
-                    'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
-                  }
-                  alt={item.name}
-                  className="h-14 w-14 object-contain bg-gray-50 rounded"
-                />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{item.name}</p>
-                  <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+            {shopGroups.map(group => (
+              <div key={group.key}>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 mb-2">
+                  <Store className="h-3.5 w-3.5" />
+                  {group.shopName}
                 </div>
-                <div className="text-sm font-semibold">
-                  {formatUsd(item.final_price * item.quantity)}
+                <div className="space-y-3 pl-1">
+                  {group.items.map(item => (
+                    <div key={item.id} className="flex gap-3">
+                      <img
+                        src={
+                          item.image_url ||
+                          'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+                        }
+                        alt={item.name}
+                        className="h-14 w-14 object-contain bg-gray-50 rounded"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{item.name}</p>
+                        <p className="text-xs text-gray-500">
+                          Qty: {item.quantity}
+                        </p>
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {formatUsd(item.final_price * item.quantity)}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-xs text-gray-500 border-t border-dashed pt-1.5">
+                    <span>Shipping ({group.shopName})</span>
+                    <span
+                      className={group.freeShipping ? 'text-green-600' : ''}
+                    >
+                      {group.freeShipping ? 'Free' : formatUsd(group.shipping)}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}
@@ -596,7 +688,10 @@ const Checkout = () => {
             )}
             {couponResult && couponResult.discount > 0 && (
               <div className="flex justify-between text-green-700">
-                <span>Voucher</span>
+                <span>
+                  Voucher
+                  {couponResult.shopName ? ` (${couponResult.shopName})` : ''}
+                </span>
                 <span>-{formatUsd(couponResult.discount)}</span>
               </div>
             )}
@@ -616,15 +711,6 @@ const Checkout = () => {
               <div className="text-xs text-green-600 flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" />
                 You qualified for free shipping!
-              </div>
-            )}
-            {!totals.isFreeShipping && (
-              <div className="text-xs text-gray-500">
-                Add{' '}
-                {formatUsd(
-                  totals.freeShippingThreshold - (cart?.total_price || 0)
-                )}{' '}
-                more for free shipping
               </div>
             )}
             <div className="flex justify-between font-semibold text-gray-900 pt-2 border-t">

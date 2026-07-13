@@ -8,7 +8,11 @@ import {
   useAdminCategories
 } from '../../hooks'
 
-export default function AdminProductEdit() {
+export default function AdminProductEdit({
+  basePath = '/admin/products'
+}: {
+  basePath?: string
+} = {}) {
   const { id } = useParams()
   const isNew = id === 'new'
   const pid = isNew ? undefined : Number(id)
@@ -154,13 +158,13 @@ export default function AdminProductEdit() {
       }
       toast.success(isNew ? 'Product created' : 'Product updated')
       // Try to preserve page from referrer or go back in history
-      if (document.referrer && document.referrer.includes('/admin/products')) {
+      if (document.referrer && document.referrer.includes(basePath)) {
         const referrerUrl = new URL(document.referrer)
         const referrerParams = referrerUrl.searchParams
         const page = referrerParams.get('page')
         const q = referrerParams.get('q')
 
-        let backUrl = '/admin/products'
+        let backUrl = basePath
         const params = new URLSearchParams()
         if (page) params.set('page', page)
         if (q) params.set('q', q)
@@ -168,7 +172,7 @@ export default function AdminProductEdit() {
 
         nav(backUrl)
       } else {
-        nav('/admin/products')
+        nav(basePath)
       }
     } catch (err) {
       toast.error('Failed to save product')

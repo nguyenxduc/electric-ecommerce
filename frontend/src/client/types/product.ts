@@ -15,6 +15,13 @@ export type ProductColor = {
   quantity?: number
 }
 
+export type ProductShop = {
+  id: number
+  name: string
+  slug: string
+  status?: string
+}
+
 export type Product = {
   id: number
   name: string
@@ -30,6 +37,7 @@ export type Product = {
   specs_detail: ProductSpecDetail[]
   color?: ProductColor[] | ProductColor | string | null
   available_colors?: ProductColor[]
+  shop?: ProductShop | null
   category_id: number
   sub_category_id: number
   description: string

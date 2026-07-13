@@ -13,15 +13,23 @@ import {
 } from '../types'
 
 export const adminProductService = {
-  list(params?: ProductListQuery) {
+  list(params?: ProductListQuery & { shop_id?: number }) {
     return axiosClient.get<ProductListResponse>('/products', { params })
+  },
+  // Seller dashboard: own shop's products (any shop status)
+  listMine(params?: ProductListQuery) {
+    return axiosClient.get<ProductListResponse>('/products/shop/mine', {
+      params
+    })
   },
   getById(id: number) {
     return axiosClient.get<ProductResponse>(`/products/${id}`)
   },
-  create(payload: CreateProductRequest & { images?: File[] }) {
+  create(payload: CreateProductRequest & { images?: File[]; shop_id?: number }) {
     const form = new FormData()
     const data = (payload as any).product || payload
+    if (data?.shop_id !== undefined && data?.shop_id !== null && data?.shop_id !== '')
+      form.append('shop_id', String(data.shop_id))
     if (data?.name) form.append('name', String(data.name))
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)

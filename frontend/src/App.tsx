@@ -39,7 +39,17 @@ import AdminChatList from './admin/pages/chat/List'
 import AdminAuditLogList from './admin/pages/audit/List'
 import AdminAiFeedbackList from './admin/pages/ai-feedback/List'
 import AdminNotificationsList from './admin/pages/notifications/List'
+import AdminShopsList from './admin/pages/shops/List'
 import Cart from './client/pages/Cart'
+import ShopPublic from './client/pages/ShopPublic'
+import RequireRole from './routing/RequireRole'
+import SellerLayout from './seller/components/SellerLayout'
+import SellerDashboard from './seller/pages/dashboard'
+import SellerProductsList from './seller/pages/products/List'
+import SellerOrdersList from './seller/pages/orders/List'
+import SellerShopProfile from './seller/pages/shop/Profile'
+import SellerCouponsList from './seller/pages/coupons/List'
+import SellerReturnsList from './seller/pages/returns/List'
 
 const queryClient = new QueryClient()
 
@@ -127,8 +137,45 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment-result" element={<PaymentResult />} />
+            <Route path="/shop/:slug" element={<ShopPublic />} />
           </Route>
-          <Route path="/admin" element={<AdminLayout />}>
+          <Route
+            path="/seller"
+            element={
+              <RequireRole allow={['seller', 'admin']}>
+                <SellerLayout />
+              </RequireRole>
+            }
+          >
+            <Route index element={<SellerDashboard />} />
+            <Route path="products">
+              <Route index element={<SellerProductsList />} />
+              <Route
+                path="new"
+                element={<AdminProductCreate basePath="/seller/products" />}
+              />
+              <Route
+                path=":id"
+                element={<AdminProductEdit basePath="/seller/products" />}
+              />
+            </Route>
+            <Route path="orders">
+              <Route index element={<SellerOrdersList />} />
+              <Route path=":id" element={<AdminOrderDetail />} />
+            </Route>
+            <Route path="coupons" element={<SellerCouponsList />} />
+            <Route path="returns" element={<SellerReturnsList />} />
+            <Route path="chat" element={<AdminChatList scope="seller" />} />
+            <Route path="shop" element={<SellerShopProfile />} />
+          </Route>
+          <Route
+            path="/admin"
+            element={
+              <RequireRole allow={['admin']}>
+                <AdminLayout />
+              </RequireRole>
+            }
+          >
             <Route index element={<AdminDashboard />} />
             <Route path="products">
               <Route index element={<AdminProductsList />} />
@@ -164,6 +211,7 @@ function App() {
               <Route index element={<AdminOrdersList />} />
               <Route path=":id" element={<AdminOrderDetail />} />
             </Route>
+            <Route path="shops" element={<AdminShopsList />} />
             <Route path="chat" element={<AdminChatList />} />
             <Route path="audit-logs" element={<AdminAuditLogList />} />
             <Route path="ai-feedback" element={<AdminAiFeedbackList />} />
