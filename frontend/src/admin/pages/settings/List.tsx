@@ -187,12 +187,12 @@ export default function SettingsList() {
         <ConfirmModal
           open={true}
           title="Delete Setting"
-          message={`Are you sure you want to delete "${showDeleteModal.name}"? This action cannot be undone.`}
+          description={`Are you sure you want to delete "${showDeleteModal.name}"? This action cannot be undone.`}
           confirmText="Delete"
           cancelText="Cancel"
           onConfirm={() => handleDelete(showDeleteModal.key)}
-          onCancel={() => setShowDeleteModal(null)}
-          type="error"
+          onClose={() => setShowDeleteModal(null)}
+          tone="danger"
         />
       )}
 

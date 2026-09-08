@@ -114,6 +114,14 @@ export default function AdminProductEdit({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (Number(price) < 0) {
+      toast.error('Price cannot be negative')
+      return
+    }
+    if (!isNew && (Number(discountPercent) < 0 || Number(discountPercent) > 100)) {
+      toast.error('Discount must be between 0 and 100%')
+      return
+    }
     const colorsPayload = colors.map(c => ({
       name: c.name,
       code: c.code,
@@ -240,6 +248,7 @@ export default function AdminProductEdit({
                 <label className="block text-sm mb-1">Product Price</label>
                 <input
                   type="number"
+                  min={0}
                   className="w-full border rounded px-3 py-2"
                   value={price === 0 ? '' : price}
                   onChange={e =>
@@ -252,6 +261,8 @@ export default function AdminProductEdit({
                   <label className="block text-sm mb-1">Discount (%)</label>
                   <input
                     type="number"
+                    min={0}
+                    max={100}
                     className="w-full border rounded px-3 py-2"
                     value={discountPercent}
                     onChange={e => setDiscountPercent(Number(e.target.value))}

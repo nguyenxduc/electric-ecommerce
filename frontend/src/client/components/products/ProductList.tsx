@@ -1,5 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { trackBehavior } from '../../services/behaviorService'
+import { makeProductSlug } from '../../utils/productSlug'
 import { useSimilarProducts } from '../../hooks/useProducts'
+import { getProductColors } from '../../utils/productColors'
 
 const StarIcon = () => (
   <svg
@@ -18,6 +22,7 @@ interface ProductSimilarProps {
 const ProductSimilar = ({ productId }: ProductSimilarProps) => {
   const { data: product, isLoading, error } = useSimilarProducts(productId, 8)
 
+  const navigate = useNavigate()
   const listProducts = product?.products || []
 
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -30,8 +35,12 @@ const ProductSimilar = ({ productId }: ProductSimilarProps) => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
   }
 
-  function onClickProduct(id: number) {
-    console.log('Product clicked:', id)
+  // Truoc day ham nay chi console.log nen bam vao san pham tuong tu khong
+  // dieu huong di dau. Dung cung dinh dang voi ProductCard: uu tien slug,
+  // lui ve id, va gui su kien click cho mo hinh goi y.
+  function onClickProduct(id: number, name: string) {
+    trackBehavior('click', id, { source: 'similar_products' })
+    navigate(`/product/${makeProductSlug(name, id)}`)
   }
 
   return (
@@ -54,34 +63,40 @@ const ProductSimilar = ({ productId }: ProductSimilarProps) => {
             className="flex transition-transform duration-300 gap-5"
             style={{ transform: `translateX(-${currentIndex * 260}px)` }}
           >
-            {listProducts.map(p => (
+            {listProducts.map(p => {
+              // p.color la truong legacy, co the la mang, mot object, chuoi JSON
+              // hoac null. Goi thang .length/.slice() se lam vo ca danh sach khi
+              // san pham khong co mau. Dung chung helper voi ProductDetail/Compare,
+              // dong thoi uu tien available_colors nen san pham kieu moi cung hien mau.
+              const colors = getProductColors(p.available_colors, p.color)
+              return (
               <div
                 key={p.id}
                 className="min-w-[250px] bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition p-3"
-                onClick={() => onClickProduct(p.id)}
+                onClick={() => onClickProduct(p.id, p.name)}
               >
                 <div className="relative mb-3">
                   <div className="w-full h-40 bg-gray-50 rounded-lg overflow-hidden">
                     <img
-                      src={p.img[0]}
+                      src={p.img?.[0]}
                       alt={p.name}
                       className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                     />
                   </div>
 
                   {/* Product colors */}
-                  {p.color.length > 0 && (
+                  {colors.length > 0 && (
                     <div className="absolute bottom-2 right-2 flex gap-1">
-                      {p.color.slice(0, 3).map((color, i) => (
+                      {colors.slice(0, 3).map((color, i) => (
                         <span
                           key={i}
                           className="h-3 w-3 rounded-full border-2 border-white shadow-sm"
                           style={{ backgroundColor: color.code }}
                         />
                       ))}
-                      {p.color.length > 3 && (
+                      {colors.length > 3 && (
                         <span className="text-xs bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded-full text-gray-600 font-medium">
-                          +{p.color.length - 3}
+                          +{colors.length - 3}
                         </span>
                       )}
                     </div>
@@ -110,7 +125,8 @@ const ProductSimilar = ({ productId }: ProductSimilarProps) => {
                   <span className="ml-1">{p.rating.toFixed(1)}</span>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 

@@ -55,9 +55,9 @@ const Order = () => {
     if (!mappedOrders.length) return []
     if (orderTab === 'delivered') return mappedOrders.filter(o => o.status === 'delivered')
     if (orderTab === 'canceled')
-      return mappedOrders.filter(
-        o => o.status === 'cancelled' || o.status === 'returned'
-      )
+      return mappedOrders.filter(o => o.status === 'cancelled')
+    if (orderTab === 'returned')
+      return mappedOrders.filter(o => o.status === 'returned')
     if (orderTab === 'current')
       return mappedOrders.filter(
         o =>
@@ -217,7 +217,10 @@ const Order = () => {
                     key: 'current',
                     label: 'Current',
                     count: mappedOrders.filter(
-                      o => o.status !== 'delivered' && o.status !== 'cancelled'
+                      o =>
+                        o.status !== 'delivered' &&
+                        o.status !== 'cancelled' &&
+                        o.status !== 'returned'
                     ).length
                   },
                   {
@@ -230,7 +233,11 @@ const Order = () => {
                     label: 'Canceled',
                     count: mappedOrders.filter(o => o.status === 'cancelled').length
                   },
-                  { key: 'returned', label: 'Returned', count: 0 }
+                  {
+                    key: 'returned',
+                    label: 'Returned',
+                    count: mappedOrders.filter(o => o.status === 'returned').length
+                  }
                 ].map(tab => (
                   <button
                     key={tab.key}

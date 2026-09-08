@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import {
   Truck,
   CreditCard,
@@ -46,6 +46,10 @@ const Checkout = () => {
   const [name, setName] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod')
   const [processing, setProcessing] = useState(false)
+  // setProcessing(true) only takes effect after a re-render, so a double
+  // click/tap before that repaint can still slip a second submission
+  // through the disabled button. This ref is checked synchronously instead.
+  const isSubmittingRef = useRef(false)
   const [qrData, setQrData] = useState<BankTransferQRResponse | null>(null)
   const [showQRModal, setShowQRModal] = useState(false)
   const [momoOrderMeta, setMomoOrderMeta] = useState<{
@@ -189,6 +193,7 @@ const Checkout = () => {
   )
 
   const handlePay = async () => {
+    if (isSubmittingRef.current) return
     if (!items.length) {
       toast.error('Cart is empty')
       return
@@ -206,6 +211,7 @@ const Checkout = () => {
 
     if (paymentMethod === 'cod') {
       try {
+        isSubmittingRef.current = true
         setProcessing(true)
         const result = await createOrderFromCart('cod')
         toast.success('Order placed successfully - Pay on delivery')
@@ -221,6 +227,7 @@ const Checkout = () => {
           toast.error(err?.response?.data?.message || 'Failed to create order')
         }
       } finally {
+        isSubmittingRef.current = false
         setProcessing(false)
       }
       return
@@ -236,12 +243,16 @@ const Checkout = () => {
     }
 
     try {
+      isSubmittingRef.current = true
       setProcessing(true)
       const orderResult = await createOrderFromCart('momo')
+      // Number() tra ve NaN chu khong bao gio nullish, nen chuoi ?? cu khien
+      // nhanh du phong momoPayAmount khong bao gio chay: total_amount thieu se
+      // cho ra NaN va don hang vua tao bi ket o trang thai chua thanh toan.
+      const groupTotal = Number(orderResult.order_group?.total_amount)
       const serverPayAmount =
         orderResult.finalAmount ??
-        Number(orderResult.order_group.total_amount) ??
-        momoPayAmount
+        (Number.isFinite(groupTotal) ? groupTotal : momoPayAmount)
 
       if (!canPayWithMomo(serverPayAmount)) {
         toast.error(
@@ -275,6 +286,7 @@ const Checkout = () => {
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to create MoMo payment')
     } finally {
+      isSubmittingRef.current = false
       setProcessing(false)
     }
   }
@@ -285,7 +297,9 @@ const Checkout = () => {
   }
 
   const handleConfirmPayment = async () => {
+    if (isSubmittingRef.current) return
     try {
+      isSubmittingRef.current = true
       setProcessing(true)
       if (momoOrderMeta) {
         setShowQRModal(false)
@@ -315,6 +329,7 @@ const Checkout = () => {
         toast.error(err?.response?.data?.message || 'Failed to create order')
       }
     } finally {
+      isSubmittingRef.current = false
       setProcessing(false)
     }
   }
