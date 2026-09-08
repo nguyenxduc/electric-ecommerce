@@ -45,8 +45,14 @@ docker compose up
 ### Reset dữ liệu demo về trạng thái ban đầu
 
 ```bash
-cd backend && npm run seed
+cd backend && npm run seed:full
 ```
+
+> **Quan trọng trước khi demo AI**: `npm run seed` xoá sạch dữ liệu cũ, trong đó
+> có bảng `product_embeddings`. Nếu chỉ chạy `npm run seed`, chatbot RAG sẽ âm
+> thầm tụt xuống chế độ tìm theo từ khoá vì không còn vector nào để truy hồi.
+> Dùng `npm run seed:full` (seed + sinh lại embedding), hoặc chạy `npm run seed`
+> rồi **khởi động lại backend** — startup task sẽ tự sinh embedding.
 
 ---
 
@@ -84,7 +90,7 @@ cd backend && npm run seed
    (Gadget Hub rẻ hơn vì shop tự đặt phí), dán mã `TECHWORLD10` → giảm giá chỉ
    áp cho phần hàng Tech World. Đặt COD → trang kết quả hiện **2 mã đơn**
    (mỗi shop một đơn, chung một mã checkout GRP-...).
-   - *Tuỳ chọn*: demo thanh toán MoMo sandbox thay vì COD.
+   - *Tuỳ chọn*: demo thanh toán **MoMo** hoặc **VNPay** sandbox thay vì COD.
 
 ### Màn 2 — Seller (seller1@example.com)
 
@@ -117,9 +123,19 @@ cd backend && npm run seed
 - **Đa gian hàng**: `Shop` (1 user – 1 shop, vòng đời pending → active →
   suspended/rejected) · `Product.shop_id` · Checkout tách `OrderGroup`
   (1 lần mua) → N `Order` (mỗi shop 1 đơn, tự quản trạng thái).
-- **Thanh toán**: 1 `Payment` gắn với `OrderGroup`; IPN MoMo cập nhật đồng
+- **Thanh toán**: 3 phương thức COD / VNPay / MoMo. 1 `Payment` gắn với
+  `OrderGroup`; IPN từ cổng thanh toán cập nhật đồng
   loạt các đơn con. Tổng các đơn con luôn khớp tuyệt đối tổng checkout
   (chia khuyến mãi theo tỉ lệ, đơn cuối hấp thụ sai số làm tròn).
+- **Bảo mật**: `helmet` đặt header bảo vệ, `express-rate-limit` chia 3 mức
+  (chung / xác thực / endpoint gọi Gemini), secret JWT bắt buộc lấy từ biến
+  môi trường và fail-fast nếu thiếu, truy vấn raw SQL đều tham số hoá.
+- **Hằng số tập trung**: `constants/status.js` giữ toàn bộ trạng thái vòng đời
+  (shop / đơn hàng / thanh toán / đổi trả) cùng bảng chuyển trạng thái hợp lệ,
+  thay cho chuỗi rời rạc — tránh nhầm `cancelled` (đơn) với `canceled` (thanh toán).
+- **Lưới an toàn lỗi**: `middleware/error.middleware.js` gom 404 và xử lý lỗi về
+  một chỗ; `middleware/validateId.middleware.js` chặn ID sai ngay tầng route nên
+  đầu vào hỏng trả 400 thay vì 500 kèm thông báo nội bộ.
 - **Phân quyền 3 lớp**: `protectRoute` (JWT) → `adminRoute`/`sellerRoute`
   (vai trò) → `requireShopOwnership` (đúng shop sở hữu tài nguyên).
 - **Voucher 2 cấp**: voucher sàn (giảm cả giỏ) và voucher shop (chỉ giảm phần
@@ -134,10 +150,32 @@ cd backend && npm run seed
   sản phẩm sinh bảng có cấu trúc, collaborative filtering (gợi ý). Mọi nguồn
   hiển thị sản phẩm đều lọc shop `active`.
 
-## 5. Kiểm thử
+## 5. Tài liệu thiết kế & số liệu thực nghiệm
+
+| Tài liệu | Nội dung | Sinh bằng |
+|---|---|---|
+| [`backend/docs/erd.md`](backend/docs/erd.md) | ERD 34 bảng, chia theo 5 miền nghiệp vụ | `npm run docs:erd` — đọc thẳng `schema.prisma` nên không bao giờ lệch |
+| [`backend/docs/architecture.md`](backend/docs/architecture.md) | Kiến trúc tổng thể, sơ đồ tuần tự (tách đơn, RAG, IPN MoMo), máy trạng thái đơn & shop, phân quyền 3 lớp | viết tay |
+| [`backend/docs/ai-evaluation.md`](backend/docs/ai-evaluation.md) | Số liệu đo thật: độ chính xác truy hồi RAG, ma trận nhầm lẫn kiểm duyệt, độ phủ gợi ý | `npm run eval:ai` |
+
+Sơ đồ viết bằng Mermaid nên hiển thị trực tiếp trên GitHub.
+
+```bash
+cd backend
+npm run docs:erd     # sinh lại ERD sau khi đổi schema
+npm run eval:ai      # đo lại chất lượng AI (gọi Gemini thật, mất vài phút)
+npm run eval:ai -- --quick   # bản rút gọn khi chỉ cần thử
+```
+
+> `eval:ai` yêu cầu backend đang chạy và đã có embedding. Kết quả ghi đè
+> `docs/ai-evaluation.md` — đây là số liệu để đưa vào chương thực nghiệm.
+
+---
+
+## 6. Kiểm thử
 
 Bộ kiểm thử API end-to-end viết bằng **node:test** (test runner có sẵn của
-Node.js, không cần cài thêm), chia 8 suite theo nghiệp vụ trong `backend/tests/`:
+Node.js, không cần cài thêm), chia 11 suite theo nghiệp vụ trong `backend/tests/`:
 
 | Suite | Phạm vi |
 |---|---|
@@ -149,9 +187,39 @@ Node.js, không cần cài thêm), chia 8 suite theo nghiệp vụ trong `backen
 | `06-vouchers` | Voucher sàn/voucher shop, validate, CRUD của seller |
 | `07-marketplace-flow` | Checkout tách đơn, phí ship theo shop, điểm loyalty, máy trạng thái đơn, đổi/trả, chat buyer↔seller |
 | `08-loyalty-notifications` | Điểm thưởng, thông báo broadcast |
+| `09-payment-security` | Xác minh chữ ký HMAC của IPN MoMo: chặn callback giả mạo, sửa số tiền, sửa resultCode |
+| `10-api-contract` | Hợp đồng tầng hạ tầng: 404 dạng JSON, ID sai trả 400 (không phải 500), lỗi không lộ chi tiết nội bộ |
+| `11-business-rules` | Quy tắc nghiệp vụ: voucher không bị dùng vượt hạn mức khi mua đồng thời, bảng chi tiết tiền cộng đúng bằng tổng, mọi trạng thái đơn đều chuyển tiếp được, đơn huỷ không tính vào doanh thu |
 
 ```bash
 # Yêu cầu: backend đang chạy (npm run dev). Lệnh test tự seed lại dữ liệu.
 cd backend
 npm test
 ```
+
+### Kiểm tra sẵn sàng trước khi demo
+
+Mười một suite ở trên là kiểm thử hồi quy: chúng **seed lại dữ liệu** rồi kiểm chứng
+nghiệp vụ. Còn `test:demo` chạy trên **đúng dữ liệu sắp đem đi demo** và **chỉ
+đọc** — không tạo đơn, không đình chỉ shop, không đổi trạng thái gì:
+
+```bash
+cd backend
+npm run test:demo
+```
+
+Bộ này soi lại toàn bộ kịch bản demo ở mục 3: 5 tài khoản đăng nhập được, hai
+gian hàng còn active và còn hàng, Gadget Hub còn phí ship riêng, 4 mã voucher
+còn hiệu lực, còn đơn mở shop chờ duyệt cho Màn 3, dashboard seller còn khối
+doanh thu/phí sàn, và **quan trọng nhất: `product_embeddings` không rỗng** —
+đây là cái bẫy hay gặp nhất vì `npm run seed` xoá sạch bảng này và làm chatbot
+RAG âm thầm tụt xuống chế độ tìm theo từ khoá.
+
+Muốn kiểm chứng luôn cả đường RAG thật (tốn một lượt gọi Gemini):
+
+```bash
+DEMO_CHECK_AI=1 npm run test:demo
+```
+
+> Thứ tự khuyên dùng ngay trước buổi bảo vệ:
+> `npm run seed:full` → khởi động backend → `npm run test:demo` → tất cả xanh thì demo.
