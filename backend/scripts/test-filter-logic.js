@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/db.js";
 
 async function testFilterLogic() {
   console.log("🧪 Testing Filter Logic...");
@@ -198,8 +196,8 @@ async function main() {
     await testFilterLogic();
   } else {
     console.log("Usage:");
-    console.log("  node test-filter-logic.js --setup   # Create test data");
-    console.log("  node test-filter-logic.js --test    # Run filter tests");
+    console.log("  node scripts/test-filter-logic.js --setup   # Create test data");
+    console.log("  node scripts/test-filter-logic.js --test    # Run filter tests");
   }
 }
 

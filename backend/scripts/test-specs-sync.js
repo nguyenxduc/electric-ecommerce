@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/db.js";
 
 async function testSpecsSync() {
   console.log("🧪 Testing Specs & Specs Detail Sync...");
@@ -251,10 +249,10 @@ async function main() {
   } else {
     console.log("Usage:");
     console.log(
-      "  node test-specs-sync.js --create-samples   # Create sample products with nested specs"
+      "  node scripts/test-specs-sync.js --create-samples   # Create sample products with nested specs"
     );
     console.log(
-      "  node test-specs-sync.js --test             # Test specs sync functionality"
+      "  node scripts/test-specs-sync.js --test             # Test specs sync functionality"
     );
   }
 }
