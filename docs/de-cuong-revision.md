@@ -1,7 +1,12 @@
-# Đề cương — bản chỉnh sửa theo góp ý
+# Đề cương — ghi chú các chỗ đã sửa và lý do
 
-> Soạn ngày 2026-09-08. Mỗi mục dưới đây là văn bản đã viết sẵn để dán thẳng vào
-> file đề cương Word. Phần in nghiêng đầu mỗi mục giải thích lý do sửa, không dán vào.
+> **Bản đề cương hoàn chỉnh đã chỉnh sửa nằm ở
+> [`de-cuong-chi-tiet-v2.md`](./de-cuong-chi-tiet-v2.md).** Đó là file dùng để dán
+> vào Word. File này chỉ giải thích chỗ nào đổi và vì sao, dùng khi thầy hỏi lại
+> hoặc khi viết phần thuyết minh.
+>
+> Soạn ngày 2026-09-08. Mỗi mục dưới đây là văn bản viết sẵn theo từng mục của đề
+> cương gốc. Phần in nghiêng đầu mỗi mục giải thích lý do sửa, không dán vào.
 >
 > Mọi khẳng định kỹ thuật ở đây đều đã đối chiếu với mã nguồn hiện có. Xem
 > [`PROGRESS.md`](../PROGRESS.md) để biết cái gì đã chạy và cái gì còn phải làm.
@@ -157,9 +162,9 @@ giữ nguyên.*
 | Thiết kế giao diện | 08/10 – 18/10 | Thiết kế wireframe, prototype bằng Figma | Giao diện mẫu, prototype |
 | Thiết kế CSDL & API | 19/10 – 29/10 | Thiết kế cơ sở dữ liệu, mô hình ERD, tài liệu API | ERD, tài liệu thiết kế dữ liệu & API |
 | **Hiện thực nền tảng** | **30/10 – 12/11** | Dựng frontend React và backend Node.js/Prisma cho các chức năng nền, có hỗ trợ của công cụ lập trình AI | Ba phân hệ chạy được đầu cuối |
-| **Kỹ thuật lõi: giao dịch & tương tranh** | **13/11 – 20/11** | Tách đơn đa gian hàng, voucher hai cấp, cập nhật có điều kiện chống bán vượt kho, bảo toàn bất biến dòng tiền | Luồng thanh toán đúng về tiền, có kiểm thử tương tranh |
-| **Kỹ thuật AI nâng cao** | **21/11 – 04/12** | Truy hồi lai với Reciprocal Rank Fusion, gọi hàm truy vấn giá và tồn kho, phản hồi theo luồng, phòng thủ tiêm lệnh | Trợ lý ảo trả lời đúng số liệu thời gian thực và an toàn |
-| Tích hợp & tối ưu | 05/12 – 18/12 | Tìm kiếm bằng ảnh, so sánh thông số, gợi ý cá nhân hoá, kiểm duyệt đánh giá, bộ nhớ đệm | Hoàn thiện năm module AI |
+| **Kỹ thuật lõi và kiểm thử nghiệp vụ thanh toán** | **13/11 – 20/11** | Tách đơn đa gian hàng, voucher hai cấp, cập nhật có điều kiện chống bán vượt kho, bảo toàn bất biến dòng tiền, viết kiểm thử đầu cuối cho kịch bản biên của thanh toán | Luồng thanh toán đúng về tiền, có kiểm thử tương tranh và kịch bản biên |
+| **An toàn và trải nghiệm tầng AI** | **21/11 – 27/11** | Phòng thủ tiêm lệnh hai lớp, phản hồi theo luồng | Trợ lý ảo an toàn, hiển thị dần |
+| Tích hợp chức năng nâng cao | 28/11 – 18/12 | Truy hồi lai với Reciprocal Rank Fusion, gọi hàm truy vấn giá và tồn kho, tìm kiếm bằng ảnh, so sánh thông số, gợi ý cá nhân hoá, kiểm duyệt đánh giá | Hoàn thiện năm module AI |
 | **Xây dựng khung đánh giá AI** | **19/12 – 25/12** | Tập dữ liệu gắn nhãn, đo RAG Triad theo Ragas, Recall@5, nDCG@5, độ chính xác tìm kiếm ảnh | Báo cáo số đo cho toàn bộ KPI |
 | Kiểm thử | 26/12 – 05/01 | Kiểm thử đơn vị, tích hợp, đầu cuối và hiệu năng, tập trung kịch bản biên của thanh toán | Hệ thống ổn định |
 | Hoàn thiện & triển khai | 06/01 – 11/01 | Hoàn thiện chức năng, tối ưu hiệu năng, triển khai môi trường demo | Website triển khai thành công |

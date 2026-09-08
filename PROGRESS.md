@@ -188,3 +188,4 @@ Mỗi câu hỏi chatbot gọi LLM ít nhất 3 lần (phân loại ngữ cảnh
 | Ngày | Việc | Người / công cụ |
 |---|---|---|
 | 2026-09-08 | Lập file theo dõi tiến độ, rà soát hiện trạng so với đề cương, chốt backlog T1 - T7 | Claude Code |
+| 2026-09-08 | Viết lại toàn văn đề cương theo góp ý của CBHD, xem `docs/de-cuong-chi-tiet-v2.md`. Kế hoạch mới rút giai đoạn cài đặt còn 2 tuần, dồn 13/11 - 27/11 cho T4 chống tiêm lệnh, T3 streaming và phần kiểm thử biên của T6 | Claude Code |
