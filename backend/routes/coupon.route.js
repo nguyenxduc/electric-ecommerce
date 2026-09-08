@@ -19,7 +19,10 @@ import {
   deleteShopCoupon,
 } from "../controllers/coupon.controller.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Public routes
 router.post("/validate", validateCoupon);

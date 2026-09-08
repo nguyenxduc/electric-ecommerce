@@ -1112,9 +1112,11 @@ async function seedOrders(users, products) {
         order_group_id: orderGroup.id,
         order_number: `ORD-${Date.now()}-${i}`,
         total_amount: totalPrice,
-        status: ["pending", "confirmed", "processing", "shipped", "delivered"][
-          i % 5
-        ],
+        // Chi dung trang thai co that trong may trang thai cua ung dung.
+        // Truoc day seed sinh ca "confirmed" - mot trang thai khong co trong
+        // ORDER_STATUS_FLOW, khien don do bi ket vinh vien: seller khong
+        // chuyen tiep duoc ma cung khong huy duoc.
+        status: ["pending", "processing", "shipped", "delivered"][i % 4],
         payment_method: paymentMethod,
         shipping_address: shippingAddress,
         receiver_name: user.name || "Customer",
@@ -1134,6 +1136,48 @@ async function seedOrders(users, products) {
     });
 
     orders.push(order);
+
+    // Them mon thu hai TU SHOP KHAC vao cung gio hang nay.
+    //
+    // Lam viec nay vi thuat toan loc cong tac hoc tu cac cap san pham duoc mua
+    // CHUNG mot gio. Neu moi gio chi co dung mot mon thi khong ton tai cap nao,
+    // ma tran dong mua rong, va goi y luon roi ve cold-start (ban chay + hang
+    // moi) — tinh nang goi y ca nhan hoa coi nhu khong demo duoc.
+    const otherShopProducts = products.filter(
+      (p) => p.shop_id?.toString() !== product.shop_id?.toString()
+    );
+    if (otherShopProducts.length > 0) {
+      const companion =
+        otherShopProducts[Math.floor(Math.random() * otherShopProducts.length)];
+      const companionQty = Math.floor(Math.random() * 2) + 1;
+      const companionUnit =
+        Number(companion.price) - Number(companion.discount || 0);
+
+      await prisma.order.create({
+        data: {
+          user_id: user.id,
+          shop_id: companion.shop_id,
+          order_group_id: orderGroup.id,
+          order_number: `ORD-${Date.now()}-${i}-b`,
+          total_amount: companionUnit * companionQty,
+          status: ["pending", "processing", "shipped", "delivered"][i % 4],
+          payment_method: paymentMethod,
+          shipping_address: shippingAddress,
+          receiver_name: user.name || "Customer",
+          receiver_phone: user.phone || "0000000000",
+          order_items: {
+            create: [
+              {
+                product_id: companion.id,
+                quantity: companionQty,
+                unit_price: companionUnit,
+                total_price: companionUnit * companionQty,
+              },
+            ],
+          },
+        },
+      });
+    }
   }
 
   return orders;
@@ -1510,6 +1554,15 @@ async function main() {
     totalSettings: settings.length,
   });
   console.log("\n🌱 Database is now seeded and ready to use!");
+
+  // clearDatabase() xoa ca product_embeddings, ma embedding phai gan voi id
+  // san pham moi nen khong the giu lai. Neu khong sinh lai, chatbot RAG am
+  // tham tut xuong chi con tim theo tu khoa - rat de vo tran luc demo.
+  console.log(
+    "\n[!] product_embeddings da bi xoa theo du lieu cu." +
+      "\n    Chay: npm run embed:products (hoac khoi dong lai backend)" +
+      "\n    truoc khi demo chatbot AI. Gon hon: npm run seed:full"
+  );
 }
 
 main()

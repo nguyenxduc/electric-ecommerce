@@ -39,6 +39,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
 import { prisma } from "./lib/db.js";
+import { ACCESS_TOKEN_SECRET } from "./lib/jwtSecret.js";
 BigInt.prototype.toJSON = function () {
   return Number(this);
 };
@@ -70,6 +71,17 @@ import { startDailyJobsScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
 import cors from "cors";
+import helmet from "helmet";
+import {
+  apiLimiter,
+  authLimiter,
+  aiLimiter,
+  rateLimitStatus,
+} from "./middleware/rateLimit.middleware.js";
+import {
+  notFoundHandler,
+  errorHandler,
+} from "./middleware/error.middleware.js";
 
 const app = express();
 dotenv.config();
@@ -91,6 +103,16 @@ const PORT = process.env.PORT || 3000;
 // Create HTTP server
 const server = createServer(app);
 
+// Header bảo mật (X-Frame-Options, HSTS, noSniff...). Tắt CSP vì đây là API
+// JSON, giao diện do Vite phục vụ riêng; mở CORP cross-origin để frontend ở
+// cổng 5173 đọc được response.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 app.use(
   cors({
     origin: "http://localhost:5173",
@@ -98,12 +120,17 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Chặn payload quá lớn (ảnh upload đi qua multer riêng, không qua đây).
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 app.use(cookieParser());
 
+// Giới hạn tần suất: mức chung cho toàn bộ /api, mức chặt hơn cho xác thực
+// và cho các endpoint gọi Gemini.
+app.use("/api", apiLimiter);
+
 // Routes
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/coupons", couponRoutes);
@@ -118,7 +145,7 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/settings", settingRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/ai-assistant", aiAssistantRoutes);
+app.use("/api/ai-assistant", aiLimiter, aiAssistantRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/loyalty", loyaltyRoutes);
 app.use("/api/notifications", notificationRoutes);
@@ -126,6 +153,12 @@ app.use("/api/audit-logs", auditRoutes);
 app.use("/api/behavior", behaviorRoutes);
 app.use("/api/shops", shopRoutes);
 app.use("/api/returns", returnRoutes);
+
+// Phai dung sau moi route: 404 cho endpoint la, roi mot cho duy nhat xu ly loi.
+// Express 4 khong tu bat promise reject, nen neu thieu luoi nay thi mot handler
+// async nem loi se lam request treo im lang thay vi tra ve loi.
+app.use("/api", notFoundHandler);
+app.use(errorHandler);
 
 // Setup Socket.io
 const io = new Server(server, {
@@ -166,9 +199,7 @@ io.use(async (socket, next) => {
     }
 
     const jwt = (await import("jsonwebtoken")).default;
-    const secret =
-      process.env.ACCESS_TOKEN_SECRET ||
-      "your-access-token-secret-key-change-in-production";
+    const secret = ACCESS_TOKEN_SECRET;
     const decoded = jwt.verify(token, secret);
 
     const userId = decoded.userId?.toString() || decoded.id?.toString();
@@ -303,6 +334,7 @@ io.on("connection", (socket) => {
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Rate limit: ${rateLimitStatus()}`);
   startStartupTasks();
   startDailyJobsScheduler();
 });

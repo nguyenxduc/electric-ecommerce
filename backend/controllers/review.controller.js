@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { ORDER_STATUS } from "../constants/status.js";
 import { moderateReviewComment } from "../ai/reviewModeration.js";
 
 const validateCommentByAi = async (comment) => {
@@ -37,7 +38,7 @@ export const createReview = async (req, res) => {
         product_id: BigInt(productId),
         order: {
           user_id: BigInt(userId),
-          status: "delivered",
+          status: ORDER_STATUS.DELIVERED,
           deleted_at: null,
         },
       },

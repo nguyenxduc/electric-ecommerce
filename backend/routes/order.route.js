@@ -18,8 +18,10 @@ import {
   sellerRoute,
 } from "../middleware/auth.middleware.js";
 import { requireShopOwnership } from "../lib/authz.js";
+import { registerIdParams } from "../middleware/validateId.middleware.js";
 
 const router = express.Router();
+registerIdParams(router);
 
 // Resolves which shop owns the order being mutated (for ownership checks)
 const resolveOrderShop = async (req) => {

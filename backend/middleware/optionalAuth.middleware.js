@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/db.js";
+import { ACCESS_TOKEN_SECRET } from "../lib/jwtSecret.js";
 
 /** Sets req.user when Bearer/cookie token is valid; otherwise continues without user. */
 export const optionalAuth = async (req, res, next) => {
@@ -18,9 +19,7 @@ export const optionalAuth = async (req, res, next) => {
       return next();
     }
 
-    const secret =
-      process.env.ACCESS_TOKEN_SECRET ||
-      "your-access-token-secret-key-change-in-production";
+    const secret = ACCESS_TOKEN_SECRET;
     const decoded = jwt.verify(accessToken, secret);
     const userRecord = await prisma.user.findUnique({
       where: { id: BigInt(decoded.userId) },

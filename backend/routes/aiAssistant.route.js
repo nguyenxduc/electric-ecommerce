@@ -13,7 +13,10 @@ import {
 } from "../controllers/aiFeedback.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 router.get("/", protectRoute, listAiChats);
 router.post("/", protectRoute, createAiChat);

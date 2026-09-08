@@ -136,7 +136,10 @@ export const upsertSetting = async (req, res) => {
       where: { key },
       update: {
         value: stringValue,
-        description: description || undefined,
+        // `|| undefined` made clearing a description to "" a silent no-op
+        // (Prisma treats undefined as "leave unchanged") - only omit the
+        // field when it wasn't sent at all.
+        description: description !== undefined ? description || null : undefined,
         category: category || "general",
         data_type: type,
         is_public: is_public !== undefined ? is_public : false,

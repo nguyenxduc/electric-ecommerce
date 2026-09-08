@@ -9,7 +9,10 @@ import {
   deleteCustomer,
 } from "../controllers/customer.controller.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 router.get("/", protectRoute, adminRoute, listCustomers);
 router.get("/:id", protectRoute, adminRoute, getCustomer);

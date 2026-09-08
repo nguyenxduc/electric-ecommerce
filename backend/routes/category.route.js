@@ -12,7 +12,10 @@ import {
 import { upload } from "../middleware/upload.middleware.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Public routes
 router.get("/", listCategories);

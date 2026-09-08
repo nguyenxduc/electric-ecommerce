@@ -4,6 +4,7 @@ import { notifyUser } from "../lib/notify.js";
 import { restockOrderItems } from "../lib/restock.js";
 import { revertPointsForOrder } from "./loyalty.controller.js";
 import { ROLES } from "../constants/roles.js";
+import { ORDER_STATUS, RETURN_STATUS } from "../constants/status.js";
 
 // POST /api/returns — buyer requests a return on their delivered order
 export const createReturnRequest = async (req, res) => {
@@ -22,7 +23,7 @@ export const createReturnRequest = async (req, res) => {
     if (!order || order.user_id.toString() !== req.user.id) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    if (order.status !== "delivered") {
+    if (order.status !== ORDER_STATUS.DELIVERED) {
       return res.status(400).json({
         success: false,
         message: "Only delivered orders can be returned",
@@ -130,31 +131,51 @@ export const resolveReturnRequest = async (req, res) => {
     if (!isAdmin && request.shop_id.toString() !== req.shop?.id?.toString()) {
       return res.status(403).json({ success: false, message: "Not authorized" });
     }
-    if (request.status !== "pending") {
+    if (request.status !== RETURN_STATUS.PENDING) {
       return res
         .status(400)
         .json({ success: false, message: "Request already resolved" });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
-      const r = await tx.returnRequest.update({
-        where: { id: request.id },
-        data: {
-          status: action === "approve" ? "approved" : "rejected",
-          resolution_note: note ? String(note).trim() : null,
-        },
-      });
-      if (action === "approve") {
-        await restockOrderItems(tx, request.order.order_items);
-        // Returned goods also claw back the loyalty points they earned
-        await revertPointsForOrder(tx, request.user_id, request.order_id);
-        await tx.order.update({
-          where: { id: request.order_id },
-          data: { status: "returned" },
+    let updated;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        // Re-check status atomically - closes the gap between the read
+        // above and this write so two concurrent resolutions of the same
+        // request (e.g. a seller double-clicking Approve) can't both
+        // restock/revert points for the same order.
+        const claimed = await tx.returnRequest.updateMany({
+          where: { id: request.id, status: RETURN_STATUS.PENDING },
+          data: {
+            status:
+              action === "approve"
+                ? RETURN_STATUS.APPROVED
+                : RETURN_STATUS.REJECTED,
+            resolution_note: note ? String(note).trim() : null,
+          },
         });
+        if (claimed.count === 0) {
+          throw new Error("RETURN_ALREADY_RESOLVED");
+        }
+        if (action === "approve") {
+          await restockOrderItems(tx, request.order.order_items);
+          // Returned goods also claw back the loyalty points they earned
+          await revertPointsForOrder(tx, request.user_id, request.order_id);
+          await tx.order.update({
+            where: { id: request.order_id },
+            data: { status: ORDER_STATUS.RETURNED },
+          });
+        }
+        return tx.returnRequest.findUniqueOrThrow({ where: { id: request.id } });
+      });
+    } catch (err) {
+      if (err.message === "RETURN_ALREADY_RESOLVED") {
+        return res
+          .status(409)
+          .json({ success: false, message: "Request already resolved" });
       }
-      return r;
-    });
+      throw err;
+    }
 
     writeAuditLog({
       userId: req.user.id,

@@ -3,6 +3,7 @@ import {
   HumanMessage,
   SystemMessage,
 } from "@langchain/core/messages";
+import { Prisma } from "@prisma/client";
 import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
 import {
   assertGeminiApiKey,
@@ -70,7 +71,19 @@ const logDebugError = (label, err, extra = {}) => {
   console.error(label, payload);
 };
 
-const escapeSqlLiteral = (value) => (value || "").replace(/'/g, "''");
+// Token dùng cho mẫu LIKE: bỏ dấu, chỉ giữ chữ - số - khoảng trắng.
+// Nhờ vậy vừa không còn ký tự nào có ý nghĩa với SQL, vừa loại được
+// wildcard % và _ do token mở rộng từ AI có thể chứa.
+const sanitizeLikeToken = (value) =>
+  (value || "")
+    .toString()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
 
 const normalizeTokens = (text) =>
   (text || "")
@@ -232,17 +245,14 @@ const classifyConversationMode = async ({ latestUserText, recentMessages }) => {
 };
 
 const buildAICatalogHints = async (prisma) => {
-  const rows = await prisma.$queryRawUnsafe(
-    `
+  const rows = await prisma.$queryRaw`
     SELECT p.name, COALESCE(pe.content, '') AS content
     FROM products p
     JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
     LEFT JOIN product_embeddings pe ON p.id = pe.product_id
     WHERE p.deleted_at IS NULL
     ORDER BY p.updated_at DESC NULLS LAST
-    LIMIT 30;
-    `
-  );
+    LIMIT 30;`;
   return (rows || [])
     .map((r) => `${r?.name || ""} | ${String(r?.content || "").slice(0, 120)}`)
     .filter(Boolean)
@@ -392,28 +402,26 @@ const retrieveContext = async (prisma, question) => {
   const focusTerms = aiResearch?.focusTerms || [];
   const strictFocus = Boolean(aiResearch?.strictFocus);
   const candidateLimit = Math.max(topK * 6, 24);
-  const keywordClause = tokens
+  const keywordConditions = tokens
+    .map((t) => sanitizeLikeToken(t))
+    .filter((t) => t.length >= 2)
     .map((t) => {
-      const safe = escapeSqlLiteral(t);
-      return `lower(p.name) LIKE '%${safe}%' OR lower(COALESCE(pe.content, '')) LIKE '%${safe}%'`;
-    })
-    .join(" OR ");
+      const pattern = `%${t}%`;
+      return Prisma.sql`(lower(p.name) LIKE ${pattern} OR lower(COALESCE(pe.content, '')) LIKE ${pattern})`;
+    });
 
   let keywordRows = [];
-  if (keywordClause) {
+  if (keywordConditions.length > 0) {
     try {
-      keywordRows = await prisma.$queryRawUnsafe(
-        `
+      keywordRows = await prisma.$queryRaw`
         SELECT p.id, p.name, p.price, p.img, COALESCE(pe.content, '') AS content
         FROM products p
         JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
         LEFT JOIN product_embeddings pe ON p.id = pe.product_id
         WHERE p.deleted_at IS NULL
-          AND (${keywordClause})
+          AND (${Prisma.join(keywordConditions, " OR ")})
         ORDER BY p.updated_at DESC NULLS LAST
-        LIMIT ${candidateLimit};
-        `
-      );
+        LIMIT ${candidateLimit};`;
       keywordRows = keywordRows.map((r) => ({ ...r, _fromKeyword: true }));
     } catch (err) {
       logDebugError("retrieveContext keyword error:", err, {
@@ -436,17 +444,14 @@ const retrieveContext = async (prisma, question) => {
   try {
     const queryVector = await embeddings.embedQuery(question);
     const vectorLiteral = `[${queryVector.join(",")}]`;
-    const vectorRows = await prisma.$queryRawUnsafe(
-      `
+    const vectorRows = await prisma.$queryRaw`
       SELECT p.id, p.name, p.price, p.img, pe.content
       FROM product_embeddings pe
       JOIN products p ON p.id = pe.product_id
       JOIN shops s ON s.id = p.shop_id AND s.status = 'active' AND s.deleted_at IS NULL
       WHERE p.deleted_at IS NULL
-      ORDER BY pe.embedding <-> '${vectorLiteral}'::vector
-      LIMIT ${candidateLimit};
-      `
-    );
+      ORDER BY pe.embedding <-> ${vectorLiteral}::vector
+      LIMIT ${candidateLimit};`;
     const taggedVectorRows = (vectorRows ?? []).map((r) => ({
       ...r,
       _fromVector: true,

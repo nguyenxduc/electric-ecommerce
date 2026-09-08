@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/db.js";
+import { ACCESS_TOKEN_SECRET } from "../lib/jwtSecret.js";
 import { ROLES } from "../constants/roles.js";
 
 export const protectRoute = async (req, res, next) => {
@@ -23,9 +24,7 @@ export const protectRoute = async (req, res, next) => {
     }
 
     try {
-      const secret =
-        process.env.ACCESS_TOKEN_SECRET ||
-        "your-access-token-secret-key-change-in-production";
+      const secret = ACCESS_TOKEN_SECRET;
       const decoded = jwt.verify(accessToken, secret);
       const userRecord = await prisma.user.findUnique({
         where: { id: BigInt(decoded.userId) },

@@ -134,7 +134,7 @@ export const updateCustomerTier = async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, loyalty_points: true },
+      select: { id: true, loyalty_points: true, segment: true },
     });
     if (!user) {
       return res.status(404).json({ message: "Customer not found" });

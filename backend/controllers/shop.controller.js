@@ -5,13 +5,9 @@ import { notifyUser } from "../lib/notify.js";
 import { ROLES } from "../constants/roles.js";
 import { createSlug, ensureUniqueSlug } from "../lib/slug.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
+import { SHOP_STATUS } from "../constants/status.js";
 
-export const SHOP_STATUS = Object.freeze({
-  PENDING: "pending",
-  ACTIVE: "active",
-  REJECTED: "rejected",
-  SUSPENDED: "suspended",
-});
+export { SHOP_STATUS } from "../constants/status.js";
 
 const shopPublicSelect = {
   id: true,

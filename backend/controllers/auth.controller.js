@@ -1,17 +1,16 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/db.js";
+import { ACCESS_TOKEN_SECRET, ACCESS_TOKEN_TTL } from "../lib/jwtSecret.js";
 import cloudinary from "../lib/cloudinary.js";
 import nodemailer from "nodemailer";
 import { promisify } from "util";
 import { writeAuditLog } from "./audit.controller.js";
 
 const generateAccessToken = (userId) => {
-  const secret =
-    process.env.ACCESS_TOKEN_SECRET ||
-    "your-access-token-secret-key-change-in-production";
+  const secret = ACCESS_TOKEN_SECRET;
   return jwt.sign({ userId }, secret, {
-    expiresIn: "7d",
+    expiresIn: ACCESS_TOKEN_TTL,
   });
 };
 

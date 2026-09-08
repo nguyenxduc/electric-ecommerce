@@ -13,7 +13,10 @@ import {
   sellerRoute,
 } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Customer routes (?shop_id= opens a chat with that shop)
 router.get("/", protectRoute, getOrCreateChat);

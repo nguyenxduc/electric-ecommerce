@@ -14,8 +14,10 @@ import { getProductsByShop } from "../controllers/product.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 import { optionalAuth } from "../middleware/optionalAuth.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { registerIdParams } from "../middleware/validateId.middleware.js";
 
 const router = express.Router();
+registerIdParams(router);
 
 const shopImages = upload.fields([
   { name: "logo", maxCount: 1 },

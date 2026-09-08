@@ -6,20 +6,16 @@ import {
 import { writeAuditLog } from "./audit.controller.js";
 import { notifyUser } from "../lib/notify.js";
 import { ROLES } from "../constants/roles.js";
-import { SHOP_STATUS } from "./shop.controller.js";
+import {
+  SHOP_STATUS,
+  ORDER_STATUS,
+  ORDER_STATUS_FLOW,
+  FINAL_ORDER_STATUSES,
+  BUYER_CANCELLABLE_STATUSES,
+  PAYMENT_STATUS,
+} from "../constants/status.js";
 import { getSettingNumber } from "../lib/settings.js";
 import { restockOrderItems } from "../lib/restock.js";
-
-// Legal order-status transitions. delivered/cancelled/returned are final
-// ("returned" is only reachable through the return-request flow).
-const STATUS_FLOW = {
-  pending: ["processing", "shipped", "delivered", "cancelled"],
-  processing: ["shipped", "delivered", "cancelled"],
-  shipped: ["delivered", "cancelled"],
-  delivered: [],
-  cancelled: [],
-  returned: [],
-};
 
 const TIER_AUTO_DISCOUNT_RATE = {
   BRONZE: 0,
@@ -41,19 +37,27 @@ const round2 = (n) => Math.round(Number(n) * 100) / 100;
 // 1. Void the checkout's un-paid payments - their amount no longer matches,
 //    so the buyer must re-initiate payment (recomputed from active orders).
 // 2. When EVERY suborder of the checkout is gone, give the voucher use back.
+// 3. If the checkout was already PAID, cancelling this suborder means the
+//    buyer is now owed a partial refund. There's no refund ledger in the
+//    schema, so the caller is told to record it (as an audit log) instead of
+//    the paid/owed amounts silently diverging with no trace anywhere.
 const onSuborderCancelled = async (tx, order) => {
   await tx.payment.updateMany({
-    where: { order_group_id: order.order_group_id, status: "pending" },
+    where: { order_group_id: order.order_group_id, status: PAYMENT_STATUS.PENDING },
     data: {
-      status: "canceled",
+      status: PAYMENT_STATUS.CANCELED,
       message: "Voided: an order in this checkout was cancelled",
     },
+  });
+
+  const paidPayment = await tx.payment.findFirst({
+    where: { order_group_id: order.order_group_id, status: PAYMENT_STATUS.PAID },
   });
 
   const activeCount = await tx.order.count({
     where: {
       order_group_id: order.order_group_id,
-      status: { not: "cancelled" },
+      status: { not: ORDER_STATUS.CANCELLED },
       deleted_at: null,
     },
   });
@@ -69,6 +73,34 @@ const onSuborderCancelled = async (tx, order) => {
       });
     }
   }
+
+  return paidPayment
+    ? {
+        refundOwed: {
+          amount: order.total_amount,
+          paymentId: paidPayment.id,
+          orderGroupId: order.order_group_id,
+        },
+      }
+    : null;
+};
+
+const logRefundOwed = (req, order, refundOwed) => {
+  if (!refundOwed) return;
+  writeAuditLog({
+    userId: req.user?.id,
+    action: "REFUND_OWED",
+    resource: "order",
+    resourceId: order.id,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    metadata: {
+      order_group_id: refundOwed.orderGroupId.toString(),
+      payment_id: refundOwed.paymentId.toString(),
+      amount: refundOwed.amount?.toString?.() ?? refundOwed.amount,
+      reason: "Suborder cancelled after checkout was already paid",
+    },
+  });
 };
 
 export const createOrder = async (req, res) => {
@@ -230,8 +262,11 @@ export const createOrder = async (req, res) => {
 
     const userTier = user.segment || getTierFromPoints(user.loyalty_points || 0);
     const tierDiscountRate = TIER_AUTO_DISCOUNT_RATE[userTier] || 0;
-    const tierDiscount = Number(totalAmount) * tierDiscountRate;
-    const amountAfterTierDiscount = Math.max(0, Number(totalAmount) - tierDiscount);
+    totalAmount = round2(totalAmount);
+    const tierDiscount = round2(Number(totalAmount) * tierDiscountRate);
+    const amountAfterTierDiscount = round2(
+      Math.max(0, Number(totalAmount) - tierDiscount)
+    );
 
     // apply coupon if provided (optional). Shop vouchers (coupon.shop_id set)
     // only discount that shop's items; platform vouchers discount the whole cart.
@@ -297,7 +332,7 @@ export const createOrder = async (req, res) => {
           coupon.discount_type === "percent"
             ? (groupAfterTier * Number(coupon.discount_value)) / 100
             : Number(coupon.discount_value);
-        couponDiscount = Math.min(couponDiscount, groupAfterTier);
+        couponDiscount = round2(Math.min(couponDiscount, groupAfterTier));
       } else {
         // Platform voucher: discounts the whole cart
         if (
@@ -313,7 +348,9 @@ export const createOrder = async (req, res) => {
             ? (Number(amountAfterTierDiscount) * Number(coupon.discount_value)) /
               100
             : Number(coupon.discount_value);
-        couponDiscount = Math.min(couponDiscount, amountAfterTierDiscount);
+        couponDiscount = round2(
+          Math.min(couponDiscount, amountAfterTierDiscount)
+        );
       }
 
       couponId = coupon.id;
@@ -392,7 +429,7 @@ export const createOrder = async (req, res) => {
             order_number: `ORD-${Date.now()}-${group.shopId}`,
             total_amount: group.finalTotal,
             shipping_fee: group.shipping,
-            status: "pending",
+            status: ORDER_STATUS.PENDING,
             shipping_address: parsedShippingAddress ?? null,
             receiver_name: parsedShippingAddress?.name || null,
             receiver_phone: parsedShippingAddress?.phone || null,
@@ -453,12 +490,28 @@ export const createOrder = async (req, res) => {
         createdOrders.push(createdOrder);
       }
 
-      // Mark coupon usage once per checkout, not per suborder.
+      // Chiem luot dung voucher - mot lan cho ca checkout, khong phai moi don con.
+      //
+      // Kiem tra usage_limit o phia tren chay TRUOC transaction, nen hai nguoi
+      // mua bam cung luc deu doc thay "con luot" va deu di tiep. Chi cap nhat co
+      // dieu kien ngay tai day moi chan duoc viec dung vuot han muc: PostgreSQL
+      // danh gia lai WHERE sau khi giao dich truoc commit, nen nguoi den sau
+      // khong khop dieu kien va nhan count = 0. Cung ky thuat da dung cho tru
+      // ton kho o tren.
       if (appliedCoupon?.id) {
-        await tx.coupon.update({
-          where: { id: appliedCoupon.id },
+        const limit = appliedCoupon.usage_limit;
+        const claimWhere = { id: appliedCoupon.id, deleted_at: null };
+        if (limit !== null && limit !== undefined) {
+          // used_count cho phep null trong schema; coi null la 0.
+          claimWhere.OR = [{ used_count: null }, { used_count: { lt: limit } }];
+        }
+        const claimed = await tx.coupon.updateMany({
+          where: claimWhere,
           data: { used_count: { increment: 1 } },
         });
+        if (claimed.count === 0) {
+          throw new Error(`COUPON_EXHAUSTED:${appliedCoupon.code}`);
+        }
       }
 
       return { orderGroup, orders: createdOrders };
@@ -517,6 +570,14 @@ export const createOrder = async (req, res) => {
       const name = error.message.slice("OUT_OF_STOCK:".length);
       return res.status(400).json({
         message: `"${name}" just sold out. Please review your cart.`,
+      });
+    }
+    // Raised by the conditional voucher claim when a concurrent checkout took
+    // the last remaining use first.
+    if (String(error?.message || "").startsWith("COUPON_EXHAUSTED:")) {
+      const code = error.message.slice("COUPON_EXHAUSTED:".length);
+      return res.status(400).json({
+        message: `Voucher "${code}" has reached its usage limit.`,
       });
     }
     res
@@ -698,12 +759,13 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
+    // "returned" khong nam trong danh sach: chi luong tra hang moi dat duoc.
     const validStatuses = [
-      "pending",
-      "processing",
-      "shipped",
-      "delivered",
-      "cancelled",
+      ORDER_STATUS.PENDING,
+      ORDER_STATUS.PROCESSING,
+      ORDER_STATUS.SHIPPED,
+      ORDER_STATUS.DELIVERED,
+      ORDER_STATUS.CANCELLED,
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -718,29 +780,57 @@ export const updateOrderStatus = async (req, res) => {
     }
 
     // Enforce a legal transition (finals: delivered/cancelled/returned)
-    const currentStatus = order.status || "pending";
-    if (!(STATUS_FLOW[currentStatus] || []).includes(status)) {
+    const currentStatus = order.status || ORDER_STATUS.PENDING;
+    if (!(ORDER_STATUS_FLOW[currentStatus] || []).includes(status)) {
       return res.status(400).json({
         message: `Cannot change order status from "${currentStatus}" to "${status}"`,
       });
     }
 
-    const updatedOrder = await prisma.$transaction(async (tx) => {
-      if (status === "cancelled") {
-        // Cancelling puts the items back in stock and claws back earned points
-        await restockOrderItems(tx, order.order_items);
-        await revertPointsForOrder(tx, order.user_id, order.id);
-      }
-      const updated = await tx.order.update({
-        where: { id: BigInt(id) },
-        data: { status },
-        include: { user: { select: { id: true, name: true, email: true } } },
+    // Statuses this transition may legally start from - re-checked
+    // atomically inside the transaction so two concurrent requests can't
+    // both pass the check above and both restock/revert points for the
+    // same order (a classic check-then-act race).
+    const allowedFromStatuses = Object.entries(ORDER_STATUS_FLOW)
+      .filter(([, nexts]) => nexts.includes(status))
+      .map(([from]) => from);
+
+    let updatedOrder;
+    let refundOwed = null;
+    try {
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        const claimed = await tx.order.updateMany({
+          where: { id: BigInt(id), status: { in: allowedFromStatuses } },
+          data: { status },
+        });
+        if (claimed.count === 0) {
+          throw new Error("ORDER_STATUS_CONFLICT");
+        }
+        if (status === ORDER_STATUS.CANCELLED) {
+          // Cancelling puts the items back in stock and claws back earned points
+          await restockOrderItems(tx, order.order_items);
+          await revertPointsForOrder(tx, order.user_id, order.id);
+        }
+        const updated = await tx.order.findUniqueOrThrow({
+          where: { id: BigInt(id) },
+          include: { user: { select: { id: true, name: true, email: true } } },
+        });
+        if (status === ORDER_STATUS.CANCELLED) {
+          const result = await onSuborderCancelled(tx, updated);
+          refundOwed = result?.refundOwed || null;
+        }
+        return updated;
       });
-      if (status === "cancelled") {
-        await onSuborderCancelled(tx, order);
+    } catch (err) {
+      if (err.message === "ORDER_STATUS_CONFLICT") {
+        return res.status(409).json({
+          message: "Order status was already changed by another request",
+        });
       }
-      return updated;
-    });
+      throw err;
+    }
+
+    logRefundOwed(req, updatedOrder, refundOwed);
 
     writeAuditLog({
       userId: req.user.id,
@@ -791,21 +881,44 @@ export const deleteOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.status !== "pending") {
+    if (order.status !== ORDER_STATUS.PENDING) {
       return res
         .status(400)
         .json({ message: "Cannot delete order in current status" });
     }
 
-    await prisma.$transaction(async (tx) => {
-      await restockOrderItems(tx, order.order_items);
-      await revertPointsForOrder(tx, order.user_id, order.id);
-      const deleted = await tx.order.update({
-        where: { id: BigInt(id) },
-        data: { deleted_at: new Date() },
+    let refundOwed = null;
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Re-check status atomically - closes the gap between the read
+        // above and this write so two concurrent deletes can't both
+        // restock/revert points for the same order.
+        const claimed = await tx.order.updateMany({
+          where: {
+            id: BigInt(id),
+            status: ORDER_STATUS.PENDING,
+            deleted_at: null,
+          },
+          data: { deleted_at: new Date() },
+        });
+        if (claimed.count === 0) {
+          throw new Error("ORDER_ALREADY_RESOLVED");
+        }
+        await restockOrderItems(tx, order.order_items);
+        await revertPointsForOrder(tx, order.user_id, order.id);
+        const result = await onSuborderCancelled(tx, order);
+        refundOwed = result?.refundOwed || null;
       });
-      await onSuborderCancelled(tx, deleted);
-    });
+    } catch (err) {
+      if (err.message === "ORDER_ALREADY_RESOLVED") {
+        return res
+          .status(409)
+          .json({ message: "Order was already updated by another request" });
+      }
+      throw err;
+    }
+
+    logRefundOwed(req, order, refundOwed);
 
     res.json({ message: "Order deleted successfully" });
   } catch (error) {
@@ -836,28 +949,54 @@ export const cancelOrder = async (req, res) => {
         .json({ success: false, message: "Not authorized" });
     // Final states are never cancellable - delivered orders go through the
     // return flow instead (which restocks and refunds properly).
-    if (["delivered", "cancelled", "returned"].includes(order.status || ""))
+    if (FINAL_ORDER_STATUSES.includes(order.status || ""))
       return res
         .status(400)
         .json({ success: false, message: "Cannot cancel in current status" });
-    if (
-      req.user.role !== ROLES.ADMIN &&
-      !["pending", "processing"].includes(order.status || "")
-    )
+    const cancellableStatuses =
+      req.user.role === ROLES.ADMIN
+        ? Object.values(ORDER_STATUS).filter(
+            (s) => !FINAL_ORDER_STATUSES.includes(s)
+          )
+        : BUYER_CANCELLABLE_STATUSES;
+    if (!cancellableStatuses.includes(order.status || ""))
       return res
         .status(400)
         .json({ success: false, message: "Cannot cancel in current status" });
 
-    const updated = await prisma.$transaction(async (tx) => {
-      await restockOrderItems(tx, order.order_items);
-      await revertPointsForOrder(tx, order.user_id, order.id);
-      const cancelled = await tx.order.update({
-        where: { id: BigInt(id) },
-        data: { status: "cancelled" },
+    let updated;
+    let refundOwed = null;
+    try {
+      updated = await prisma.$transaction(async (tx) => {
+        // Re-check status atomically - closes the gap between the read
+        // above and this write so a double-click or two concurrent
+        // requests can't both restock/revert points for the same order.
+        const claimed = await tx.order.updateMany({
+          where: { id: BigInt(id), status: { in: cancellableStatuses } },
+          data: { status: ORDER_STATUS.CANCELLED },
+        });
+        if (claimed.count === 0) {
+          throw new Error("ORDER_ALREADY_RESOLVED");
+        }
+        await restockOrderItems(tx, order.order_items);
+        await revertPointsForOrder(tx, order.user_id, order.id);
+        const cancelled = await tx.order.findUniqueOrThrow({
+          where: { id: BigInt(id) },
+        });
+        const result = await onSuborderCancelled(tx, cancelled);
+        refundOwed = result?.refundOwed || null;
+        return cancelled;
       });
-      await onSuborderCancelled(tx, cancelled);
-      return cancelled;
-    });
+    } catch (err) {
+      if (err.message === "ORDER_ALREADY_RESOLVED") {
+        return res
+          .status(409)
+          .json({ success: false, message: "Order status already changed" });
+      }
+      throw err;
+    }
+
+    logRefundOwed(req, updated, refundOwed);
 
     // Let the seller know the buyer cancelled
     if (order.user_id.toString() === userId) {
@@ -885,7 +1024,9 @@ export const getOrderStats = async (_req, res) => {
     const [total_orders, pending_orders, revenueRows, recent_orders] =
       await Promise.all([
         prisma.order.count({ where: whereActive }),
-        prisma.order.count({ where: { status: "pending", deleted_at: null } }),
+        prisma.order.count({
+          where: { status: ORDER_STATUS.PENDING, deleted_at: null },
+        }),
         prisma.order.aggregate({
           _sum: { total_amount: true },
           where: whereActive,
@@ -919,7 +1060,9 @@ export const getShopOrderStats = async (req, res) => {
     const [total_orders, pending_orders, revenueRows, recent_orders] =
       await Promise.all([
         prisma.order.count({ where: whereActive }),
-        prisma.order.count({ where: { ...whereActive, status: "pending" } }),
+        prisma.order.count({
+          where: { ...whereActive, status: ORDER_STATUS.PENDING },
+        }),
         prisma.order.aggregate({
           _sum: { total_amount: true },
           where: whereActive,

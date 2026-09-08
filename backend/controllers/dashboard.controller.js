@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { ORDER_STATUS } from "../constants/status.js";
 import { getSettingNumber } from "../lib/settings.js";
 
 // Get dashboard statistics.
@@ -8,7 +9,22 @@ const buildDashboardStats = async (res, shopId = null) => {
     const shopScope = shopId ? { shop_id: shopId } : {};
     const whereActive = { deleted_at: null };
     const whereActiveOrders = { deleted_at: null, ...shopScope };
+    // Doanh thu chi tinh tren don thuc su ban duoc. Truoc day cac phep cong
+    // tien dung chung whereActiveOrders (khong loc trang thai), nen don da huy
+    // va don da tra hang van duoc tinh la doanh thu - keo theo ca phi san 5%
+    // cua seller bi tinh tren tien khong he thu duoc.
+    const whereRevenueOrders = {
+      ...whereActiveOrders,
+      status: {
+        notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED],
+      },
+    };
     const whereActiveProducts = { deleted_at: null, ...shopScope };
+    // Seller dashboard: "customers" means buyers who've ordered from this
+    // shop, not every registered user on the platform.
+    const whereCustomers = shopId
+      ? { ...whereActive, orders: { some: { shop_id: shopId, deleted_at: null } } }
+      : whereActive;
 
     // Calculate date ranges
     const now = new Date();
@@ -50,7 +66,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.aggregate({
         _sum: { total_amount: true },
         where: {
-          ...whereActiveOrders,
+          ...whereRevenueOrders,
           created_at: { gte: last7Days },
         },
       }),
@@ -58,7 +74,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.aggregate({
         _sum: { total_amount: true },
         where: {
-          ...whereActiveOrders,
+          ...whereRevenueOrders,
           created_at: { gte: previous7DaysStart, lt: previous7DaysEnd },
         },
       }),
@@ -66,7 +82,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.count({
         where: {
           ...whereActiveOrders,
-          status: "pending",
+          status: ORDER_STATUS.PENDING,
           created_at: { gte: last7Days },
         },
       }),
@@ -74,7 +90,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.count({
         where: {
           ...whereActiveOrders,
-          status: "pending",
+          status: ORDER_STATUS.PENDING,
           created_at: { gte: previous7DaysStart, lt: previous7DaysEnd },
         },
       }),
@@ -82,7 +98,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.count({
         where: {
           ...whereActiveOrders,
-          status: "cancelled",
+          status: ORDER_STATUS.CANCELLED,
           created_at: { gte: last7Days },
         },
       }),
@@ -90,13 +106,13 @@ const buildDashboardStats = async (res, shopId = null) => {
       prisma.order.count({
         where: {
           ...whereActiveOrders,
-          status: "cancelled",
+          status: ORDER_STATUS.CANCELLED,
           created_at: { gte: previous7DaysStart, lt: previous7DaysEnd },
         },
       }),
       // Total customers
       prisma.user.count({
-        where: whereActive,
+        where: whereCustomers,
       }),
       // Total products
       prisma.product.count({
@@ -119,7 +135,7 @@ const buildDashboardStats = async (res, shopId = null) => {
       // Total revenue (all time)
       prisma.order.aggregate({
         _sum: { total_amount: true },
-        where: whereActiveOrders,
+        where: whereRevenueOrders,
       }),
     ]);
 

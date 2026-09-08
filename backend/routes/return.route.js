@@ -9,7 +9,10 @@ import {
   sellerRoute,
 } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Buyer requests a return on a delivered order
 router.post("/", protectRoute, createReturnRequest);

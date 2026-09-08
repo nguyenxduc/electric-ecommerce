@@ -1,5 +1,5 @@
 import { prisma } from "../lib/db.js";
-import { SHOP_STATUS } from "./shop.controller.js";
+import { SHOP_STATUS } from "../constants/status.js";
 
 export const addToCart = async (req, res) => {
   try {

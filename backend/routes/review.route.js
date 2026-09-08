@@ -11,7 +11,10 @@ import {
 } from "../controllers/review.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Public routes (legacy)
 router.get("/product/:productId", getReviewsByProduct);

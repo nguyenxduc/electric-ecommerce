@@ -1,5 +1,5 @@
 import { prisma } from "../lib/db.js";
-import { SHOP_STATUS } from "./shop.controller.js";
+import { SHOP_STATUS } from "../constants/status.js";
 
 const computeCouponDiscount = (coupon, amount) => {
   if (coupon.discount_type === "percent") {
@@ -388,8 +388,14 @@ export const createShopCoupon = async (req, res) => {
         .json({ message: "code and discount_value are required" });
     }
 
+    // Normalize once and use it for both the duplicate check and the
+    // insert - checking the raw body value let a case-differing code
+    // (e.g. "save10" vs "SAVE10") slip past this check and hit the
+    // unique-constraint error below instead.
+    const normalizedCode = String(code).toUpperCase().trim();
+
     const existingCoupon = await prisma.coupon.findFirst({
-      where: { code, deleted_at: null },
+      where: { code: normalizedCode, deleted_at: null },
     });
     if (existingCoupon) {
       return res.status(400).json({ message: "Coupon code already exists" });
@@ -397,7 +403,7 @@ export const createShopCoupon = async (req, res) => {
 
     const savedCoupon = await prisma.coupon.create({
       data: {
-        code: String(code).toUpperCase().trim(),
+        code: normalizedCode,
         description,
         discount_type,
         discount_value,
@@ -412,6 +418,9 @@ export const createShopCoupon = async (req, res) => {
       coupon: savedCoupon,
     });
   } catch (error) {
+    if (error.code === "P2002") {
+      return res.status(400).json({ message: "Coupon code already exists" });
+    }
     res
       .status(500)
       .json({ message: "Failed to create shop voucher", error: error.message });

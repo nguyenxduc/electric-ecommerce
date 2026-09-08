@@ -112,8 +112,8 @@ model Shop {
   contact_phone     String?
   address           String?
 
-  // Shop-level overrides for future shipping/settlement work. Not read by
-  // any pricing/shipping logic yet.
+  // Per-shop shipping overrides. Read by cart.controller.js and
+  // order.controller.js; null falls back to the platform-wide Setting.
   shipping_fee_override            Decimal? @db.Decimal(10, 2)
   free_shipping_threshold_override Decimal? @db.Decimal(10, 2)
 
@@ -492,6 +492,10 @@ model FilterOption {
   category   Category? @relation(fields: [category_id], references: [id])
   product_filter_values ProductFilterValue[]
 
+  // Postgres treats every NULL as distinct, so this alone doesn't dedupe
+  // global options (category_id IS NULL). A partial unique index closes that
+  // gap - see migrations/20260905_filter_options_global_unique (can't be
+  // expressed here since @@unique has no WHERE clause in the schema DSL).
   @@unique([filter_key_id, value, category_id])
   @@index([filter_key_id, category_id])
   @@map("filter_options")

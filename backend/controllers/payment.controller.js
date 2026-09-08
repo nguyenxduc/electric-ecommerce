@@ -1,5 +1,6 @@
 import { VNPay, ProductCode } from "vnpay";
 import { prisma } from "../lib/db.js";
+import { ORDER_STATUS, PAYMENT_STATUS } from "../constants/status.js";
 import {
   resolveGatewayVndAmount,
   usdToGatewayVnd,
@@ -67,31 +68,34 @@ export const createVnpayPayment = async (req, res) => {
       });
     }
 
-    const { amount, orderInfo, bankCode, order_group_id } = req.body || {};
-
-    // Prefer deriving the amount from the checkout server-side
-    // (sum of still-active suborders - cancelled ones are not charged).
-    let numericAmount = Number(amount);
-    if (order_group_id != null && order_group_id !== "") {
-      const orderGroup = await prisma.orderGroup.findFirst({
-        where: { id: BigInt(order_group_id), deleted_at: null },
-      });
-      if (!orderGroup) {
-        return res.status(404).json({ message: "Order group not found" });
-      }
-      if (orderGroup.user_id.toString() !== req.user.id) {
-        return res.status(403).json({ message: "Not authorized" });
-      }
-      const activeAgg = await prisma.order.aggregate({
-        _sum: { total_amount: true },
-        where: {
-          order_group_id: orderGroup.id,
-          deleted_at: null,
-          status: { notIn: ["cancelled", "returned"] },
-        },
-      });
-      numericAmount = Number(activeAgg._sum.total_amount || 0);
+    const { orderInfo, bankCode, order_group_id } = req.body || {};
+    if (order_group_id == null || order_group_id === "") {
+      return res.status(400).json({ message: "order_group_id is required" });
     }
+
+    // Amount is always derived server-side from the checkout total (sum of
+    // still-active suborders - cancelled ones are not charged) - never
+    // trusted from the client body.
+    const orderGroup = await prisma.orderGroup.findFirst({
+      where: { id: BigInt(order_group_id), deleted_at: null },
+    });
+    if (!orderGroup) {
+      return res.status(404).json({ message: "Order group not found" });
+    }
+    if (orderGroup.user_id.toString() !== req.user.id) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+    const activeAgg = await prisma.order.aggregate({
+      _sum: { total_amount: true },
+      where: {
+        order_group_id: orderGroup.id,
+        deleted_at: null,
+        status: {
+          notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED],
+        },
+      },
+    });
+    const numericAmount = Number(activeAgg._sum.total_amount || 0);
     if (!numericAmount || numericAmount <= 0) {
       return res.status(400).json({ message: "Invalid amount" });
     }
@@ -116,15 +120,19 @@ export const createVnpayPayment = async (req, res) => {
       `${process.env.FRONTEND_URL || "http://localhost:5173"}/payment-result`;
 
     const vnpay = vnpayInstance();
+    // The vnpay library requires its own vnp_-prefixed field names and
+    // multiplies vnp_Amount by 100 internally - passing camelCase fields (as
+    // this used to) left vnp_Amount/vnp_TxnRef undefined and produced a
+    // broken payment URL for every VNPay checkout.
     const paymentUrl = vnpay.buildPaymentUrl({
-      amount: Math.round(vndAmount * 100),
-      bankCode: bankCode || undefined,
-      orderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
-      orderType: ProductCode.Other,
-      orderId,
-      locale: "vn",
-      returnUrl,
-      ipAddr: clientIp,
+      vnp_Amount: vndAmount,
+      vnp_TxnRef: orderId,
+      vnp_BankCode: bankCode || undefined,
+      vnp_OrderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
+      vnp_OrderType: ProductCode.Other,
+      vnp_Locale: "vn",
+      vnp_ReturnUrl: returnUrl,
+      vnp_IpAddr: clientIp,
     });
 
     res.json({ paymentUrl, orderId });
@@ -170,7 +178,9 @@ export const createMomoPayment = async (req, res) => {
       where: {
         order_group_id: orderGroup.id,
         deleted_at: null,
-        status: { notIn: ["cancelled", "returned"] },
+        status: {
+            notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED],
+          },
       },
     });
     const numericAmount = Number(activeAgg._sum.total_amount || 0);
@@ -274,7 +284,7 @@ export const createMomoPayment = async (req, res) => {
         provider: "momo",
         amount: numericAmount,
         currency: "USD",
-        status: "pending",
+        status: PAYMENT_STATUS.PENDING,
         momo_order_id: momoOrderId,
         momo_request_id: requestId,
         pay_url: momoData.payUrl || null,
@@ -317,6 +327,44 @@ export const createMomoPayment = async (req, res) => {
 // Backward-compatible alias for old frontend clients.
 export const createBankTransferQR = createMomoPayment;
 
+// MoMo ky moi callback IPN bang HMAC-SHA256 tren mot chuoi truong da sap xep.
+// Neu khong kiem chung chu ky thi endpoint nay la cong mo: bat ky ai doan duoc
+// requestId deu co the POST resultCode=0 de danh dau don da thanh toan ma khong
+// tra dong nao. Thu tu cac truong duoi day la thu tu MoMo quy dinh cho IPN v2.
+const verifyMomoIpnSignature = (data) => {
+  const secretKey =
+    process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
+  const accessKey = process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
+  const provided = String(data.signature || "");
+  if (!provided) return false;
+
+  const field = (value) => (value == null ? "" : String(value));
+  const rawSignature =
+    `accessKey=${accessKey}` +
+    `&amount=${field(data.amount)}` +
+    `&extraData=${field(data.extraData)}` +
+    `&message=${field(data.message)}` +
+    `&orderId=${field(data.orderId)}` +
+    `&orderInfo=${field(data.orderInfo)}` +
+    `&orderType=${field(data.orderType)}` +
+    `&partnerCode=${field(data.partnerCode)}` +
+    `&payType=${field(data.payType)}` +
+    `&requestId=${field(data.requestId)}` +
+    `&responseTime=${field(data.responseTime)}` +
+    `&resultCode=${field(data.resultCode)}` +
+    `&transId=${field(data.transId)}`;
+
+  const expected = crypto
+    .createHmac("sha256", secretKey)
+    .update(rawSignature)
+    .digest("hex");
+
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(provided, "utf8");
+  // So sanh chong tan cong do thoi gian.
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
 export const momoIpnHandler = async (req, res) => {
   try {
     const data = { ...(req.body || {}), ...(req.query || {}) };
@@ -325,6 +373,16 @@ export const momoIpnHandler = async (req, res) => {
     const transId = data.transId ?? data.transid;
     const momoOrderId = data.orderId ?? data.orderid;
     const message = data.message ?? data.errMsg ?? data.errorMessage ?? null;
+
+    if (!verifyMomoIpnSignature(data)) {
+      console.warn(
+        "[momo-ipn] Tu choi callback: chu ky khong hop le",
+        { requestId, momoOrderId }
+      );
+      return res
+        .status(400)
+        .json({ success: false, error: "Invalid signature" });
+    }
 
     const isPaid = String(resultCode) === "0" || String(resultCode) === "00";
 
@@ -342,11 +400,26 @@ export const momoIpnHandler = async (req, res) => {
       return res.status(200).send("success");
     }
 
+    // Chong sua so tien: callback phai khop dung so tien da ghi khi tao giao dich.
+    const callbackAmount = Number(data.amount);
+    if (isPaid && Number.isFinite(callbackAmount)) {
+      const expectedAmount = Number(payment.amount);
+      if (Number.isFinite(expectedAmount) && callbackAmount !== expectedAmount) {
+        console.warn("[momo-ipn] Tu choi callback: so tien khong khop", {
+          expected: expectedAmount,
+          received: callbackAmount,
+        });
+        return res
+          .status(400)
+          .json({ success: false, error: "Amount mismatch" });
+      }
+    }
+
     await prisma.$transaction(async tx => {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
-          status: isPaid ? "paid" : "failed",
+          status: isPaid ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.FAILED,
           momo_trans_id: transId ? String(transId) : null,
           result_code:
             resultCode != null && resultCode !== ""
@@ -364,10 +437,10 @@ export const momoIpnHandler = async (req, res) => {
         await tx.order.updateMany({
           where: {
             order_group_id: payment.order_group_id,
-            status: "pending",
+            status: ORDER_STATUS.PENDING,
             deleted_at: null,
           },
-          data: { status: "processing" },
+          data: { status: ORDER_STATUS.PROCESSING },
         });
       }
     });
