@@ -74,3 +74,30 @@ export const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
   ]);
   return { total_count, products };
 };
+
+/**
+ * Lay san pham theo dung thu hang da xep san (ket qua tim kiem).
+ *
+ * Prisma khong sap xep duoc theo thu tu cua mot mang id truyen vao, ma dung
+ * `where: { id: { in: ids } }` roi de Prisma tu sap thi mat sach thu hang -
+ * ket qua khop nhat co the roi xuong trang hai. Vi so ung vien da bi chan o
+ * 200 nen lay het ve roi sap trong bo nho la re va dung.
+ */
+export const fetchRankedProducts = async (where, rankedIds, skip, take) => {
+  const products = await prisma.product.findMany({
+    where,
+    include: { product_colors: true, shop: { select: shopSelect } },
+  });
+
+  const rank = new Map(rankedIds.map((id, i) => [id.toString(), i]));
+  products.sort(
+    (a, b) =>
+      (rank.get(a.id.toString()) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(b.id.toString()) ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  return {
+    total_count: products.length,
+    products: products.slice(skip, skip + take),
+  };
+};
