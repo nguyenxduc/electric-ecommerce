@@ -416,20 +416,29 @@ export const momoIpnHandler = async (req, res) => {
     }
 
     await prisma.$transaction(async tx => {
-      await tx.payment.update({
-        where: { id: payment.id },
+      // Cong thanh toan phat lai callback la chuyen binh thuong: gateway tu
+      // retry khi khong nhan duoc 200, va ke tan cong cung co the phat lai
+      // nguyen mot payload hop le. Truoc day ban ghi payment bi ghi de moi
+      // lan, keo theo paid_at, trans_id va raw_response deu bi thay. Don
+      // hang thi da an toan nho guard status PENDING, con payment thi khong.
+      //
+      // Dung cap nhat co dieu kien - cung ky thuat da ap dung cho ton kho va
+      // luot voucher - de chi ban ghi chua o trang thai cuoi moi duoc ghi.
+      const applied = await tx.payment.updateMany({
+        where: { id: payment.id, status: { not: PAYMENT_STATUS.PAID } },
         data: {
           status: isPaid ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.FAILED,
           momo_trans_id: transId ? String(transId) : null,
           result_code:
-            resultCode != null && resultCode !== ""
-              ? Number(resultCode)
-              : null,
+            resultCode != null && resultCode !== "" ? Number(resultCode) : null,
           message: message || payment.message,
           paid_at: isPaid ? payment.paid_at ?? new Date() : null,
           raw_response: data,
         },
       });
+
+      // Callback lap lai: lan dau da xu ly xong, khong lam gi them.
+      if (applied.count === 0) return;
 
       // When paid, move every shop-order of this checkout forward.
       // (Avoid overriding cancelled/shipped orders.)
