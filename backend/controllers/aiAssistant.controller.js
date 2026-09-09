@@ -3,6 +3,7 @@ import { prisma } from "../lib/db.js";
 import { runAgent } from "../ai/agent.js";
 import { writeAuditLog } from "../services/audit.service.js";
 import { parsePagination } from "../lib/pagination.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
 /**
  * Ghi lại mỗi lần lớp phòng thủ tiêm lệnh chặn một lượt trao đổi.
@@ -42,220 +43,179 @@ const ensureChatOwner = async (chatId, userId) => {
   return { chat };
 };
 
-export const listAiChats = async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const { skip, take } = parsePagination(page, limit);
-    const where = { user_id: BigInt(req.user.id) };
+export const listAiChats = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+  const { skip, take } = parsePagination(page, limit);
+  const where = { user_id: BigInt(req.user.id) };
 
-    const [chats, total] = await Promise.all([
-      prisma.aiChat.findMany({
-        where,
-        orderBy: { updated_at: "desc" },
-        skip,
-        take,
-        include: {
-          messages: {
-            take: 1,
-            orderBy: { created_at: "desc" },
-          },
-        },
-      }),
-      prisma.aiChat.count({ where }),
-    ]);
-
-    return res.json({
-      success: true,
-      data: {
-        chats,
-        pagination: {
-          page: Number(page),
-          limit: take,
-          total,
-          pages: Math.ceil(total / take),
+  const [chats, total] = await Promise.all([
+    prisma.aiChat.findMany({
+      where,
+      orderBy: { updated_at: "desc" },
+      skip,
+      take,
+      include: {
+        messages: {
+          take: 1,
+          orderBy: { created_at: "desc" },
         },
       },
-    });
-  } catch (error) {
-    console.error("listAiChats error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Không thể tải danh sách hội thoại",
-    });
-  }
-};
+    }),
+    prisma.aiChat.count({ where }),
+  ]);
 
-export const createAiChat = async (req, res) => {
-  try {
-    const { title } = req.body || {};
-    const chat = await prisma.aiChat.create({
-      data: {
-        user_id: BigInt(req.user.id),
-        title: title?.trim() || null,
-        thread_key: randomUUID(),
+  return res.json({
+    success: true,
+    data: {
+      chats,
+      pagination: {
+        page: Number(page),
+        limit: take,
+        total,
+        pages: Math.ceil(total / take),
       },
-    });
+    },
+  });
+});
 
-    return res.status(201).json({
-      success: true,
-      data: chat,
-    });
-  } catch (error) {
-    console.error("createAiChat error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Không thể tạo hội thoại mới",
-    });
-  }
-};
+export const createAiChat = asyncHandler(async (req, res) => {
+  const { title } = req.body || {};
+  const chat = await prisma.aiChat.create({
+    data: {
+      user_id: BigInt(req.user.id),
+      title: title?.trim() || null,
+      thread_key: randomUUID(),
+    },
+  });
 
-export const getAiMessages = async (req, res) => {
-  try {
-    const { chatId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
-    const ownership = await ensureChatOwner(chatId, req.user.id);
+  return res.status(201).json({
+    success: true,
+    data: chat,
+  });
+});
 
-    if (ownership.error) {
-      return res
-        .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
-        .json({
-          success: false,
-          error: ownership.error,
-        });
-    }
+export const getAiMessages = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { page = 1, limit = 20 } = req.query;
+  const ownership = await ensureChatOwner(chatId, req.user.id);
 
-    const { skip, take } = parsePagination(page, limit);
-
-    const [messages, total] = await Promise.all([
-      prisma.aiMessage.findMany({
-        where: { ai_chat_id: BigInt(chatId) },
-        orderBy: { created_at: "asc" },
-        skip,
-        take,
-      }),
-      prisma.aiMessage.count({
-        where: { ai_chat_id: BigInt(chatId) },
-      }),
-    ]);
-
-    return res.json({
-      success: true,
-      data: {
-        messages,
-        pagination: {
-          page: Number(page),
-          limit: take,
-          total,
-          pages: Math.ceil(total / take),
-        },
-      },
-    });
-  } catch (error) {
-    console.error("getAiMessages error:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Không thể tải tin nhắn",
-    });
-  }
-};
-
-export const sendAiChatMessage = async (req, res) => {
-  try {
-    const { chatId } = req.params;
-    const { content } = req.body;
-
-    if (!content || !content.trim()) {
-      return res.status(400).json({
+  if (ownership.error) {
+    return res
+      .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
+      .json({
         success: false,
-        error: "Nội dung tin nhắn không được để trống",
+        error: ownership.error,
       });
-    }
+  }
 
-    const ownership = await ensureChatOwner(chatId, req.user.id);
-    if (ownership.error) {
-      return res
-        .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
-        .json({
-          success: false,
-          error: ownership.error,
-        });
-    }
+  const { skip, take } = parsePagination(page, limit);
 
-    const userMessage = await prisma.aiMessage.create({
-      data: {
-        ai_chat_id: BigInt(chatId),
-        role: "user",
-        content: content.trim(),
+  const [messages, total] = await Promise.all([
+    prisma.aiMessage.findMany({
+      where: { ai_chat_id: BigInt(chatId) },
+      orderBy: { created_at: "asc" },
+      skip,
+      take,
+    }),
+    prisma.aiMessage.count({
+      where: { ai_chat_id: BigInt(chatId) },
+    }),
+  ]);
+
+  return res.json({
+    success: true,
+    data: {
+      messages,
+      pagination: {
+        page: Number(page),
+        limit: take,
+        total,
+        pages: Math.ceil(total / take),
       },
-    });
+    },
+  });
+});
 
-    const result = await runAgent(prisma, chatId);
-    const text = result.text;
-    await logGuardBlock(req, chatId, result);
+export const sendAiChatMessage = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const { content } = req.body;
 
-    const aiMessage = await prisma.aiMessage.create({
-      data: {
-        ai_chat_id: BigInt(chatId),
-        role: "assistant",
-        content: text,
-      },
-    });
-
-    await prisma.aiChat.update({
-      where: { id: BigInt(chatId) },
-      data: { updated_at: new Date() },
-    });
-
-    return res.json({
-      success: true,
-      data: {
-        userMessage,
-        aiMessage,
-        reply: text,
-        guard: { blocked: result.blocked, stage: result.blockedAt },
-        tools: result.toolCalls,
-      },
-    });
-  } catch (error) {
-    console.error("sendAiChatMessage error:", error);
-    return res.status(500).json({
+  if (!content || !content.trim()) {
+    return res.status(400).json({
       success: false,
-      error: "Không thể gửi tin nhắn",
+      error: "Nội dung tin nhắn không được để trống",
     });
   }
-};
 
-export const deleteAiChat = async (req, res) => {
-  try {
-    const { chatId } = req.params;
-    const ownership = await ensureChatOwner(chatId, req.user.id);
-
-    if (ownership.error) {
-      return res
-        .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
-        .json({
-          success: false,
-          error: ownership.error,
-        });
-    }
-
-    await prisma.aiChat.delete({
-      where: { id: BigInt(chatId) },
-    });
-
-    return res.json({
-      success: true,
-      message: "Đã xóa hội thoại",
-    });
-  } catch (error) {
-    console.error("deleteAiChat error:", error);
-
-    return res.status(500).json({
-      success: false,
-      error: "Không thể xóa hội thoại",
-    });
+  const ownership = await ensureChatOwner(chatId, req.user.id);
+  if (ownership.error) {
+    return res
+      .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
+      .json({
+        success: false,
+        error: ownership.error,
+      });
   }
-};
+
+  const userMessage = await prisma.aiMessage.create({
+    data: {
+      ai_chat_id: BigInt(chatId),
+      role: "user",
+      content: content.trim(),
+    },
+  });
+
+  const result = await runAgent(prisma, chatId);
+  const text = result.text;
+  await logGuardBlock(req, chatId, result);
+
+  const aiMessage = await prisma.aiMessage.create({
+    data: {
+      ai_chat_id: BigInt(chatId),
+      role: "assistant",
+      content: text,
+    },
+  });
+
+  await prisma.aiChat.update({
+    where: { id: BigInt(chatId) },
+    data: { updated_at: new Date() },
+  });
+
+  return res.json({
+    success: true,
+    data: {
+      userMessage,
+      aiMessage,
+      reply: text,
+      guard: { blocked: result.blocked, stage: result.blockedAt },
+      tools: result.toolCalls,
+    },
+  });
+});
+
+export const deleteAiChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const ownership = await ensureChatOwner(chatId, req.user.id);
+
+  if (ownership.error) {
+    return res
+      .status(ownership.error === "Chat không tồn tại" ? 404 : 403)
+      .json({
+        success: false,
+        error: ownership.error,
+      });
+  }
+
+  await prisma.aiChat.delete({
+    where: { id: BigInt(chatId) },
+  });
+
+  return res.json({
+    success: true,
+    message: "Đã xóa hội thoại",
+  });
+});
 
 /**
  * Phiên bản trả lời theo luồng (Server-Sent Events).

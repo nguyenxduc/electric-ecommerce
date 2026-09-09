@@ -6,6 +6,7 @@ import { ROLES } from "../constants/roles.js";
 import { createSlug, ensureUniqueSlug } from "../lib/slug.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { SHOP_STATUS } from "../constants/status.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
 export { SHOP_STATUS } from "../constants/status.js";
 
@@ -38,463 +39,400 @@ const maybeUploadImages = async (req) => {
 };
 
 // POST /api/shops/apply — any logged-in user applies to open a shop
-export const applyForShop = async (req, res) => {
-  try {
-    const userId = BigInt(req.user.id);
-    const { name, description, contact_email, contact_phone, address } =
-      req.body || {};
+export const applyForShop = asyncHandler(async (req, res) => {
+  const userId = BigInt(req.user.id);
+  const { name, description, contact_email, contact_phone, address } =
+    req.body || {};
 
-    if (!name || !String(name).trim()) {
-      return res
-        .status(400)
-        .json({ success: false, error: "Shop name is required" });
-    }
-
-    const existing = await prisma.shop.findUnique({
-      where: { owner_id: userId },
-    });
-    if (existing) {
-      return res.status(400).json({
-        success: false,
-        error: "You already have a shop application/shop",
-        data: { status: existing.status },
-      });
-    }
-
-    const slug = await ensureUniqueSlug(prisma.shop, createSlug(name));
-    const imageUrls = await maybeUploadImages(req);
-
-    const shop = await prisma.shop.create({
-      data: {
-        owner_id: userId,
-        name: String(name).trim(),
-        slug,
-        description: description ? String(description).trim() : null,
-        contact_email: contact_email || req.user.email || null,
-        contact_phone: contact_phone || req.user.phone || null,
-        address: address || req.user.address || null,
-        status: SHOP_STATUS.PENDING,
-        ...imageUrls,
-      },
-    });
-
-    writeAuditLog({
-      userId: req.user.id,
-      action: "SHOP_APPLY",
-      resource: "shop",
-      resourceId: shop.id,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-      metadata: { name: shop.name, slug: shop.slug },
-    });
-
-    return res.status(201).json({ success: true, data: shop });
-  } catch (error) {
-    console.error("applyForShop error:", error);
+  if (!name || !String(name).trim()) {
     return res
-      .status(500)
-      .json({ success: false, error: "Failed to submit shop application" });
+      .status(400)
+      .json({ success: false, error: "Shop name is required" });
   }
-};
+
+  const existing = await prisma.shop.findUnique({
+    where: { owner_id: userId },
+  });
+  if (existing) {
+    return res.status(400).json({
+      success: false,
+      error: "You already have a shop application/shop",
+      data: { status: existing.status },
+    });
+  }
+
+  const slug = await ensureUniqueSlug(prisma.shop, createSlug(name));
+  const imageUrls = await maybeUploadImages(req);
+
+  const shop = await prisma.shop.create({
+    data: {
+      owner_id: userId,
+      name: String(name).trim(),
+      slug,
+      description: description ? String(description).trim() : null,
+      contact_email: contact_email || req.user.email || null,
+      contact_phone: contact_phone || req.user.phone || null,
+      address: address || req.user.address || null,
+      status: SHOP_STATUS.PENDING,
+      ...imageUrls,
+    },
+  });
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: "SHOP_APPLY",
+    resource: "shop",
+    resourceId: shop.id,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    metadata: { name: shop.name, slug: shop.slug },
+  });
+
+  return res.status(201).json({ success: true, data: shop });
+});
 
 // GET /api/shops/me — the caller's own shop, any status
-export const getMyShop = async (req, res) => {
-  try {
-    const shop = await prisma.shop.findUnique({
-      where: { owner_id: BigInt(req.user.id) },
-    });
-    if (!shop || shop.deleted_at) {
-      return res
-        .status(404)
-        .json({ success: false, error: "You do not have a shop yet" });
-    }
-    return res.json({ success: true, data: shop });
-  } catch (error) {
-    console.error("getMyShop error:", error);
+export const getMyShop = asyncHandler(async (req, res) => {
+  const shop = await prisma.shop.findUnique({
+    where: { owner_id: BigInt(req.user.id) },
+  });
+  if (!shop || shop.deleted_at) {
     return res
-      .status(500)
-      .json({ success: false, error: "Failed to load shop" });
+      .status(404)
+      .json({ success: false, error: "You do not have a shop yet" });
   }
-};
+  return res.json({ success: true, data: shop });
+});
 
 // PATCH /api/shops/me — owner edits profile; a rejected application is
 // resubmitted (status back to pending). Ownership via owner_id, not role,
 // so pending/rejected applicants (still role "user") can edit too.
-export const updateMyShop = async (req, res) => {
-  try {
-    const shop = await prisma.shop.findUnique({
-      where: { owner_id: BigInt(req.user.id) },
-    });
-    if (!shop || shop.deleted_at) {
-      return res
-        .status(404)
-        .json({ success: false, error: "You do not have a shop yet" });
-    }
-
-    const {
-      name,
-      description,
-      contact_email,
-      contact_phone,
-      address,
-      shipping_fee_override,
-      free_shipping_threshold_override,
-    } = req.body || {};
-
-    let slug;
-    if (name && String(name).trim() && String(name).trim() !== shop.name) {
-      slug = await ensureUniqueSlug(prisma.shop, createSlug(name), shop.id);
-    }
-
-    const imageUrls = await maybeUploadImages(req);
-
-    const resubmitting = shop.status === SHOP_STATUS.REJECTED;
-
-    // "" clears an override (falls back to platform default); undefined = untouched
-    const parseOverride = (v) => {
-      if (v === undefined) return undefined;
-      if (v === null || v === "") return null;
-      const n = Number(v);
-      return Number.isFinite(n) && n >= 0 ? n : undefined;
-    };
-
-    const updated = await prisma.shop.update({
-      where: { id: shop.id },
-      data: {
-        name: name ? String(name).trim() : undefined,
-        slug: slug ?? undefined,
-        description: description !== undefined ? description : undefined,
-        contact_email: contact_email ?? undefined,
-        contact_phone: contact_phone ?? undefined,
-        address: address ?? undefined,
-        shipping_fee_override: parseOverride(shipping_fee_override),
-        free_shipping_threshold_override: parseOverride(
-          free_shipping_threshold_override
-        ),
-        ...imageUrls,
-        ...(resubmitting && {
-          status: SHOP_STATUS.PENDING,
-          rejection_reason: null,
-        }),
-      },
-    });
-
-    writeAuditLog({
-      userId: req.user.id,
-      action: resubmitting ? "SHOP_RESUBMIT" : "SHOP_UPDATE",
-      resource: "shop",
-      resourceId: shop.id,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-    });
-
-    return res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("updateMyShop error:", error);
+export const updateMyShop = asyncHandler(async (req, res) => {
+  const shop = await prisma.shop.findUnique({
+    where: { owner_id: BigInt(req.user.id) },
+  });
+  if (!shop || shop.deleted_at) {
     return res
-      .status(500)
-      .json({ success: false, error: "Failed to update shop" });
+      .status(404)
+      .json({ success: false, error: "You do not have a shop yet" });
   }
-};
+
+  const {
+    name,
+    description,
+    contact_email,
+    contact_phone,
+    address,
+    shipping_fee_override,
+    free_shipping_threshold_override,
+  } = req.body || {};
+
+  let slug;
+  if (name && String(name).trim() && String(name).trim() !== shop.name) {
+    slug = await ensureUniqueSlug(prisma.shop, createSlug(name), shop.id);
+  }
+
+  const imageUrls = await maybeUploadImages(req);
+
+  const resubmitting = shop.status === SHOP_STATUS.REJECTED;
+
+  // "" clears an override (falls back to platform default); undefined = untouched
+  const parseOverride = (v) => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+
+  const updated = await prisma.shop.update({
+    where: { id: shop.id },
+    data: {
+      name: name ? String(name).trim() : undefined,
+      slug: slug ?? undefined,
+      description: description !== undefined ? description : undefined,
+      contact_email: contact_email ?? undefined,
+      contact_phone: contact_phone ?? undefined,
+      address: address ?? undefined,
+      shipping_fee_override: parseOverride(shipping_fee_override),
+      free_shipping_threshold_override: parseOverride(
+        free_shipping_threshold_override
+      ),
+      ...imageUrls,
+      ...(resubmitting && {
+        status: SHOP_STATUS.PENDING,
+        rejection_reason: null,
+      }),
+    },
+  });
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: resubmitting ? "SHOP_RESUBMIT" : "SHOP_UPDATE",
+    resource: "shop",
+    resourceId: shop.id,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
+  return res.json({ success: true, data: updated });
+});
 
 // GET /api/shops — public browse list (active shops only)
-export const listShops = async (req, res) => {
-  try {
-    const { search, page = 1, limit = 20 } = req.query;
-    const { currentPage, perPage, skip } = parsePagination(page, limit);
+export const listShops = asyncHandler(async (req, res) => {
+  const { search, page = 1, limit = 20 } = req.query;
+  const { currentPage, perPage, skip } = parsePagination(page, limit);
 
-    const where = {
-      status: SHOP_STATUS.ACTIVE,
-      deleted_at: null,
-      ...(search && {
-        name: { contains: String(search), mode: "insensitive" },
-      }),
-    };
+  const where = {
+    status: SHOP_STATUS.ACTIVE,
+    deleted_at: null,
+    ...(search && {
+      name: { contains: String(search), mode: "insensitive" },
+    }),
+  };
 
-    const [total, shops] = await Promise.all([
-      prisma.shop.count({ where }),
-      prisma.shop.findMany({
-        where,
-        select: {
-          ...shopPublicSelect,
-          _count: { select: { products: { where: { deleted_at: null } } } },
-        },
-        orderBy: { created_at: "desc" },
-        skip,
-        take: perPage,
-      }),
-    ]);
-
-    return res.json({
-      success: true,
-      data: {
-        shops,
-        pagination: buildPaginationMeta(currentPage, perPage, total),
+  const [total, shops] = await Promise.all([
+    prisma.shop.count({ where }),
+    prisma.shop.findMany({
+      where,
+      select: {
+        ...shopPublicSelect,
+        _count: { select: { products: { where: { deleted_at: null } } } },
       },
-    });
-  } catch (error) {
-    console.error("listShops error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to load shops" });
-  }
-};
+      orderBy: { created_at: "desc" },
+      skip,
+      take: perPage,
+    }),
+  ]);
+
+  return res.json({
+    success: true,
+    data: {
+      shops,
+      pagination: buildPaginationMeta(currentPage, perPage, total),
+    },
+  });
+});
 
 // GET /api/shops/:slug — public shop profile. Non-active shops are only
 // visible to their owner or an admin (preview).
-export const getShopBySlug = async (req, res) => {
-  try {
-    const shop = await prisma.shop.findFirst({
-      where: { slug: req.params.slug, deleted_at: null },
-      select: {
-        ...shopPublicSelect,
-        owner_id: true,
-        contact_email: true,
-        contact_phone: true,
-        _count: { select: { products: { where: { deleted_at: null } } } },
-      },
-    });
+export const getShopBySlug = asyncHandler(async (req, res) => {
+  const shop = await prisma.shop.findFirst({
+    where: { slug: req.params.slug, deleted_at: null },
+    select: {
+      ...shopPublicSelect,
+      owner_id: true,
+      contact_email: true,
+      contact_phone: true,
+      _count: { select: { products: { where: { deleted_at: null } } } },
+    },
+  });
 
-    const isOwner =
-      req.user && shop && shop.owner_id.toString() === req.user.id;
-    const isAdmin = req.user?.role === ROLES.ADMIN;
+  const isOwner =
+    req.user && shop && shop.owner_id.toString() === req.user.id;
+  const isAdmin = req.user?.role === ROLES.ADMIN;
 
-    if (
-      !shop ||
-      (shop.status !== SHOP_STATUS.ACTIVE && !isOwner && !isAdmin)
-    ) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Shop not found" });
-    }
-
-    // Aggregate rating across the shop's products
-    const ratingAgg = await prisma.review.aggregate({
-      where: { product: { shop_id: shop.id }, deleted_at: null },
-      _avg: { rating: true },
-      _count: { rating: true },
-    });
-
-    const { owner_id, ...publicShop } = shop;
-    return res.json({
-      success: true,
-      data: {
-        ...publicShop,
-        is_owner: Boolean(isOwner),
-        rating: ratingAgg._avg.rating
-          ? Number(ratingAgg._avg.rating.toFixed(1))
-          : null,
-        review_count: ratingAgg._count.rating || 0,
-      },
-    });
-  } catch (error) {
-    console.error("getShopBySlug error:", error);
+  if (
+    !shop ||
+    (shop.status !== SHOP_STATUS.ACTIVE && !isOwner && !isAdmin)
+  ) {
     return res
-      .status(500)
-      .json({ success: false, error: "Failed to load shop" });
+      .status(404)
+      .json({ success: false, error: "Shop not found" });
   }
-};
+
+  // Aggregate rating across the shop's products
+  const ratingAgg = await prisma.review.aggregate({
+    where: { product: { shop_id: shop.id }, deleted_at: null },
+    _avg: { rating: true },
+    _count: { rating: true },
+  });
+
+  const { owner_id, ...publicShop } = shop;
+  return res.json({
+    success: true,
+    data: {
+      ...publicShop,
+      is_owner: Boolean(isOwner),
+      rating: ratingAgg._avg.rating
+        ? Number(ratingAgg._avg.rating.toFixed(1))
+        : null,
+      review_count: ratingAgg._count.rating || 0,
+    },
+  });
+});
 
 // GET /api/shops/admin/all — moderation queue (any status)
-export const adminListShops = async (req, res) => {
-  try {
-    const { status, search, page = 1, limit = 20 } = req.query;
-    const { currentPage, perPage, skip } = parsePagination(page, limit);
+export const adminListShops = asyncHandler(async (req, res) => {
+  const { status, search, page = 1, limit = 20 } = req.query;
+  const { currentPage, perPage, skip } = parsePagination(page, limit);
 
-    const where = {
-      deleted_at: null,
-      ...(status && { status: String(status) }),
-      ...(search && {
-        OR: [
-          { name: { contains: String(search), mode: "insensitive" } },
-          { slug: { contains: String(search), mode: "insensitive" } },
-          {
-            owner: {
-              email: { contains: String(search), mode: "insensitive" },
-            },
+  const where = {
+    deleted_at: null,
+    ...(status && { status: String(status) }),
+    ...(search && {
+      OR: [
+        { name: { contains: String(search), mode: "insensitive" } },
+        { slug: { contains: String(search), mode: "insensitive" } },
+        {
+          owner: {
+            email: { contains: String(search), mode: "insensitive" },
           },
-        ],
-      }),
-    };
-
-    const [total, shops, statusCounts] = await Promise.all([
-      prisma.shop.count({ where }),
-      prisma.shop.findMany({
-        where,
-        include: {
-          owner: { select: { id: true, name: true, email: true, role: true } },
-          _count: { select: { products: true, orders: true } },
         },
-        orderBy: { created_at: "desc" },
-        skip,
-        take: perPage,
-      }),
-      prisma.shop.groupBy({
-        by: ["status"],
-        where: { deleted_at: null },
-        _count: { _all: true },
-      }),
-    ]);
+      ],
+    }),
+  };
 
-    return res.json({
-      success: true,
-      data: {
-        shops,
-        status_counts: Object.fromEntries(
-          statusCounts.map((s) => [s.status, s._count._all])
-        ),
-        pagination: buildPaginationMeta(currentPage, perPage, total),
+  const [total, shops, statusCounts] = await Promise.all([
+    prisma.shop.count({ where }),
+    prisma.shop.findMany({
+      where,
+      include: {
+        owner: { select: { id: true, name: true, email: true, role: true } },
+        _count: { select: { products: true, orders: true } },
       },
-    });
-  } catch (error) {
-    console.error("adminListShops error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to load shops" });
-  }
-};
+      orderBy: { created_at: "desc" },
+      skip,
+      take: perPage,
+    }),
+    prisma.shop.groupBy({
+      by: ["status"],
+      where: { deleted_at: null },
+      _count: { _all: true },
+    }),
+  ]);
+
+  return res.json({
+    success: true,
+    data: {
+      shops,
+      status_counts: Object.fromEntries(
+        statusCounts.map((s) => [s.status, s._count._all])
+      ),
+      pagination: buildPaginationMeta(currentPage, perPage, total),
+    },
+  });
+});
 
 // PATCH /api/shops/admin/:id/approve — activate shop + promote owner to seller
-export const approveShop = async (req, res) => {
-  try {
-    const shopId = BigInt(req.params.id);
-    const shop = await prisma.shop.findUnique({ where: { id: shopId } });
-    if (!shop || shop.deleted_at) {
-      return res.status(404).json({ success: false, error: "Shop not found" });
-    }
-
-    const updated = await prisma.$transaction(async (tx) => {
-      const s = await tx.shop.update({
-        where: { id: shopId },
-        data: {
-          status: SHOP_STATUS.ACTIVE,
-          rejection_reason: null,
-          approved_at: new Date(),
-          approved_by: BigInt(req.user.id),
-        },
-      });
-      // Promote the owner so seller-dashboard routes open up. Never demote
-      // an admin who happens to own a shop.
-      await tx.user.updateMany({
-        where: { id: shop.owner_id, role: { not: ROLES.ADMIN } },
-        data: { role: ROLES.SELLER },
-      });
-      return s;
-    });
-
-    writeAuditLog({
-      userId: req.user.id,
-      action: "SHOP_APPROVE",
-      resource: "shop",
-      resourceId: shopId,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-    });
-
-    notifyUser({
-      userId: shop.owner_id,
-      title: "Shop approved 🎉",
-      message: `Your shop "${shop.name}" has been approved. You can now manage it from the Seller Dashboard.`,
-      type: "SHOP",
-    });
-
-    return res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("approveShop error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to approve shop" });
+export const approveShop = asyncHandler(async (req, res) => {
+  const shopId = BigInt(req.params.id);
+  const shop = await prisma.shop.findUnique({ where: { id: shopId } });
+  if (!shop || shop.deleted_at) {
+    return res.status(404).json({ success: false, error: "Shop not found" });
   }
-};
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const s = await tx.shop.update({
+      where: { id: shopId },
+      data: {
+        status: SHOP_STATUS.ACTIVE,
+        rejection_reason: null,
+        approved_at: new Date(),
+        approved_by: BigInt(req.user.id),
+      },
+    });
+    // Promote the owner so seller-dashboard routes open up. Never demote
+    // an admin who happens to own a shop.
+    await tx.user.updateMany({
+      where: { id: shop.owner_id, role: { not: ROLES.ADMIN } },
+      data: { role: ROLES.SELLER },
+    });
+    return s;
+  });
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: "SHOP_APPROVE",
+    resource: "shop",
+    resourceId: shopId,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+
+  notifyUser({
+    userId: shop.owner_id,
+    title: "Shop approved 🎉",
+    message: `Your shop "${shop.name}" has been approved. You can now manage it from the Seller Dashboard.`,
+    type: "SHOP",
+  });
+
+  return res.json({ success: true, data: updated });
+});
 
 // PATCH /api/shops/admin/:id/reject — reject with reason
-export const rejectShop = async (req, res) => {
-  try {
-    const shopId = BigInt(req.params.id);
-    const { reason } = req.body || {};
-    const shop = await prisma.shop.findUnique({ where: { id: shopId } });
-    if (!shop || shop.deleted_at) {
-      return res.status(404).json({ success: false, error: "Shop not found" });
-    }
-
-    const updated = await prisma.shop.update({
-      where: { id: shopId },
-      data: {
-        status: SHOP_STATUS.REJECTED,
-        rejection_reason: reason ? String(reason).trim() : null,
-      },
-    });
-
-    writeAuditLog({
-      userId: req.user.id,
-      action: "SHOP_REJECT",
-      resource: "shop",
-      resourceId: shopId,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-      metadata: { reason: reason || null },
-    });
-
-    notifyUser({
-      userId: shop.owner_id,
-      title: "Shop application rejected",
-      message: `Your shop application "${shop.name}" was rejected${
-        reason ? `: ${reason}` : "."
-      } You can update your application and resubmit.`,
-      type: "SHOP",
-    });
-
-    return res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("rejectShop error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to reject shop" });
+export const rejectShop = asyncHandler(async (req, res) => {
+  const shopId = BigInt(req.params.id);
+  const { reason } = req.body || {};
+  const shop = await prisma.shop.findUnique({ where: { id: shopId } });
+  if (!shop || shop.deleted_at) {
+    return res.status(404).json({ success: false, error: "Shop not found" });
   }
-};
+
+  const updated = await prisma.shop.update({
+    where: { id: shopId },
+    data: {
+      status: SHOP_STATUS.REJECTED,
+      rejection_reason: reason ? String(reason).trim() : null,
+    },
+  });
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: "SHOP_REJECT",
+    resource: "shop",
+    resourceId: shopId,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    metadata: { reason: reason || null },
+  });
+
+  notifyUser({
+    userId: shop.owner_id,
+    title: "Shop application rejected",
+    message: `Your shop application "${shop.name}" was rejected${
+      reason ? `: ${reason}` : "."
+    } You can update your application and resubmit.`,
+    type: "SHOP",
+  });
+
+  return res.json({ success: true, data: updated });
+});
 
 // PATCH /api/shops/admin/:id/suspend — hide shop's catalog from buyers
-export const suspendShop = async (req, res) => {
-  try {
-    const shopId = BigInt(req.params.id);
-    const { reason } = req.body || {};
-    const shop = await prisma.shop.findUnique({ where: { id: shopId } });
-    if (!shop || shop.deleted_at) {
-      return res.status(404).json({ success: false, error: "Shop not found" });
-    }
-
-    const updated = await prisma.shop.update({
-      where: { id: shopId },
-      data: {
-        status: SHOP_STATUS.SUSPENDED,
-        rejection_reason: reason ? String(reason).trim() : null,
-      },
-    });
-
-    writeAuditLog({
-      userId: req.user.id,
-      action: "SHOP_SUSPEND",
-      resource: "shop",
-      resourceId: shopId,
-      ip: req.ip,
-      userAgent: req.headers["user-agent"],
-      metadata: { reason: reason || null },
-    });
-
-    notifyUser({
-      userId: shop.owner_id,
-      title: "Shop suspended",
-      message: `Your shop "${shop.name}" has been suspended${
-        reason ? `: ${reason}` : "."
-      } Its products are hidden from buyers. Contact support for details.`,
-      type: "SHOP",
-    });
-
-    return res.json({ success: true, data: updated });
-  } catch (error) {
-    console.error("suspendShop error:", error);
-    return res
-      .status(500)
-      .json({ success: false, error: "Failed to suspend shop" });
+export const suspendShop = asyncHandler(async (req, res) => {
+  const shopId = BigInt(req.params.id);
+  const { reason } = req.body || {};
+  const shop = await prisma.shop.findUnique({ where: { id: shopId } });
+  if (!shop || shop.deleted_at) {
+    return res.status(404).json({ success: false, error: "Shop not found" });
   }
-};
+
+  const updated = await prisma.shop.update({
+    where: { id: shopId },
+    data: {
+      status: SHOP_STATUS.SUSPENDED,
+      rejection_reason: reason ? String(reason).trim() : null,
+    },
+  });
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: "SHOP_SUSPEND",
+    resource: "shop",
+    resourceId: shopId,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    metadata: { reason: reason || null },
+  });
+
+  notifyUser({
+    userId: shop.owner_id,
+    title: "Shop suspended",
+    message: `Your shop "${shop.name}" has been suspended${
+      reason ? `: ${reason}` : "."
+    } Its products are hidden from buyers. Contact support for details.`,
+    type: "SHOP",
+  });
+
+  return res.json({ success: true, data: updated });
+});

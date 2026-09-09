@@ -9,6 +9,7 @@ import {
   calculateProductPrices,
   shopSelect,
 } from "../lib/productQuery.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
 // Tim kiem san pham bang hinh anh (Gemini Vision).
 //
@@ -340,45 +341,34 @@ export const searchProductsByImage = async (req, res) => {
   }
 };
 
-export const getImageSearchOverview = async (req, res) => {
-  try {
-    const detected = req.body?.detected || {};
-    const productName = String(req.body?.product_name || "").trim();
-    const fallbackNotice = String(req.body?.fallback_notice || "").trim();
+export const getImageSearchOverview = asyncHandler(async (req, res) => {
+  const detected = req.body?.detected || {};
+  const productName = String(req.body?.product_name || "").trim();
+  const fallbackNotice = String(req.body?.fallback_notice || "").trim();
 
-    const hasDetectedInfo = Boolean(
-      String(detected?.product_type || "").trim() ||
-        String(detected?.brand || "").trim() ||
-        String(detected?.line_or_model || "").trim()
-    );
+  const hasDetectedInfo = Boolean(
+    String(detected?.product_type || "").trim() ||
+      String(detected?.brand || "").trim() ||
+      String(detected?.line_or_model || "").trim()
+  );
 
-    if (!hasDetectedInfo && !productName) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing detected/product_name for overview.",
-      });
-    }
-
-    const overview =
-      (await buildGeneralProductOverview({
-        detected,
-        productName,
-      })) || fallbackNotice;
-
-    return res.json({
-      success: true,
-      data: {
-        overview: overview || "",
-      },
-    });
-  } catch (error) {
-    console.error("getImageSearchOverview error:", {
-      message: error?.message,
-      name: error?.name,
-    });
-    return res.status(500).json({
+  if (!hasDetectedInfo && !productName) {
+    return res.status(400).json({
       success: false,
-      message: "Unable to generate product overview.",
+      message: "Missing detected/product_name for overview.",
     });
   }
-};
+
+  const overview =
+    (await buildGeneralProductOverview({
+      detected,
+      productName,
+    })) || fallbackNotice;
+
+  return res.json({
+    success: true,
+    data: {
+      overview: overview || "",
+    },
+  });
+});

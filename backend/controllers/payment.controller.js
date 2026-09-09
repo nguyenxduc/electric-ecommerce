@@ -6,6 +6,7 @@ import {
   usdToGatewayVnd,
 } from "../lib/gatewayAmount.js";
 import crypto from "crypto";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
 
@@ -59,90 +60,83 @@ const vnpayInstance = () =>
     hashAlgorithm: process.env.VNP_HASH_ALG || "SHA512",
   });
 
-export const createVnpayPayment = async (req, res) => {
-  try {
-    if (!hasConfig()) {
-      return res.status(500).json({
-        message: "VNPAY config missing",
-        required: requiredEnv,
-      });
-    }
-
-    const { orderInfo, bankCode, order_group_id } = req.body || {};
-    if (order_group_id == null || order_group_id === "") {
-      return res.status(400).json({ message: "order_group_id is required" });
-    }
-
-    // Amount is always derived server-side from the checkout total (sum of
-    // still-active suborders - cancelled ones are not charged) - never
-    // trusted from the client body.
-    const orderGroup = await prisma.orderGroup.findFirst({
-      where: { id: BigInt(order_group_id), deleted_at: null },
-    });
-    if (!orderGroup) {
-      return res.status(404).json({ message: "Order group not found" });
-    }
-    if (orderGroup.user_id.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Not authorized" });
-    }
-    const activeAgg = await prisma.order.aggregate({
-      _sum: { total_amount: true },
-      where: {
-        order_group_id: orderGroup.id,
-        deleted_at: null,
-        status: {
-          notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED],
-        },
-      },
-    });
-    const numericAmount = Number(activeAgg._sum.total_amount || 0);
-    if (!numericAmount || numericAmount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
-
-    let vndAmount;
-    try {
-      vndAmount = resolveGatewayVndAmount(numericAmount);
-    } catch (err) {
-      return res.status(err.status || 400).json({
-        message: err.message,
-        code: err.code,
-        minVnd: err.minVnd,
-        minUsd: err.minUsd,
-        amountVnd: err.amountVnd,
-      });
-    }
-
-    const orderId = Date.now().toString();
-    const clientIp = buildClientIp(req);
-    const returnUrl =
-      process.env.VNP_RETURN_URL ||
-      `${process.env.FRONTEND_URL || "http://localhost:5173"}/payment-result`;
-
-    const vnpay = vnpayInstance();
-    // The vnpay library requires its own vnp_-prefixed field names and
-    // multiplies vnp_Amount by 100 internally - passing camelCase fields (as
-    // this used to) left vnp_Amount/vnp_TxnRef undefined and produced a
-    // broken payment URL for every VNPay checkout.
-    const paymentUrl = vnpay.buildPaymentUrl({
-      vnp_Amount: vndAmount,
-      vnp_TxnRef: orderId,
-      vnp_BankCode: bankCode || undefined,
-      vnp_OrderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
-      vnp_OrderType: ProductCode.Other,
-      vnp_Locale: "vn",
-      vnp_ReturnUrl: returnUrl,
-      vnp_IpAddr: clientIp,
-    });
-
-    res.json({ paymentUrl, orderId });
-  } catch (error) {
-    res.status(500).json({
-      message: "Failed to create VNPAY payment",
-      error: error?.message,
+export const createVnpayPayment = asyncHandler(async (req, res) => {
+  if (!hasConfig()) {
+    return res.status(500).json({
+      message: "VNPAY config missing",
+      required: requiredEnv,
     });
   }
-};
+
+  const { orderInfo, bankCode, order_group_id } = req.body || {};
+  if (order_group_id == null || order_group_id === "") {
+    return res.status(400).json({ message: "order_group_id is required" });
+  }
+
+  // Amount is always derived server-side from the checkout total (sum of
+  // still-active suborders - cancelled ones are not charged) - never
+  // trusted from the client body.
+  const orderGroup = await prisma.orderGroup.findFirst({
+    where: { id: BigInt(order_group_id), deleted_at: null },
+  });
+  if (!orderGroup) {
+    return res.status(404).json({ message: "Order group not found" });
+  }
+  if (orderGroup.user_id.toString() !== req.user.id) {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+  const activeAgg = await prisma.order.aggregate({
+    _sum: { total_amount: true },
+    where: {
+      order_group_id: orderGroup.id,
+      deleted_at: null,
+      status: {
+        notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED],
+      },
+    },
+  });
+  const numericAmount = Number(activeAgg._sum.total_amount || 0);
+  if (!numericAmount || numericAmount <= 0) {
+    return res.status(400).json({ message: "Invalid amount" });
+  }
+
+  let vndAmount;
+  try {
+    vndAmount = resolveGatewayVndAmount(numericAmount);
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      message: err.message,
+      code: err.code,
+      minVnd: err.minVnd,
+      minUsd: err.minUsd,
+      amountVnd: err.amountVnd,
+    });
+  }
+
+  const orderId = Date.now().toString();
+  const clientIp = buildClientIp(req);
+  const returnUrl =
+    process.env.VNP_RETURN_URL ||
+    `${process.env.FRONTEND_URL || "http://localhost:5173"}/payment-result`;
+
+  const vnpay = vnpayInstance();
+  // The vnpay library requires its own vnp_-prefixed field names and
+  // multiplies vnp_Amount by 100 internally - passing camelCase fields (as
+  // this used to) left vnp_Amount/vnp_TxnRef undefined and produced a
+  // broken payment URL for every VNPay checkout.
+  const paymentUrl = vnpay.buildPaymentUrl({
+    vnp_Amount: vndAmount,
+    vnp_TxnRef: orderId,
+    vnp_BankCode: bankCode || undefined,
+    vnp_OrderInfo: orderInfo || `Thanh toan don hang ${orderId}`,
+    vnp_OrderType: ProductCode.Other,
+    vnp_Locale: "vn",
+    vnp_ReturnUrl: returnUrl,
+    vnp_IpAddr: clientIp,
+  });
+
+  res.json({ paymentUrl, orderId });
+});
 
 export const createMomoPayment = async (req, res) => {
   try {
