@@ -1,5 +1,6 @@
 import { prisma } from "../lib/db.js";
 import { SHOP_STATUS } from "../constants/status.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const chatMessagesInclude = {
   messages: {
@@ -175,8 +176,7 @@ export const sendMessage = async (req, res) => {
 export const getAllChats = async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const where = {
       deleted_at: null,
@@ -252,9 +252,9 @@ export const getAllChats = async (req, res) => {
         chats: chatsWithUnread,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });

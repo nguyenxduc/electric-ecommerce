@@ -2,7 +2,11 @@ import { prisma } from "../lib/db.js";
 import cloudinary from "../lib/cloudinary.js";
 import { ROLES } from "../constants/roles.js";
 import { SHOP_STATUS } from "../constants/status.js";
-import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
+import {
+  parsePagination,
+  buildPaginationMeta,
+  clampLimit,
+} from "../lib/pagination.js";
 
 import {
   buyerVisibilityWhere,
@@ -1040,7 +1044,7 @@ export const getSimilarProducts = async (req, res) => {
         },
         include: { product_colors: true, shop: { select: shopSelect } },
         orderBy: { rating: "desc" },
-        take: Number(limit),
+        take: clampLimit(limit, 6),
       });
 
       const productsWithCalculations = similarProducts.map(
@@ -1111,7 +1115,7 @@ export const getSimilarProducts = async (req, res) => {
         },
         include: { product_colors: true, shop: { select: shopSelect } },
         orderBy: { rating: "desc" },
-        take: Number(limit),
+        take: clampLimit(limit, 6),
       });
 
       const productsWithCalculations = categoryProducts.map(

@@ -1,5 +1,6 @@
 import { prisma } from "../lib/db.js";
 import { SHOP_STATUS } from "../constants/status.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const computeCouponDiscount = (coupon, amount) => {
   if (coupon.discount_type === "percent") {
@@ -198,8 +199,7 @@ export const getAllCoupons = async (req, res) => {
       where.code = { contains: String(q), mode: "insensitive" };
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [coupons, total] = await Promise.all([
       prisma.coupon.findMany({

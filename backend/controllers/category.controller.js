@@ -1,5 +1,6 @@
 import { prisma } from "../lib/db.js";
 import cloudinary from "../lib/cloudinary.js";
+import { parsePagination } from "../lib/pagination.js";
 
 // Public API - returns simple array for client-side use
 export const listCategories = async (req, res) => {
@@ -27,8 +28,7 @@ export const listCategoriesAdmin = async (req, res) => {
       where.name = { contains: String(q), mode: "insensitive" };
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [categories, total] = await Promise.all([
       prisma.category.findMany({

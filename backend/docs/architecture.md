@@ -58,6 +58,52 @@ o day (xem muc 4).
 
 ---
 
+
+### Phan tang trong backend
+
+```mermaid
+flowchart LR
+  R["routes/<br/>khai bao duong dan<br/>gan middleware"]
+  C["controllers/<br/>bo chuyen doi HTTP<br/>doc req, tra res"]
+  S["services/<br/>quy tac nghiep vu<br/>khong biet req/res"]
+  L["lib/<br/>ha tang dung chung<br/>db · pagination · vietnamese"]
+  D[("PostgreSQL")]
+
+  R --> C --> S --> D
+  C --> L
+  S --> L
+  C -.-> D
+
+  classDef pure fill:#eef7ee,stroke:#4a7
+  class S pure
+```
+
+Quy tac mot chieu: **route → controller → service → du lieu**. Khong bao gio
+nguoc lai, va **khong bao gio controller import controller**.
+
+Truoc dot don kien truc, quy tac nay bi pha o 8 cho: `writeAuditLog` nam trong
+`audit.controller.js` va duoc 5 controller khac import nguoc ra, con quy tac
+tich diem va hang thanh vien thi nam trong `loyalty.controller.js` va bi
+`order.controller.js`, `return.controller.js`, `customer.controller.js` keo ra
+dung. Hau qua khong chi la kho doc: mot job chay nen hay mot bai test muon cong
+diem cho don hang deu phai import ca mot module HTTP, keo theo ca tang khong
+lien quan gi den viec no can lam.
+
+| Tang | Duoc phep biet | Khong duoc biet |
+|---|---|---|
+| `routes/` | controller, middleware | nghiep vu, DB |
+| `controllers/` | service, lib, prisma | controller khac |
+| `services/` | lib, prisma, service khac | req, res, ma trang thai HTTP |
+| `lib/` | khong gi trong hai tang tren | controller, service |
+
+`services/pricing.service.js` la vi du ro nhat cho cot cuoi: khi voucher khong
+hop le, no tra ve `{ ok: false, code: "COUPON_EXPIRED" }` chu khong tra
+`res.status(400)`. Tang HTTP la noi duy nhat biet ma trang thai la gi. Nho vay
+toan bo quy tac tinh tien kiem thu duoc bang ham thuan, khong can dung mot
+request nao — xem `tests/15-pricing.test.mjs`.
+
+---
+
 ## 2. Luong then chot: tach don khi thanh toan
 
 Day la bai toan kho nhat cua mo hinh da gian hang. Mot lan bam mua tao ra

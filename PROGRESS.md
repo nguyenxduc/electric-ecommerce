@@ -11,7 +11,8 @@
 
 - Database dev chạy ở **port 55432** (không phải 5432) vì máy dev đã có PostgreSQL 18 chiếm 5432. Xem `README.md` mục 1.
 - Sau khi seed lại: dùng `npm run seed:full` (seed + sinh embedding). Nếu chỉ chạy `npm run seed`, bảng `product_embeddings` rỗng và chatbot RAG **âm thầm** tụt về tìm theo từ khoá — mọi số đo AI sẽ sai.
-- Trước khi commit: `cd backend && npm test` (14 bộ test + `demo-readiness`, 105 ca). Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
+- **Quy tắc phân tầng**: route → controller → service → dữ liệu, một chiều. Controller **không được import controller khác**; service **không được biết `req`/`res`**. Xem `backend/docs/architecture.md` mục 1.
+- Trước khi commit: `cd backend && npm test` (15 bộ test + `demo-readiness`, 123 ca). Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
 - Đo lại AI: `npm run eval:ai` → `backend/docs/ai-evaluation.md`.
 - Đo truy hồi và RAG Triad: `npm run eval:rag` → `backend/docs/rag-evaluation.md`. Thêm `-- --quick` để chạy nhanh. Bản miễn phí của Gemini giới hạn 15 lượt/phút nên script tự giãn nhịp, chạy đầy đủ mất khoảng 4 phút.
 - Chuẩn hoá tiếng Việt: dùng `lib/vietnamese.js`, **đừng tự viết lại** `normalize("NFD")` vì chữ "đ" không tách được bằng cách đó.
@@ -181,6 +182,10 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 |---|---|
 | Tách đơn, voucher hai cấp, bất biến dòng tiền | `backend/controllers/order.controller.js` và `docs/architecture.md` mục 2 |
 | Chatbot RAG trên cơ sở dữ liệu vector | `backend/ai/agent.js`, bảng `product_embeddings` |
+| Quy tắc tính tiền, phân bổ, bất biến dòng tiền | `backend/services/pricing.service.js` |
+| Tích điểm, hạng thành viên, voucher thăng hạng | `backend/services/loyalty.service.js` |
+| Ghi nhật ký thao tác | `backend/services/audit.service.js` |
+| Phân trang và chặn trên `limit` | `backend/lib/pagination.js` |
 | Truy hồi lai và hợp nhất RRF | `backend/ai/retrieval.js` |
 | Function calling cho giá và tồn kho | `backend/ai/tools.js` |
 | Phòng thủ tiêm lệnh ba lớp | `backend/ai/guard.js` |
@@ -205,3 +210,5 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 | 2026-09-09 | Hiện thực T1 - T6 theo góp ý của CBHD. Recall@5 đi từ 62.5% lên 100%, thời gian hoàn tất từ 9.0s xuống 4.5s. Thêm `ai/retrieval.js`, `ai/tools.js`, `ai/guard.js`, `lib/vietnamese.js`, `eval/dataset.json`, `scripts/evaluate-rag.js`, ba bộ test 12-14, migration `20260909_product_search_vector` | Claude Code |
 | 2026-09-09 | Sửa lỗi chuẩn hoá chữ "đ" làm lệch token giữa JS và Postgres, ảnh hưởng mọi câu hỏi tiếng Việt có chữ này. Sửa cả backend lẫn `frontend/src/client/utils/productSlug.ts` | Claude Code |
 | 2026-09-09 | Thêm guard chống ghi đè khi IPN bị phát lại. Test được kiểm chứng là đỏ khi gỡ guard, xanh khi có guard | Claude Code |
+| 2026-09-09 | Dọn kiến trúc: lập tầng `services/`, gỡ 8 chỗ controller import controller. Tách quy tắc tính tiền khỏi `createOrder` thành `pricing.service.js`, nhờ đó bất biến dòng tiền kiểm thử được bằng 1100 giỏ hàng ngẫu nhiên trong 5ms thay vì phải đặt đơn thật qua HTTP | Claude Code |
+| 2026-09-09 | 12/14 endpoint danh sách vốn bỏ qua `lib/pagination.js` và tự tính phân trang, nên `?limit=999999` kéo được cả bảng. Bổ sung `take` và `clampLimit` vào helper rồi đưa toàn bộ về dùng chung | Claude Code |

@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
 import { moderateReviewComment } from "../ai/reviewModeration.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const validateCommentByAi = async (comment) => {
   const text = String(comment || "").trim();
@@ -108,8 +109,7 @@ export const getReviewsByProduct = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const pid = BigInt(req.params.productId);
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
     const [total, reviews, agg] = await Promise.all([
       prisma.review.count({ where: { product_id: pid } }),
       prisma.review.findMany({
@@ -131,7 +131,7 @@ export const getReviewsByProduct = async (req, res) => {
         current_page: Number(page),
         per_page: Number(limit),
         total_count: total,
-        total_pages: Math.ceil(total / Number(limit)),
+        total_pages: Math.ceil(total / take),
       },
       summary: { average_rating: agg._avg.rating || 0, total_reviews: total },
     });

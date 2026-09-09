@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { parsePagination } from "../lib/pagination.js";
 
 const requireAdmin = (req, res) => {
   if (req.user?.role !== "admin") {
@@ -164,8 +165,7 @@ export const listAiFeedbackAdmin = async (req, res) => {
     if (!requireAdmin(req, res)) return;
 
     const { page = 1, limit = 30, min_rating, max_rating } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const ratingFilter = {};
     if (min_rating) ratingFilter.gte = Number(min_rating);
@@ -232,9 +232,9 @@ export const listAiFeedbackAdmin = async (req, res) => {
         items: enriched,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });

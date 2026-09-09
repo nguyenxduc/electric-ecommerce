@@ -1,13 +1,13 @@
 import { prisma } from "../lib/db.js";
 import { notifyUser } from "../lib/notify.js";
+import { parsePagination } from "../lib/pagination.js";
 
 // Lấy danh sách thông báo cho user hiện tại
 export const listNotifications = async (req, res) => {
   try {
     const userId = BigInt(req.user.id);
     const { page = 1, limit = 20, unreadOnly } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const where = {
       OR: [{ user_id: userId }, { user_id: null }],
@@ -30,9 +30,9 @@ export const listNotifications = async (req, res) => {
         notifications,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });
