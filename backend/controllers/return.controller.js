@@ -1,8 +1,8 @@
 import { prisma } from "../lib/db.js";
-import { writeAuditLog } from "./audit.controller.js";
+import { writeAuditLog } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { restockOrderItems } from "../lib/restock.js";
-import { revertPointsForOrder } from "./loyalty.controller.js";
+import { revertPointsForOrder } from "../services/loyalty.service.js";
 import { ROLES } from "../constants/roles.js";
 import { ORDER_STATUS, RETURN_STATUS } from "../constants/status.js";
 

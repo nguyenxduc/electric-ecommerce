@@ -1,31 +1,8 @@
 import { prisma } from "../lib/db.js";
+import { parsePagination } from "../lib/pagination.js";
 
-// Helper dùng nội bộ để log hành động
-export const writeAuditLog = async ({
-  userId,
-  action,
-  resource,
-  resourceId,
-  ip,
-  userAgent,
-  metadata,
-}) => {
-  try {
-    await prisma.auditLog.create({
-      data: {
-        user_id: userId ? BigInt(userId) : null,
-        action,
-        resource: resource || null,
-        resource_id: resourceId ? BigInt(resourceId) : null,
-        ip: ip || null,
-        user_agent: userAgent || null,
-        metadata: metadata || {},
-      },
-    });
-  } catch (err) {
-    console.error("writeAuditLog error:", err);
-  }
-};
+// Logic ghi log da chuyen sang services/audit.service.js. Controller nay gio
+// chi con phan doc log cho quan tri vien, dung nhiem vu cua mot bo chuyen doi HTTP.
 
 // Admin xem log (lọc theo action, user, resource, khoảng thời gian, IP)
 export const listAuditLogs = async (req, res) => {
@@ -42,8 +19,7 @@ export const listAuditLogs = async (req, res) => {
       date_to,
       q,
     } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const createdFilter = {};
     if (date_from) {
@@ -88,9 +64,9 @@ export const listAuditLogs = async (req, res) => {
         logs,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });

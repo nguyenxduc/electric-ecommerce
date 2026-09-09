@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
-import { grantUpgradeVouchers, getTierByPoints } from "./loyalty.controller.js";
+import { grantUpgradeVouchers, getTierByPoints } from "../services/loyalty.service.js";
 import { VALID_ROLES } from "../constants/roles.js";
+import { parsePagination } from "../lib/pagination.js";
 
 export const listCustomers = async (req, res) => {
   try {
@@ -14,8 +15,7 @@ export const listCustomers = async (req, res) => {
       ];
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [total, users] = await Promise.all([
       prisma.user.count({ where }),

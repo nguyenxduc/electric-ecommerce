@@ -5,7 +5,7 @@ import { ACCESS_TOKEN_SECRET, ACCESS_TOKEN_TTL } from "../lib/jwtSecret.js";
 import cloudinary from "../lib/cloudinary.js";
 import nodemailer from "nodemailer";
 import { promisify } from "util";
-import { writeAuditLog } from "./audit.controller.js";
+import { writeAuditLog } from "../services/audit.service.js";
 
 const generateAccessToken = (userId) => {
   const secret = ACCESS_TOKEN_SECRET;

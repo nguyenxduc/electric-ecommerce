@@ -2,8 +2,8 @@ import { prisma } from "../lib/db.js";
 import {
   earnPointsForOrder,
   revertPointsForOrder,
-} from "./loyalty.controller.js";
-import { writeAuditLog } from "./audit.controller.js";
+} from "../services/loyalty.service.js";
+import { writeAuditLog } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { ROLES } from "../constants/roles.js";
 import {
@@ -17,21 +17,20 @@ import {
 import { getSettingNumber } from "../lib/settings.js";
 import { restockOrderItems } from "../lib/restock.js";
 
-const TIER_AUTO_DISCOUNT_RATE = {
-  BRONZE: 0,
-  SILVER: 0.02,
-  GOLD: 0.05,
-  PLATINUM: 0.08,
-};
-
-const getTierFromPoints = (points = 0) => {
-  if (points >= 5000) return "PLATINUM";
-  if (points >= 2000) return "GOLD";
-  if (points >= 500) return "SILVER";
-  return "BRONZE";
-};
-
-const round2 = (n) => Math.round(Number(n) * 100) / 100;
+// Quy tac tinh tien nam o services/pricing.service.js. Controller nay chi con
+// lo phan doc du lieu, kiem tra quyen, ghi don va tra ve HTTP.
+import {
+  round2,
+  TIER_AUTO_DISCOUNT_RATE,
+  getTierFromPoints,
+  groupItemsByShop,
+  applyShopShipping,
+  computeTierDiscount,
+  resolveCouponDiscount,
+  allocateMerchandise,
+  merchandiseTotalAfterDiscounts,
+} from "../services/pricing.service.js";
+import { parsePagination } from "../lib/pagination.js";
 
 // Housekeeping after a suborder is cancelled/deleted:
 // 1. Void the checkout's un-paid payments - their amount no longer matches,
@@ -212,45 +211,18 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Group cart items by shop - each shop gets its own Order
-    const shopGroups = new Map();
-    for (const item of preparedItems) {
-      const key = item.shop.id.toString();
-      if (!shopGroups.has(key)) {
-        shopGroups.set(key, {
-          shopId: item.shop.id,
-          shopName: item.shop.name,
-          shopOwnerId: item.shop.owner_id,
-          shippingFeeOverride: item.shop.shipping_fee_override,
-          freeShippingThresholdOverride:
-            item.shop.free_shipping_threshold_override,
-          items: [],
-          subtotal: 0,
-        });
-      }
-      const group = shopGroups.get(key);
-      group.items.push(item);
-      group.subtotal += Number(item.data.total_price);
-    }
+    // Gom hang theo gian hang: moi shop se thanh mot don con doc lap.
+    const shopGroups = groupItemsByShop(preparedItems);
 
-    // Per-shop shipping: the shop's own fee/threshold, else platform defaults.
+    // Phi van chuyen tinh rieng tung gian hang, mac dinh lay tu cau hinh san.
     const [platformShippingFee, platformFreeThreshold] = await Promise.all([
       getSettingNumber("shipping_fee", 9.99),
       getSettingNumber("free_shipping_threshold", 199),
     ]);
-    let shippingTotal = 0;
-    for (const group of shopGroups.values()) {
-      const fee =
-        group.shippingFeeOverride != null
-          ? Number(group.shippingFeeOverride)
-          : platformShippingFee;
-      const threshold =
-        group.freeShippingThresholdOverride != null
-          ? Number(group.freeShippingThresholdOverride)
-          : platformFreeThreshold;
-      group.shipping = group.subtotal >= threshold ? 0 : round2(fee);
-      shippingTotal += group.shipping;
-    }
+    const shippingTotal = applyShopShipping(shopGroups, {
+      platformShippingFee,
+      platformFreeThreshold,
+    });
 
     const user = await prisma.user.findUnique({
       where: { id: BigInt(userId) },
@@ -262,105 +234,48 @@ export const createOrder = async (req, res) => {
 
     const userTier = user.segment || getTierFromPoints(user.loyalty_points || 0);
     const tierDiscountRate = TIER_AUTO_DISCOUNT_RATE[userTier] || 0;
-    totalAmount = round2(totalAmount);
-    const tierDiscount = round2(Number(totalAmount) * tierDiscountRate);
-    const amountAfterTierDiscount = round2(
-      Math.max(0, Number(totalAmount) - tierDiscount)
-    );
+    const tierResult = computeTierDiscount(totalAmount, tierDiscountRate);
+    totalAmount = tierResult.totalAmount;
+    const tierDiscount = tierResult.tierDiscount;
+    const amountAfterTierDiscount = tierResult.amountAfterTierDiscount;
 
-    // apply coupon if provided (optional). Shop vouchers (coupon.shop_id set)
-    // only discount that shop's items; platform vouchers discount the whole cart.
+    // Voucher: quy tac tinh nam o service, tang nay chi doc DB va anh xa
+    // ma loi cua service sang ma trang thai HTTP.
     let couponId = null;
     let couponDiscount = 0;
     let appliedCoupon = null;
-    let couponShopKey = null; // shopGroups key the voucher applies to
+    let couponShopKey = null;
     if (coupon_code) {
       const coupon = await prisma.coupon.findFirst({
         where: { code: coupon_code, deleted_at: null },
         include: {
-          users: {
-            select: { id: true },
-          },
+          users: { select: { id: true } },
           shop: { select: { id: true, name: true } },
         },
       });
 
-      // Validate coupon
-      if (!coupon) {
-        return res.status(400).json({ message: "Invalid coupon code" });
-      }
-      const now = new Date();
-      if (coupon.expires_at && now > coupon.expires_at) {
-        return res.status(400).json({ message: "Coupon has expired" });
-      }
-      if (
-        coupon.usage_limit !== null &&
-        coupon.used_count !== null &&
-        coupon.used_count >= coupon.usage_limit
-      ) {
-        return res.status(400).json({ message: "Coupon usage limit reached" });
-      }
-      // Personal voucher: must belong to current user
-      if (
-        Array.isArray(coupon.users) &&
-        coupon.users.length > 0 &&
-        !coupon.users.some((u) => u.id.toString() === String(userId))
-      ) {
-        return res.status(403).json({ message: "Voucher does not belong to this user" });
+      const outcome = resolveCouponDiscount({
+        coupon,
+        shopGroups,
+        tierDiscountRate,
+        amountAfterTierDiscount,
+        userId,
+      });
+      if (!outcome.ok) {
+        const status = outcome.code === "COUPON_NOT_OWNED" ? 403 : 400;
+        return res.status(status).json({ message: outcome.message });
       }
 
-      if (coupon.shop_id) {
-        // Shop voucher: cart must contain items from that shop
-        couponShopKey = coupon.shop_id.toString();
-        const targetGroup = shopGroups.get(couponShopKey);
-        if (!targetGroup) {
-          return res.status(400).json({
-            message: `Voucher only applies to items from ${
-              coupon.shop?.name || "its shop"
-            }`,
-          });
-        }
-        const groupAfterTier = round2(
-          targetGroup.subtotal * (1 - tierDiscountRate)
-        );
-        if (coupon.min_order && groupAfterTier < Number(coupon.min_order)) {
-          return res.status(400).json({
-            message: `${coupon.shop?.name || "Shop"} items do not meet the voucher minimum`,
-          });
-        }
-        couponDiscount =
-          coupon.discount_type === "percent"
-            ? (groupAfterTier * Number(coupon.discount_value)) / 100
-            : Number(coupon.discount_value);
-        couponDiscount = round2(Math.min(couponDiscount, groupAfterTier));
-      } else {
-        // Platform voucher: discounts the whole cart
-        if (
-          coupon.min_order &&
-          Number(amountAfterTierDiscount) < Number(coupon.min_order)
-        ) {
-          return res
-            .status(400)
-            .json({ message: "Order does not meet minimum amount" });
-        }
-        couponDiscount =
-          coupon.discount_type === "percent"
-            ? (Number(amountAfterTierDiscount) * Number(coupon.discount_value)) /
-              100
-            : Number(coupon.discount_value);
-        couponDiscount = round2(
-          Math.min(couponDiscount, amountAfterTierDiscount)
-        );
-      }
-
+      couponDiscount = outcome.couponDiscount;
+      couponShopKey = outcome.couponShopKey;
       couponId = coupon.id;
       appliedCoupon = coupon;
     }
 
-    // Merchandise total after discounts; shipping is added on top.
-    const merchandiseTotal = Math.max(
-      0,
-      Number(amountAfterTierDiscount) - couponDiscount
+    // Tien hang sau moi khoan giam; phi ship cong o tren cung, khong bi giam.
+    const merchandiseTotal = merchandiseTotalAfterDiscounts(
+      amountAfterTierDiscount,
+      couponDiscount
     );
     const finalAmount = round2(merchandiseTotal + shippingTotal);
 
@@ -374,32 +289,16 @@ export const createOrder = async (req, res) => {
       }
     }
 
-    // Allocate the merchandise total across shop-orders (each order then adds
-    // its own shipping fee). Tier discount is prorated by subtotal share; a
-    // shop voucher lands entirely on its shop; a platform voucher is prorated.
-    // The last group absorbs rounding remainders so suborder totals sum to
-    // finalAmount exactly (required for payment reconciliation).
-    const groups = [...shopGroups.values()];
-    let allocatedMerch = 0;
-    for (let i = 0; i < groups.length; i++) {
-      const group = groups[i];
-      if (i === groups.length - 1) {
-        group.merchTotal = round2(merchandiseTotal - allocatedMerch);
-      } else {
-        const share = totalAmount > 0 ? group.subtotal / totalAmount : 0;
-        const tierShare = tierDiscount * share;
-        const couponShare = couponShopKey
-          ? group.shopId.toString() === couponShopKey
-            ? couponDiscount
-            : 0
-          : couponDiscount * share;
-        group.merchTotal = round2(
-          Math.max(0, group.subtotal - tierShare - couponShare)
-        );
-        allocatedMerch += group.merchTotal;
-      }
-      group.finalTotal = round2(group.merchTotal + group.shipping);
-    }
+    // Phan bo tien hang cho tung don con. Bat bien: tong cac don con phai
+    // bang dung finalAmount. Quy tac va phan hap thu sai so lam tron nam o
+    // services/pricing.service.js, kiem thu rieng o tests/15-pricing.
+    const groups = allocateMerchandise(shopGroups, {
+      merchandiseTotal,
+      totalAmount,
+      tierDiscount,
+      couponDiscount,
+      couponShopKey,
+    });
 
     const created = await prisma.$transaction(async (tx) => {
       const orderGroup = await tx.orderGroup.create({
@@ -666,8 +565,7 @@ export const getAllOrders = async (req, res) => {
     if (shop_id) where.shop_id = BigInt(shop_id);
     if (q) where.order_number = { contains: String(q), mode: "insensitive" };
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [total, orders] = await Promise.all([
       prisma.order.count({ where }),
@@ -716,8 +614,7 @@ export const getShopOrders = async (req, res) => {
     if (status) where.status = String(status);
     if (q) where.order_number = { contains: String(q), mode: "insensitive" };
 
-    const skip = (Number(page) - 1) * Number(limit);
-    const take = Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [total, orders] = await Promise.all([
       prisma.order.count({ where }),

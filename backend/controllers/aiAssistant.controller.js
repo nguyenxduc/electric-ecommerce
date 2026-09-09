@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import { prisma } from "../lib/db.js";
 import { runAgent } from "../ai/agent.js";
-import { writeAuditLog } from "./audit.controller.js";
+import { writeAuditLog } from "../services/audit.service.js";
+import { parsePagination } from "../lib/pagination.js";
 
 /**
  * Ghi lại mỗi lần lớp phòng thủ tiêm lệnh chặn một lượt trao đổi.
@@ -44,7 +45,7 @@ const ensureChatOwner = async (chatId, userId) => {
 export const listAiChats = async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const { skip, take } = parsePagination(page, limit);
     const where = { user_id: BigInt(req.user.id) };
 
     const [chats, total] = await Promise.all([
@@ -52,7 +53,7 @@ export const listAiChats = async (req, res) => {
         where,
         orderBy: { updated_at: "desc" },
         skip,
-        take: Number(limit),
+        take,
         include: {
           messages: {
             take: 1,
@@ -69,9 +70,9 @@ export const listAiChats = async (req, res) => {
         chats,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });
@@ -123,14 +124,14 @@ export const getAiMessages = async (req, res) => {
         });
     }
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const { skip, take } = parsePagination(page, limit);
 
     const [messages, total] = await Promise.all([
       prisma.aiMessage.findMany({
         where: { ai_chat_id: BigInt(chatId) },
         orderBy: { created_at: "asc" },
         skip,
-        take: Number(limit),
+        take,
       }),
       prisma.aiMessage.count({
         where: { ai_chat_id: BigInt(chatId) },
@@ -143,9 +144,9 @@ export const getAiMessages = async (req, res) => {
         messages,
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: take,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / take),
         },
       },
     });

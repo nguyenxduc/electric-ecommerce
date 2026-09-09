@@ -1,6 +1,6 @@
 import { prisma } from "../lib/db.js";
 import cloudinary from "../lib/cloudinary.js";
-import { writeAuditLog } from "./audit.controller.js";
+import { writeAuditLog } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { ROLES } from "../constants/roles.js";
 import { createSlug, ensureUniqueSlug } from "../lib/slug.js";
