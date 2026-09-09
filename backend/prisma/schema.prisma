@@ -77,6 +77,9 @@ model Product {
   updated_at      DateTime  @updatedAt
   deleted_at      DateTime?
   description     String?
+  // Cột full-text do trigger trong DB tự cập nhật, Prisma không ghi vào cột này.
+  // Xem prisma/migrations/20260909_product_search_vector.
+  search_vector   Unsupported("tsvector")?
   // relations
   shop         Shop         @relation(fields: [shop_id], references: [id])
   category     Category     @relation(fields: [category_id], references: [id])
