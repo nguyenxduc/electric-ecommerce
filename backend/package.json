@@ -22,7 +22,8 @@
     "job:rollup-user-behavior-daily": "node jobs/rollupUserBehaviorDaily.js",
     "job:daily-recommendation": "node jobs/runDailyRecommendationJobs.js",
     "test": "npm run seed && node --test --test-concurrency=1 \"tests/[0-9][0-9]-*.test.mjs\"",
-    "test:demo": "node --test \"tests/demo-readiness.test.mjs\""
+    "test:demo": "node --test \"tests/demo-readiness.test.mjs\"",
+    "eval:rag": "node scripts/evaluate-rag.js"
   },
   "dependencies": {
     "@langchain/core": "^0.3.79",

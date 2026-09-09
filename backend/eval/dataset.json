@@ -1,0 +1,39 @@
+{
+  "note": "Tap du lieu gan nhan de do Recall@5 va MRR cho truy hoi. Khoa theo TEN san pham chu khong theo id, vi id thay doi sau moi lan seed lai. Ten duoc so khop khong phan biet hoa thuong va bo dau.",
+  "version": 1,
+  "questions": [
+    { "q": "Dell XPS 15 giá bao nhiêu", "expect": ["Dell XPS 15"], "loai": "ten-truc-tiep" },
+    { "q": "MacBook Pro 16 còn hàng không", "expect": ["MacBook Pro 16"], "loai": "ten-truc-tiep" },
+    { "q": "iPhone 15 Pro Max", "expect": ["iPhone 15 Pro Max"], "loai": "ten-truc-tiep" },
+    { "q": "Canon EOS R5 chụp ảnh thế nào", "expect": ["Canon EOS R5"], "loai": "ten-truc-tiep" },
+    { "q": "Sony WH-1000XM5", "expect": ["Sony WH-1000XM5"], "loai": "ten-truc-tiep" },
+    { "q": "PlayStation 5 giá bao nhiêu", "expect": ["PlayStation 5"], "loai": "ten-truc-tiep" },
+    { "q": "Nintendo Switch OLED", "expect": ["Nintendo Switch OLED"], "loai": "ten-truc-tiep" },
+    { "q": "Apple Watch Series 9", "expect": ["Apple Watch Series 9"], "loai": "ten-truc-tiep" },
+    { "q": "Garmin Fenix 7", "expect": ["Garmin Fenix 7"], "loai": "ten-truc-tiep" },
+    { "q": "Logitech MX Master 3S", "expect": ["Logitech MX Master 3S"], "loai": "ten-truc-tiep" },
+
+    { "q": "iphon 15 pro", "expect": ["iPhone 15 Pro Max"], "loai": "sai-chinh-ta" },
+    { "q": "macbok pro", "expect": ["MacBook Pro 16"], "loai": "sai-chinh-ta" },
+    { "q": "samsng galaxy tab", "expect": ["Samsung Galaxy Tab S9"], "loai": "sai-chinh-ta" },
+    { "q": "dell xsp 15", "expect": ["Dell XPS 15"], "loai": "sai-chinh-ta" },
+    { "q": "airpod pro", "expect": ["AirPods Pro 2"], "loai": "sai-chinh-ta" },
+    { "q": "playstaton 5", "expect": ["PlayStation 5"], "loai": "sai-chinh-ta" },
+
+    { "q": "laptop có card RTX 4060", "expect": ["ASUS ROG Strix G16", "Dell XPS 15"], "loai": "theo-thong-so" },
+    { "q": "máy có chip M3", "expect": ["MacBook Pro 16"], "loai": "theo-thong-so" },
+    { "q": "máy ảnh full-frame", "expect": ["Canon EOS R5"], "loai": "theo-thong-so" },
+
+    { "q": "tư vấn điện thoại chụp ảnh đẹp", "expect": ["iPhone 15 Pro Max", "Galaxy S24 Ultra", "Google Pixel 8 Pro", "Xiaomi 14"], "loai": "theo-nhu-cau" },
+    { "q": "laptop để làm đồ hoạ", "expect": ["MacBook Pro 16", "Dell XPS 15", "ASUS ROG Strix G16"], "loai": "theo-nhu-cau" },
+    { "q": "tai nghe chống ồn đi máy bay", "expect": ["Sony WH-1000XM5", "AirPods Pro 2", "Samsung Galaxy Buds3 Pro"], "loai": "theo-nhu-cau" },
+    { "q": "đồng hồ thông minh theo dõi sức khoẻ", "expect": ["Apple Watch Series 9", "Garmin Fenix 7"], "loai": "theo-nhu-cau" },
+    { "q": "máy tính bảng học online", "expect": ["iPad Pro 12.9", "Samsung Galaxy Tab S9"], "loai": "theo-nhu-cau" },
+    { "q": "máy chơi game tại nhà", "expect": ["PlayStation 5", "Xbox Series X", "Nintendo Switch OLED"], "loai": "theo-nhu-cau" },
+    { "q": "chuột không dây cho dân văn phòng", "expect": ["Logitech MX Master 3S"], "loai": "theo-nhu-cau" },
+    { "q": "laptop gaming mạnh", "expect": ["ASUS ROG Strix G16"], "loai": "theo-nhu-cau" },
+    { "q": "sạc nhanh cho iPhone", "expect": ["MagSafe Charger 15W"], "loai": "theo-nhu-cau" },
+    { "q": "điện thoại Android cao cấp", "expect": ["Galaxy S24 Ultra", "Google Pixel 8 Pro", "Xiaomi 14"], "loai": "theo-nhu-cau" },
+    { "q": "tai nghe true wireless của Apple", "expect": ["AirPods Pro 2"], "loai": "theo-nhu-cau" }
+  ]
+}

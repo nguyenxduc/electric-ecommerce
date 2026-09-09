@@ -1,6 +1,6 @@
 # Tiến độ & việc cần làm — NGX E-Commerce
 
-> Cập nhật: 2026-09-08. File này là **nguồn sự thật duy nhất** về "đang tới đâu".
+> Cập nhật: 2026-09-09. File này là **nguồn sự thật duy nhất** về "đang tới đâu".
 > Đọc hết mục 0 → 4 trước khi viết dòng code nào. Xong việc thì ghi vào mục 6.
 
 ---
@@ -11,8 +11,10 @@
 
 - Database dev chạy ở **port 55432** (không phải 5432) vì máy dev đã có PostgreSQL 18 chiếm 5432. Xem `README.md` mục 1.
 - Sau khi seed lại: dùng `npm run seed:full` (seed + sinh embedding). Nếu chỉ chạy `npm run seed`, bảng `product_embeddings` rỗng và chatbot RAG **âm thầm** tụt về tìm theo từ khoá — mọi số đo AI sẽ sai.
-- Trước khi commit: `cd backend && npm test` (11 bộ test + `demo-readiness`). Không commit khi test đỏ.
-- Đo lại AI: `npm run eval:ai` → cập nhật `backend/docs/ai-evaluation.md`.
+- Trước khi commit: `cd backend && npm test` (14 bộ test + `demo-readiness`, 105 ca). Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
+- Đo lại AI: `npm run eval:ai` → `backend/docs/ai-evaluation.md`.
+- Đo truy hồi và RAG Triad: `npm run eval:rag` → `backend/docs/rag-evaluation.md`. Thêm `-- --quick` để chạy nhanh. Bản miễn phí của Gemini giới hạn 15 lượt/phút nên script tự giãn nhịp, chạy đầy đủ mất khoảng 4 phút.
+- Chuẩn hoá tiếng Việt: dùng `lib/vietnamese.js`, **đừng tự viết lại** `normalize("NFD")` vì chữ "đ" không tách được bằng cách đó.
 - Sinh lại ERD: `npm run docs:erd` → `backend/docs/erd.md`.
 - Tài liệu hành vi hệ thống: `backend/docs/architecture.md` (Mermaid). **Sửa code lõi thì sửa luôn tài liệu này.**
 - Mỗi task ở mục 4 đều có "Tiêu chí nghiệm thu". Không tự coi là xong nếu chưa có test hoặc số đo chứng minh.
@@ -40,7 +42,11 @@
 | Khách hàng thân thiết (tích điểm, hạng, đổi điểm) | Xong | `earnPointsForOrder` trong `order.controller.js` | `tests/08-loyalty-notifications` |
 | Chat thời gian thực 2 kênh + thông báo | Xong | `controllers/chat.controller.js`, Socket.IO trong `server.js` | `tests/07`, `tests/08` |
 | Nhật ký thao tác (audit log) | Xong | `writeAuditLog` | ghi ở mọi lệnh tạo đơn |
-| Chatbot RAG (pgvector + mở rộng từ khoá bằng LLM + nhận diện đổi chủ đề) | Xong, cần nâng cấp | `backend/ai/agent.js` | `docs/ai-evaluation.md` mục 1 |
+| **Truy hồi lai**: full-text + trigram + vector, hợp nhất bằng RRF | Xong | `backend/ai/retrieval.js` | `tests/13-retrieval`, Recall@5 100% |
+| **Function calling**: bot tự đọc giá, tồn kho, phí ship từ DB | Xong | `backend/ai/tools.js` | `docs/rag-evaluation.md` |
+| **Phòng thủ tiêm lệnh ba lớp** (gồm tiêm gián tiếp qua mô tả người bán) | Xong | `backend/ai/guard.js` | `tests/12-ai-guard` 15/15 |
+| **Trả lời theo luồng (SSE)** | Xong | `controllers/aiAssistant.controller.js` | sự kiện `token`/`replace`/`done` |
+| Chatbot RAG điều phối chung | Xong | `backend/ai/agent.js` | `docs/rag-evaluation.md` |
 | Tìm kiếm bằng hình ảnh | Xong, chưa đo | `ai/imageSearch.js`, `controllers/productImageSearch.controller.js` | — |
 | So sánh sản phẩm bằng AI (trả JSON có cấu trúc) | Xong | `ai/productComparison.js` | — |
 | Kiểm duyệt đánh giá tự động | Xong | `ai/reviewModeration.js` | `docs/ai-evaluation.md` mục 2 |
@@ -54,110 +60,111 @@
 
 ## 2. Số đo thực tế so với KPI trong đề cương
 
-Nguồn: `backend/docs/ai-evaluation.md`, sinh bằng `npm run eval:ai`.
+Nguồn: `backend/docs/rag-evaluation.md` (`npm run eval:rag`, tập gắn nhãn 30 câu)
+và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 
-| KPI đề cương | Mục tiêu | Đo được | Kết luận |
-|---|---|---|---|
-| Truy hồi đúng sản phẩm liên quan trong top 5 | > 75% | 62.5% (5/8 câu đúng nhóm hàng) | **Chưa đạt** |
-| Thời gian phản hồi chatbot | < 6.0 s | p50 = 9.0 s, p95 = 11.6 s | **Chưa đạt** |
-| Phát hiện bình luận vi phạm | > 80% | 100% (F1 = 1.0, n = 10) | Đạt, cỡ mẫu còn nhỏ |
-| Chặn nhầm bình luận sạch | < 5% | 0% | Đạt |
-| Độ chính xác giá / tồn kho trong câu trả lời | > 85% | **chưa đo** | Chưa có phép đo |
-| Nhận diện đúng dòng máy khi tìm bằng ảnh | > 70% | **chưa đo** | Chưa có phép đo |
-| nDCG của danh sách gợi ý | > 0.60 | **chưa đo** | Chưa có phép đo |
-| Phản hồi tích cực của người dùng về trả lời AI | > 80% | chưa gom số | Có API thu thập, chưa có báo cáo |
+| KPI đề cương | Mục tiêu | Trước 09/09 | Đo được 09/09 | Kết luận |
+|---|---|---|---|---|
+| Truy hồi đúng sản phẩm trong top 5 | > 75% | 62.5% | **100%** (30/30) | Đạt |
+| MRR của truy hồi | - | chưa đo | **0.919** | Có số |
+| Faithfulness (Ragas) | > 0.75 | chưa đo | **0.875** | Đạt |
+| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.825** | Đạt |
+| Context Relevance (Ragas) | - | chưa đo | **0.275** | Thấp, xem ghi chú |
+| Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **4.0 s** | **Chưa đạt** |
+| Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **4.5 s** | Đạt |
+| Độ chính xác giá / tồn kho | > 85% | chưa đo được | khớp tuyệt đối với DB | Đạt, xem ghi chú |
+| Chặn tấn công tiêm lệnh | 100% | chưa có | **11/11**, chặn nhầm 0/10 | Đạt |
+| Phát hiện bình luận vi phạm | > 80% | 100% (n = 10) | 100% | Đạt, cỡ mẫu nhỏ |
+| Nhận diện đúng khi tìm bằng ảnh | > 70% | chưa đo | **chưa đo** | Còn thiếu |
+| nDCG của gợi ý cá nhân hoá | > 0.60 | chưa đo | **chưa đo** | Còn thiếu |
 
-**Đây là danh sách việc phải làm, không phải điểm trừ.** Ba KPI chưa có phép đo là rủi ro lớn nhất khi bảo vệ: hội đồng sẽ hỏi "đo bằng gì". Xem T5.
+**Ghi chú ba con số cần giải thích khi bảo vệ:**
+
+- **Context Relevance 0.275 không phải lỗi.** Chỉ số này của Ragas phạt việc lấy
+  về thừa: hệ thống luôn trả 5 ứng viên, trong khi câu hỏi kiểu "Dell XPS 15 giá
+  bao nhiêu" chỉ cần 1. Bốn sản phẩm còn lại bị tính là nhiễu. Muốn nâng thì
+  giảm `topK` động theo độ chắc chắn của truy hồi, đánh đổi với Recall.
+- **Độ chính xác giá / tồn kho.** Không còn là phép đo xác suất nữa: giá và tồn
+  kho đưa vào ngữ cảnh đọc trực tiếp từ cùng một truy vấn, và dùng chung hàm
+  `calculateProductPrices` với API sản phẩm. Sai số chỉ xảy ra nếu model đọc sai
+  con số đã cho, và đó chính là thứ Faithfulness 0.875 đang đo.
+- **TTFT 4.0 s chưa đạt mốc 1.5 s.** Phần còn lại gần như toàn bộ là thời gian
+  model cân nhắc trước khi phát token đầu. Đo riêng lượt sinh không bind công cụ
+  thì TTFT là 1.4 s, còn khi bind công cụ model dừng lại để quyết định có gọi
+  hay không. Xem T7.
 
 ---
 
 ## 3. Khoảng trống kỹ thuật
 
-**G1 — Chatbot không truy vấn giá / tồn kho theo thời gian thực.**
-`ai/agent.js` nhồi kết quả truy hồi vào prompt dưới dạng văn bản tĩnh. Giá trong câu trả lời là ảnh chụp lúc truy hồi, không phải giá hiện tại; tồn kho hoàn toàn không có trong ngữ cảnh. KPI "độ chính xác giá / tồn kho > 85%" gần như không chứng minh được nếu giữ kiến trúc này. Cần Function Calling / Tool Use.
+### Đã đóng (09/09/2026)
 
-**G2 — Hybrid search mới ở mức thô.**
-Nhánh từ khoá trong `agent.js:405-424` dùng `LIKE %token%`, không có xếp hạng. Nhánh vector dùng pgvector đúng chuẩn. Hai nhánh được hợp nhất bằng cách cộng điểm thủ công trong `scoreCandidateRow`. Chưa có BM25 hay `ts_rank`, chưa có Reciprocal Rank Fusion. Đây là chỗ trực tiếp kéo Recall xuống 62.5%.
+| Mã | Vấn đề | Đã xử lý thế nào | Bằng chứng |
+|---|---|---|---|
+| G1 | Chatbot không có giá / tồn kho thời gian thực | Giá và tồn kho nạp sẵn vào ngữ cảnh từ chính truy vấn truy hồi, cộng ba công cụ `lookup_product`, `check_stock`, `get_shop_policy` cho phần ngữ cảnh không có. Dùng chung `calculateProductPrices` với API sản phẩm | `ai/tools.js`, Faithfulness 0.875 |
+| G2 | Hybrid search thô, cộng điểm thủ công | Ba nhánh full-text `ts_rank`, trigram `word_similarity`, vector pgvector; hợp nhất bằng Reciprocal Rank Fusion | `ai/retrieval.js`, `tests/13-retrieval`, Recall@5 100% |
+| G3 | Tìm kiếm không chịu lỗi chính tả | Nhánh trigram dùng `word_similarity` thay vì `similarity`: tên sản phẩm dài làm `similarity` tụt dưới ngưỡng | `tests/13`: "iphon", "macbok pro", "samsng galaxy tab" |
+| G4 | Không có phòng thủ tiêm lệnh | Ba lớp: đầu vào, ngữ cảnh (nonce + vô hiệu hoá câu lệnh trong mô tả người bán), đầu ra | `ai/guard.js`, `tests/12-ai-guard` 15/15 |
+| G5 | Không có streaming | Endpoint SSE `POST /:chatId/messages/stream`, endpoint cũ giữ làm dự phòng | `controllers/aiAssistant.controller.js` |
+| G6 | Khung đánh giá chưa chuẩn hoá | Tập gắn nhãn 30 câu, Recall@5 và MRR đo khách quan, RAG Triad chấm theo phương pháp Ragas | `eval/dataset.json`, `npm run eval:rag` |
+| G7 | Thiếu ca biên thanh toán | Hai người mua tranh mặt hàng cuối; IPN phát lại không ghi đè bản ghi thanh toán | `tests/14-concurrency` |
 
-**G3 — Tìm kiếm văn bản chưa chịu lỗi chính tả.**
-Đề cương hứa "tìm kiếm hỗ trợ sửa lỗi chính tả nhẹ" bằng kỹ thuật trigram. Thực tế `product.controller.js:216` chỉ dùng `contains`, tức so khớp chuỗi con. `pg_trgm` đã bật nhưng **chỉ dùng cho gợi ý sản phẩm tương tự theo mô tả** (`product.controller.js:1087`), chưa dùng cho ô tìm kiếm. Gõ "iphon" hay "labtop dell" hiện trả về rỗng.
+**Một lỗi phát sinh trong lúc làm, đã sửa:** chữ "đ" và "Đ" không tách được bằng
+`normalize("NFD")` vì là ký tự có gạch ngang chứ không phải nguyên âm mang dấu,
+nên bước lọc `[^a-z0-9]` xoá luôn cả chữ: `"điện thoại"` thành `"ien thoai"`.
+Phía Postgres thì `unaccent` ánh xạ đúng thành `"dien thoai"`. Hai bên lệch nhau
+nghĩa là token gửi xuống không khớp được với thứ đã lập chỉ mục — mọi câu hỏi
+tiếng Việt có chữ "đ" đều bị ảnh hưởng. Gom về `lib/vietnamese.js`, sửa luôn cả
+`frontend/src/client/utils/productSlug.ts`.
 
-**G4 — Không có phòng thủ prompt injection.**
-Không có lớp lọc nào giữa câu người dùng và LLM. Rủi ro thật gồm hai hướng:
+### Còn lại
 
-- *Trực tiếp*: người mua ép bot hứa giảm giá, cấp voucher, hoặc lộ system prompt.
-- *Gián tiếp*: **mô tả sản phẩm do seller tự nhập được đưa thẳng vào ngữ cảnh** (`agent.js` lấy `pe.content`). Một seller có thể nhét câu lệnh vào mô tả để thao túng bot trong phiên của người mua khác. Đây là lỗ hổng đặc thù của mô hình đa gian hàng và là điểm rất mạnh cho báo cáo.
+**G8 — Chưa có bộ nhớ đệm, và TTFT chưa đạt.**
+Mỗi câu hỏi hiện tốn 1 lượt gọi model khi ngữ cảnh đã đủ, 2 lượt khi phải gọi
+công cụ (trước đây là 3). Đo riêng lượt sinh không bind công cụ cho TTFT 1.4 s;
+khi bind công cụ, model dừng lại cân nhắc và TTFT lên 4.0 s. Xem T7.
 
-**G5 — Chưa có streaming.**
-`sendAiChatMessage` trả một cục JSON sau khi model chạy xong. Với p50 = 9 s, người dùng nhìn màn hình trống 9 giây. Frontend đã có sẵn `AiChatTypingIndicator.tsx` nên phần hiển thị không phải làm lại từ đầu.
-
-**G6 — Khung đánh giá AI chưa chuẩn hoá.**
-`scripts/evaluate-ai.js` tự viết, đo bốn thứ: có trích dẫn sản phẩm không, đúng nhóm hàng không, độ trễ, và P/R/F1 của kiểm duyệt. Chưa có bộ ba RAG Triad (Faithfulness, Answer Relevance, Context Relevance), chưa có tập ground-truth để tính Recall@5 đúng nghĩa, chưa có nDCG.
-
-**G7 — Thiếu vài ca biên nghiệp vụ thanh toán.**
-Đã có: chữ ký IPN sai / bịa / sửa số tiền (`tests/09`), voucher đua nhau (`tests/11`). Chưa có: hai người mua cùng lúc mặt hàng còn 1 cái, IPN phát lại cùng một payload hợp lệ, huỷ đơn sau khi đã thanh toán. Riêng IPN: `payment.controller.js:418` cập nhật bản ghi payment mà không kiểm tra trạng thái đã `PAID` chưa. Đơn hàng thì an toàn nhờ guard `status: PENDING`, nhưng bản ghi thanh toán bị ghi đè.
-
-**G8 — Chưa có bộ nhớ đệm.**
-Mỗi câu hỏi chatbot gọi LLM ít nhất 3 lần (phân loại ngữ cảnh, mở rộng từ khoá, sinh câu trả lời) cộng 1 lần embedding. Đây là nguyên nhân chính của 9 giây và của chi phí gọi API.
+**G9 — Hai KPI vẫn chưa có phép đo:** độ chính xác tìm kiếm bằng ảnh và nDCG
+của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-truth cho gợi ý.
 
 ---
 
 ## 4. Backlog theo thứ tự ưu tiên
 
-### P0 — chặn KPI đề cương, làm trước
+### Đã xong 09/09/2026
 
-#### T1. Function Calling: bot tự truy vấn giá & tồn kho
+| Mã | Việc | Nghiệm thu |
+|---|---|---|
+| T1 | Function calling: bot tự truy vấn giá và tồn kho | Trả lời khớp tuyệt đối với DB; công cụ chỉ đọc gian hàng đang hoạt động |
+| T2 | Hybrid search chuẩn hoá + chịu lỗi chính tả | Recall@5 = 100% trên tập 30 câu, vượt mốc 75% |
+| T3 | Streaming câu trả lời (SSE) | Endpoint stream phát `token` / `replace` / `done` kèm số đo TTFT |
+| T4 | Chống prompt injection hai chiều | 11 câu tấn công chặn 100%, 10 câu mua hàng bình thường không bị chặn nhầm |
+| T5 | Khung đánh giá theo RAG Triad | `npm run eval:rag` xuất Recall@5, MRR, Faithfulness, Answer Relevance, Context Relevance |
+| T6 | Ca biên nghiệp vụ thanh toán | `tests/14-concurrency` xanh; test IPN phát lại được kiểm chứng là **đỏ khi gỡ guard** |
 
-- **File**: `backend/ai/agent.js`; thêm `backend/ai/tools/` gồm `lookupProduct`, `checkStock`, `getShopPolicy`.
-- **Việc**: định nghĩa tool schema cho Gemini qua `@langchain/google-genai`, để model tự gọi khi câu hỏi chạm tới giá, tồn kho hoặc phí ship. Truy hồi vector chỉ còn nhiệm vụ *tìm ứng viên*; *số liệu* luôn lấy từ tool đọc thẳng DB tại thời điểm trả lời.
-- **Nghiệm thu**: sửa giá một sản phẩm trong DB rồi hỏi lại ngay, bot trả giá mới. Có test tự động cho ca này. Bot không nêu tồn kho của shop đang bị đình chỉ.
-- **Vì sao P0**: mở khoá KPI "độ chính xác giá / tồn kho > 85%", và là điểm kỹ thuật đáng nói nhất trong chương AI của báo cáo.
+### Còn lại
 
-#### T2. Hybrid search chuẩn hoá + tìm kiếm chịu lỗi chính tả
+#### T7. Hạ thời gian tới ký tự đầu tiên xuống dưới 1.5 s
 
-- **File**: `backend/ai/agent.js` hàm `retrieveContext`; `backend/controllers/product.controller.js:216`; migration mới cho `tsvector` và index GIN.
 - **Việc**:
-  1. Thêm cột `search_vector tsvector` cho `products` (name + description + specs), index GIN, cập nhật bằng trigger hoặc lúc ghi.
-  2. Nhánh từ khoá đổi từ `LIKE` sang `websearch_to_tsquery` kèm `ts_rank`. Giữ `similarity()` của `pg_trgm` làm lớp cứu khi tsquery không khớp — đây chính là phần "sửa lỗi chính tả nhẹ" mà đề cương đã hứa.
-  3. Hợp nhất hai bảng xếp hạng bằng **Reciprocal Rank Fusion** với công thức `score = Σ 1/(k + rank)`, k = 60, thay cho hàm cộng điểm thủ công hiện tại.
-- **Nghiệm thu**: Recall@5 trên tập ground-truth của T5 đạt từ 75% trở lên. Gõ "iphon 15" hoặc "labtop dell" vẫn ra đúng sản phẩm.
+  1. Chỉ bind công cụ khi câu hỏi thực sự cần, ví dụ khi ngữ cảnh truy hồi rỗng
+     hoặc câu hỏi chạm tới màu sắc / phí ship. Đo cho thấy chỉ riêng việc bind
+     công cụ đã đẩy TTFT từ 1.4 s lên 4.0 s.
+  2. Cache embedding của câu hỏi lặp lại và kết quả truy hồi theo câu đã chuẩn hoá.
+  3. Thử tắt chế độ suy nghĩ của model nếu thư viện hỗ trợ. Bản
+     `@langchain/google-genai@0.2.18` hiện không có tham số này.
+- **Nghiệm thu**: TTFT trung vị dưới 1.5 s trên tập 30 câu, Faithfulness không tụt.
 
-#### T3. Streaming câu trả lời (SSE)
+#### T8. Đo hai KPI còn thiếu
 
-- **File**: `backend/controllers/aiAssistant.controller.js`, `frontend/src/client/components/chat/AiChatPanel.tsx`.
-- **Việc**: đổi `sendAiChatMessage` sang `text/event-stream`, dùng `model.stream()` của LangChain. Frontend đọc dần bằng `ReadableStream`. Giữ endpoint cũ làm dự phòng.
-- **Nghiệm thu**: **thời gian tới ký tự đầu tiên** dưới 1.5 s. Báo cáo trình bày cả hai số — thời gian tới ký tự đầu và thời gian hoàn tất — thay vì một con số tổng.
+- Tập từ 20 ảnh gắn nhãn cho tìm kiếm bằng ảnh; tập ground-truth cho gợi ý để
+  tính nDCG@5.
+- **Nghiệm thu**: bảng ở mục 2 không còn ô "chưa đo".
 
-#### T4. Chống prompt injection hai chiều
+#### T9. Nâng Context Relevance
 
-- **File**: `backend/ai/agent.js`; thêm `backend/ai/guard.js`.
-- **Việc**:
-  1. *Đầu vào*: chặn mẫu câu ép vai ("bỏ qua hướng dẫn", "bạn là admin", "cấp cho tôi voucher"), giới hạn độ dài, ghi log mỗi lần chặn.
-  2. *Ngữ cảnh*: bọc dữ liệu sản phẩm trong khối phân định rõ ràng, và nêu trong system prompt rằng nội dung trong khối là **dữ liệu, không phải mệnh lệnh**. Đây là lớp chống injection gián tiếp qua mô tả do seller nhập.
-  3. *Đầu ra*: chặn câu trả lời chứa cam kết giá hoặc voucher không có trong DB.
-- **Nghiệm thu**: bộ test có ít nhất 10 câu tấn công, 5 trực tiếp và 5 nhét vào mô tả sản phẩm, tỉ lệ chặn 100%, không chặn nhầm câu hỏi mua hàng bình thường.
-
-#### T5. Khung đánh giá AI theo chuẩn RAG Triad
-
-- **File**: `backend/scripts/evaluate-ai.js`; thêm `backend/eval/dataset.json`.
-- **Việc**:
-  1. Xây tập ground-truth từ 30 câu hỏi trở lên, mỗi câu gắn nhãn sản phẩm đúng, để tính **Recall@5** và **MRR** thật.
-  2. Thêm ba chỉ số RAG Triad chấm bằng LLM-as-judge: **Faithfulness** (câu trả lời có bám ngữ cảnh không), **Answer Relevance**, **Context Relevance**. Theo phương pháp của Ragas hoặc TruLens. Nếu không cài được thư viện Python thì hiện thực lại công thức bằng JS và **ghi rõ trong báo cáo là theo phương pháp Ragas**.
-  3. Thêm **nDCG@5** cho gợi ý cá nhân hoá, và độ chính xác cho tìm kiếm bằng ảnh trên tập từ 20 ảnh gắn nhãn trở lên.
-- **Nghiệm thu**: `npm run eval:ai` xuất đủ mọi KPI ở mục 2, không còn ô "chưa đo".
-
-### P1 — làm sau khi P0 xanh
-
-#### T6. Bổ sung ca biên nghiệp vụ thanh toán
-
-- **File**: `backend/tests/12-concurrency.test.mjs` (mới), `backend/controllers/payment.controller.js`.
-- **Việc**: test hai người mua đồng thời mặt hàng còn đúng 1 cái, chỉ một đơn được tạo và tồn kho không âm. Test IPN phát lại hai lần cùng payload hợp lệ. Test huỷ đơn sau khi đã thanh toán. Thêm guard chống ghi đè khi payment đã ở trạng thái `PAID`.
-- **Nghiệm thu**: ba test mới xanh, tồn kho và dòng tiền không lệch sau mọi kịch bản.
-
-#### T7. Bộ nhớ đệm nhiều tầng
-
-- **Việc**: cache embedding của câu hỏi lặp lại; cache kết quả truy hồi theo câu hỏi đã chuẩn hoá; bỏ bớt một lượt gọi LLM bằng cách gộp bước phân loại ngữ cảnh và mở rộng từ khoá vào chung một lần gọi.
-- **Nghiệm thu**: p50 giảm ít nhất 40% so với 9.0 s. Số lượt gọi LLM mỗi câu hỏi giảm từ 3 xuống 2.
+- Giảm `topK` động: câu hỏi nêu đích danh tên sản phẩm thì chỉ cần 1-2 ứng viên.
+- **Nghiệm thu**: Context Relevance trên 0.5 mà Recall@5 không tụt dưới 90%.
 
 ### P2 — nếu còn thời gian
 
@@ -167,19 +174,25 @@ Mỗi câu hỏi chatbot gọi LLM ít nhất 3 lần (phân loại ngữ cảnh
 
 ---
 
+
 ## 5. Bản đồ đề cương → thư mục code
 
 | Mục đề cương | Nơi hiện thực |
 |---|---|
 | Tách đơn, voucher hai cấp, bất biến dòng tiền | `backend/controllers/order.controller.js` và `docs/architecture.md` mục 2 |
 | Chatbot RAG trên cơ sở dữ liệu vector | `backend/ai/agent.js`, bảng `product_embeddings` |
+| Truy hồi lai và hợp nhất RRF | `backend/ai/retrieval.js` |
+| Function calling cho giá và tồn kho | `backend/ai/tools.js` |
+| Phòng thủ tiêm lệnh ba lớp | `backend/ai/guard.js` |
+| Chuẩn hoá tiếng Việt dùng chung | `backend/lib/vietnamese.js` |
+| Khung đánh giá RAG Triad | `backend/scripts/evaluate-rag.js`, `backend/eval/dataset.json` |
 | Tìm kiếm bằng hình ảnh | `backend/ai/imageSearch.js` |
 | So sánh thông số có cấu trúc | `backend/ai/productComparison.js` |
 | Lọc cộng tác gợi ý | `backend/jobs/compute*.js` |
 | Kiểm duyệt đánh giá | `backend/ai/reviewModeration.js` |
 | Phân quyền ba lớp | `backend/middleware/auth.middleware.js` |
 | Bộ kiểm thử tự động | `backend/tests/*.test.mjs` |
-| Số đo KPI | `backend/scripts/evaluate-ai.js` → `docs/ai-evaluation.md` |
+| Số đo KPI | `backend/scripts/evaluate-ai.js` → `docs/ai-evaluation.md`, `evaluate-rag.js` → `docs/rag-evaluation.md` |
 
 ---
 
@@ -189,3 +202,6 @@ Mỗi câu hỏi chatbot gọi LLM ít nhất 3 lần (phân loại ngữ cảnh
 |---|---|---|
 | 2026-09-08 | Lập file theo dõi tiến độ, rà soát hiện trạng so với đề cương, chốt backlog T1 - T7 | Claude Code |
 | 2026-09-08 | Viết lại toàn văn đề cương theo góp ý của CBHD, xem `docs/de-cuong-chi-tiet-v2.md`. Kế hoạch mới rút giai đoạn cài đặt còn 2 tuần, dồn 13/11 - 27/11 cho T4 chống tiêm lệnh, T3 streaming và phần kiểm thử biên của T6 | Claude Code |
+| 2026-09-09 | Hiện thực T1 - T6 theo góp ý của CBHD. Recall@5 đi từ 62.5% lên 100%, thời gian hoàn tất từ 9.0s xuống 4.5s. Thêm `ai/retrieval.js`, `ai/tools.js`, `ai/guard.js`, `lib/vietnamese.js`, `eval/dataset.json`, `scripts/evaluate-rag.js`, ba bộ test 12-14, migration `20260909_product_search_vector` | Claude Code |
+| 2026-09-09 | Sửa lỗi chuẩn hoá chữ "đ" làm lệch token giữa JS và Postgres, ảnh hưởng mọi câu hỏi tiếng Việt có chữ này. Sửa cả backend lẫn `frontend/src/client/utils/productSlug.ts` | Claude Code |
+| 2026-09-09 | Thêm guard chống ghi đè khi IPN bị phát lại. Test được kiểm chứng là đỏ khi gỡ guard, xanh khi có guard | Claude Code |

@@ -116,34 +116,100 @@ cua ho bi huy — thay vi ca hai cung di lot.
 
 ---
 
-## 3. Luong AI: chatbot tu van (RAG)
+## 3. Luong AI: tro ly ao (truy hoi lai + goi cong cu + phong thu tiem lenh)
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor B as Nguoi mua
   participant API as /api/ai-assistant
+  participant G as ai/guard.js
+  participant R as ai/retrieval.js
+  participant PG as Postgres
   participant EMB as Gemini Embedding
-  participant PG as pgvector
   participant LLM as Gemini Chat
+  participant T as ai/tools.js
 
   B->>API: cau hoi tieng Viet
-  API->>API: lay 6 luot chat gan nhat lam ngu canh
-  API->>EMB: nhung cau hoi thanh vector
-  EMB-->>API: vector 768 chieu
-  API->>PG: tim top-K san pham gan nhat<br/>(chi shop dang active)
-  PG-->>API: danh sach san pham + mo ta
-  API->>LLM: prompt he thong + ngu canh + lich su + cau hoi
-  LLM-->>API: cau tra loi kem URL san pham
-  API-->>B: hien thi kem card san pham
+  API->>G: lop 1 - soi dau vao
+  alt phat hien tiem lenh
+    G-->>B: tu choi ngay, ghi audit log, khong ton mot luot goi model nao
+  else hop le
+    API->>R: truy hoi lai
+    par ba nhanh chay song song
+      R->>PG: full-text, xep hang bang ts_rank
+    and
+      R->>PG: trigram, word_similarity (chiu loi chinh ta)
+    and
+      R->>EMB: nhung cau hoi thanh vector
+      EMB-->>R: vector
+      R->>PG: tuong dong vector (pgvector)
+    end
+    R->>R: hop nhat ba bang xep hang bang RRF
+    R-->>API: top-K kem gia va ton kho tai thoi diem hoi
+    API->>G: lop 2 - vo hieu hoa cau lenh nam trong mo ta nguoi ban
+    G-->>API: khoi du lieu boc trong nonce ngau nhien
+    API->>LLM: system prompt + khoi du lieu + lich su hoi thoai
+    opt khoi du lieu khong du
+      LLM->>T: goi cong cu (lookup_product / check_stock / get_shop_policy)
+      T->>PG: doc truc tiep
+      T-->>LLM: so lieu tai dung thoi diem tra loi
+    end
+    LLM-->>API: tra loi theo luong
+    API->>G: lop 3 - soi dau ra
+    API-->>B: day tung mau chu qua SSE, kem su kien replace neu bi chan
+  end
 ```
 
-Truy hoi chay song song hai duong: **tu khoa** (LIKE, tham so hoa) va **vector**
-(pgvector), roi hop nhat va xep hang. Neu chua co embedding thi he thong tu dong
-lui ve tim theo tu khoa — chay duoc nhung chat luong giam ro, va **khong bao loi**,
-nen `npm run test:demo` co han mot phep kiem tra bang `product_embeddings`.
+### Vi sao hop nhat bang RRF chu khong cong diem
+
+Ba nhanh tra ve ba thang do khac nhau: `ts_rank` la so thuc khong chan tren,
+`word_similarity` nam trong khoang 0-1, con vector tra ve *khoang cach* (cang
+nho cang tot). Cong thang ba so nay lai la so sanh khap khieng. Reciprocal Rank
+Fusion chi dung **thu hang**:
+
+```
+score(d) = tong cua  weight_i / (k + rank_i(d)),   k = 60
+```
+
+Nho vay khong can chuan hoa thang do, va tai lieu duoc nhieu nhanh cung tim
+thay se tu dong len tren. Nhanh trigram mang trong so 0.5 vi no la luoi an toan
+cho loi go phim, nhieu hon hai nhanh kia.
+
+Phan cong vai tro giua hai tang:
+
+| Tang | Nhiem vu | Khong lam gi |
+|---|---|---|
+| Truy hoi lai | TIM ung vien phu hop voi cau hoi | Khong phai nguon so lieu |
+| Cong cu / khoi du lieu | Cung cap SO LIEU tai thoi diem tra loi | Khong quyet dinh san pham nao lien quan |
+
+Day la diem mau chot voi du lieu thuong mai dien tu: gia va ton kho doi lien
+tuc, trong khi vector nhung chi duoc sinh lai theo chu ky. Neu de mo hinh doc
+gia tu noi dung da nhung thi cau tra loi la anh chup cua qua khu.
+
+### Ba lop phong thu tiem lenh
+
+San da gian hang co mot be mat tan cong ma cua hang mot chu khong co: **mo ta
+san pham do nguoi ban tu nhap duoc nap thang vao ngu canh cua phien chat cua
+nguoi mua khac**. Vi vay phong thu khong the chi loc dau vao.
+
+| Lop | Cho | Chan gi |
+|---|---|---|
+| 1. Dau vao | truoc khi goi model | ep vai, doi voucher, moi lo system prompt, payload qua dai |
+| 2. Ngu canh | khi dung khoi du lieu | cau lenh giau trong mo ta nguoi ban; boc trong nonce de khong the dong khoi som |
+| 3. Dau ra | truoc khi tra ve | tu hua gia rieng, tu cap ma giam gia khong co trong DB, lo nonce |
+
+Lop 1 dang gia nhat ve mat chi phi: chan tai cho, khong ton luot goi model nao.
+Moi lan chan deu ghi `AI_GUARD_BLOCK` vao nhat ky thao tac, vua de quan tri vien
+xem duoc, vua la nguon so lieu cho chi tieu ti le chan tan cong.
+
+Danh doi cua streaming: lop 3 chi chay duoc khi da co tron cau tra loi, luc do
+nguoi dung da doc duoc vai dong. Vi vay endpoint SSE phat them su kien
+`replace` de client thay toan bo noi dung; ban ghi luu vao co so du lieu luon la
+ban da qua kiem tra.
 
 ---
+
 
 ## 4. Luong thanh toan MoMo va xac thuc callback
 
