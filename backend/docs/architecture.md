@@ -65,8 +65,8 @@ o day (xem muc 4).
 flowchart LR
   R["routes/<br/>khai bao duong dan<br/>gan middleware"]
   C["controllers/<br/>bo chuyen doi HTTP<br/>doc req, tra res"]
-  S["services/<br/>quy tac nghiep vu<br/>khong biet req/res"]
-  L["lib/<br/>ha tang dung chung<br/>db · pagination · vietnamese"]
+  S["services/<br/>quy tac nghiep vu<br/>pricing · loyalty · audit<br/>filterSync · productFilter"]
+  L["lib/<br/>ha tang dung chung<br/>db · pagination · vietnamese<br/>productSearch · productQuery"]
   D[("PostgreSQL")]
 
   R --> C --> S --> D
@@ -95,6 +95,22 @@ lien quan gi den viec no can lam.
 | `controllers/` | service, lib, prisma | controller khac |
 | `services/` | lib, prisma, service khac | req, res, ma trang thai HTTP |
 | `lib/` | khong gi trong hai tang tren | controller, service |
+
+### Hai thu bi dat nham tang
+
+Ngoai huong phu thuoc, con hai cho bi dat sai cho ma chi lo ra khi doc lai ca cay thu muc:
+
+- **Kha nang tim kiem nam trong `ai/`.** Full-text, trigram va phep hop nhat RRF
+  duoc viet trong `ai/retrieval.js` vi chatbot can chung truoc. Nhung chung khong
+  co gi rieng cua AI ca - do la kha nang tim kiem cua chinh catalog. Hau qua rat cu
+  the: o tim kiem cua nguoi dung, thu can chiu loi go phim nhat, van ket o `contains`
+  va tra ve rong khi go "iphon", trong khi chatbot ngay ben canh da co day du cong cu.
+  Chuyen sang `lib/productSearch.js` thi ca hai cung dung mot duong.
+- **Xu ly loi lap 147 lan.** `asyncHandler` va `AppError` da duoc viet san trong
+  `middleware/error.middleware.js` nhung khong noi nao dung, con moi handler thi tu
+  viet mot khoi `try/catch` chi de log roi tra 500. Ha tang co san ma khong ai dung
+  la ha tang chet. Da boc 129 handler bang `asyncHandler`; loi bay gio di ve mot cho,
+  va ma loi cua Prisma duoc anh xa sang status co nghia thay vi 500 cho tat ca.
 
 `services/pricing.service.js` la vi du ro nhat cho cot cuoi: khi voucher khong
 hop le, no tra ve `{ ok: false, code: "COUPON_EXPIRED" }` chu khong tra

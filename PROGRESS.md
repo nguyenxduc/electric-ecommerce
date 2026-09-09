@@ -12,7 +12,7 @@
 - Database dev chạy ở **port 55432** (không phải 5432) vì máy dev đã có PostgreSQL 18 chiếm 5432. Xem `README.md` mục 1.
 - Sau khi seed lại: dùng `npm run seed:full` (seed + sinh embedding). Nếu chỉ chạy `npm run seed`, bảng `product_embeddings` rỗng và chatbot RAG **âm thầm** tụt về tìm theo từ khoá — mọi số đo AI sẽ sai.
 - **Quy tắc phân tầng**: route → controller → service → dữ liệu, một chiều. Controller **không được import controller khác**; service **không được biết `req`/`res`**. Xem `backend/docs/architecture.md` mục 1.
-- Trước khi commit: `cd backend && npm test` (15 bộ test + `demo-readiness`, 123 ca). Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
+- Trước khi commit: `cd backend && npm test` (15 bộ test + `demo-readiness`, 123 ca). Test HTTP cần server đang chạy: mở một terminal khác chạy `node server.js` trước. Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
 - Đo lại AI: `npm run eval:ai` → `backend/docs/ai-evaluation.md`.
 - Đo truy hồi và RAG Triad: `npm run eval:rag` → `backend/docs/rag-evaluation.md`. Thêm `-- --quick` để chạy nhanh. Bản miễn phí của Gemini giới hạn 15 lượt/phút nên script tự giãn nhịp, chạy đầy đủ mất khoảng 4 phút.
 - Chuẩn hoá tiếng Việt: dùng `lib/vietnamese.js`, **đừng tự viết lại** `normalize("NFD")` vì chữ "đ" không tách được bằng cách đó.
@@ -104,7 +104,7 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 |---|---|---|---|
 | G1 | Chatbot không có giá / tồn kho thời gian thực | Giá và tồn kho nạp sẵn vào ngữ cảnh từ chính truy vấn truy hồi, cộng ba công cụ `lookup_product`, `check_stock`, `get_shop_policy` cho phần ngữ cảnh không có. Dùng chung `calculateProductPrices` với API sản phẩm | `ai/tools.js`, Faithfulness 0.875 |
 | G2 | Hybrid search thô, cộng điểm thủ công | Ba nhánh full-text `ts_rank`, trigram `word_similarity`, vector pgvector; hợp nhất bằng Reciprocal Rank Fusion | `ai/retrieval.js`, `tests/13-retrieval`, Recall@5 100% |
-| G3 | Tìm kiếm không chịu lỗi chính tả | Nhánh trigram dùng `word_similarity` thay vì `similarity`: tên sản phẩm dài làm `similarity` tụt dưới ngưỡng | `tests/13`: "iphon", "macbok pro", "samsng galaxy tab" |
+| G3 | Tìm kiếm không chịu lỗi chính tả | Nhánh trigram dùng `word_similarity` thay vì `similarity`. **Ngày 09/09 mới chỉ sửa đường của chatbot**; ô tìm kiếm sản phẩm vẫn kẹt ở `contains` cho tới khi chuyển khả năng tìm kiếm sang `lib/productSearch.js` để cả hai dùng chung | `tests/13`; kiểm tra thực tế: `iphon`, `macbok pro`, `dell xsp 15`, `playstaton` đều ra đúng sản phẩm ở vị trí đầu |
 | G4 | Không có phòng thủ tiêm lệnh | Ba lớp: đầu vào, ngữ cảnh (nonce + vô hiệu hoá câu lệnh trong mô tả người bán), đầu ra | `ai/guard.js`, `tests/12-ai-guard` 15/15 |
 | G5 | Không có streaming | Endpoint SSE `POST /:chatId/messages/stream`, endpoint cũ giữ làm dự phòng | `controllers/aiAssistant.controller.js` |
 | G6 | Khung đánh giá chưa chuẩn hoá | Tập gắn nhãn 30 câu, Recall@5 và MRR đo khách quan, RAG Triad chấm theo phương pháp Ragas | `eval/dataset.json`, `npm run eval:rag` |
@@ -186,6 +186,10 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 | Tích điểm, hạng thành viên, voucher thăng hạng | `backend/services/loyalty.service.js` |
 | Ghi nhật ký thao tác | `backend/services/audit.service.js` |
 | Phân trang và chặn trên `limit` | `backend/lib/pagination.js` |
+| Tìm kiếm sản phẩm (full-text, trigram, RRF) | `backend/lib/productSearch.js` |
+| Đồng bộ bộ lọc từ thông số sản phẩm | `backend/services/filterSync.service.js` |
+| Giải bộ lọc động ra danh sách sản phẩm | `backend/services/productFilter.service.js` |
+| Xử lý lỗi tập trung, ánh xạ mã lỗi Prisma | `backend/middleware/error.middleware.js` |
 | Truy hồi lai và hợp nhất RRF | `backend/ai/retrieval.js` |
 | Function calling cho giá và tồn kho | `backend/ai/tools.js` |
 | Phòng thủ tiêm lệnh ba lớp | `backend/ai/guard.js` |
@@ -212,3 +216,6 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 | 2026-09-09 | Thêm guard chống ghi đè khi IPN bị phát lại. Test được kiểm chứng là đỏ khi gỡ guard, xanh khi có guard | Claude Code |
 | 2026-09-09 | Dọn kiến trúc: lập tầng `services/`, gỡ 8 chỗ controller import controller. Tách quy tắc tính tiền khỏi `createOrder` thành `pricing.service.js`, nhờ đó bất biến dòng tiền kiểm thử được bằng 1100 giỏ hàng ngẫu nhiên trong 5ms thay vì phải đặt đơn thật qua HTTP | Claude Code |
 | 2026-09-09 | 12/14 endpoint danh sách vốn bỏ qua `lib/pagination.js` và tự tính phân trang, nên `?limit=999999` kéo được cả bảng. Bổ sung `take` và `clampLimit` vào helper rồi đưa toàn bộ về dùng chung | Claude Code |
+| 2026-09-09 | Bọc 129 handler bằng `asyncHandler`, gỡ 129 khối `try/catch` chỉ để log rồi trả 500. Hạ tầng xử lý lỗi đã viết sẵn từ trước nhưng chưa nơi nào dùng. Lỗi Prisma giờ được ánh xạ sang status có nghĩa thay vì 500 cho tất cả | Claude Code |
+| 2026-09-09 | Chuyển khả năng tìm kiếm từ `ai/retrieval.js` sang `lib/productSearch.js`. Nhờ đó ô tìm kiếm sản phẩm dùng chung full-text + trigram với chatbot, đóng nốt phần còn lại của G3. Thêm `fetchRankedProducts` vì `where id in [...]` làm mất thứ hạng RRF | Claude Code |
+| 2026-09-09 | Tách `syncFilterOptionsFromProducts` (179 dòng) và bộ giải bộ lọc động (186 dòng) ra khỏi controller thành `services/filterSync.service.js` và `services/productFilter.service.js` | Claude Code |
