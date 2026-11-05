@@ -58,38 +58,41 @@ model SubCategory {
 }
 
 model Product {
-  id              BigInt    @id @default(autoincrement())
+  id              BigInt                   @id @default(autoincrement())
   name            String
-  price           Decimal   @db.Decimal(10, 2)
-  discount        Decimal   @default(0.0) @db.Decimal(10, 2)
-  quantity        Int       @default(0) // total stock (optional aggregate)
-  sold            Int       @default(0)
-  img             String[]  @db.Text
-  specs           Json      @default("[]")
-  specs_detail    Json      @default("[]")
-  color           Json      @default("[]") // legacy color list
+  price           Decimal                  @db.Decimal(10, 2)
+  discount        Decimal                  @default(0.0) @db.Decimal(10, 2)
+  quantity        Int                      @default(0) // total stock (optional aggregate)
+  sold            Int                      @default(0)
+  img             String[]                 @db.Text
+  specs           Json                     @default("[]")
+  specs_detail    Json                     @default("[]")
+  color           Json                     @default("[]") // legacy color list
   product_colors  ProductColor[]
   shop_id         BigInt
   category_id     BigInt
   sub_category_id BigInt?
-  rating          Decimal?  @db.Decimal(3, 2)
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  rating          Decimal?                 @db.Decimal(3, 2)
+  created_at      DateTime                 @default(now())
+  updated_at      DateTime                 @updatedAt
   deleted_at      DateTime?
   description     String?
+  // Khoi luong mot don vi, dung de bao gia van chuyen theo can nang.
+  weight_grams    Int                      @default(500)
   // Cột full-text do trigger trong DB tự cập nhật, Prisma không ghi vào cột này.
   // Xem prisma/migrations/20260909_product_search_vector.
   search_vector   Unsupported("tsvector")?
   // relations
-  shop         Shop         @relation(fields: [shop_id], references: [id])
-  category     Category     @relation(fields: [category_id], references: [id])
-  sub_category SubCategory? @relation(fields: [sub_category_id], references: [id])
-  reviews      Review[]
-  order_items  OrderItem[]
-  cart_items   CartItem[]
-  wishlists    Wishlist[]
-  embedding    ProductEmbedding? @relation("ProductEmbedding")
-  filter_values ProductFilterValue[]
+  shop            Shop                     @relation(fields: [shop_id], references: [id])
+  category        Category                 @relation(fields: [category_id], references: [id])
+  sub_category    SubCategory?             @relation(fields: [sub_category_id], references: [id])
+  reviews         Review[]
+  order_items     OrderItem[]
+  cart_items      CartItem[]
+  wishlists       Wishlist[]
+  embedding       ProductEmbedding?        @relation("ProductEmbedding")
+  filter_values   ProductFilterValue[]
+  variants        ProductVariant[]
 
   @@index([name])
   @@index([shop_id])
@@ -102,23 +105,34 @@ model Product {
 
 // A seller's storefront within the marketplace. One shop per user.
 model Shop {
-  id                BigInt    @id @default(autoincrement())
-  owner_id          BigInt    @unique
-  name              String
-  slug              String    @unique
-  description       String?
-  logo_url          String?
-  banner_url        String?
-  status            String    @default("pending") // pending | active | rejected | suspended
-  rejection_reason  String?
-  contact_email     String?
-  contact_phone     String?
-  address           String?
+  id               BigInt  @id @default(autoincrement())
+  owner_id         BigInt  @unique
+  name             String
+  slug             String  @unique
+  description      String?
+  logo_url         String?
+  banner_url       String?
+  status           String  @default("pending") // pending | active | rejected | suspended
+  rejection_reason String?
+  contact_email    String?
+  contact_phone    String?
+  address          String?
 
   // Per-shop shipping overrides. Read by cart.controller.js and
   // order.controller.js; null falls back to the platform-wide Setting.
   shipping_fee_override            Decimal? @db.Decimal(10, 2)
   free_shipping_threshold_override Decimal? @db.Decimal(10, 2)
+
+  // Dia chi lay hang cho don vi van chuyen.
+  pickup_province String?
+  pickup_district String?
+  pickup_ward     String?
+  pickup_address  String?
+
+  // Thue: household = ho kinh doanh/ca nhan, san khau tru thue thay
+  // (ND 117/2025); company = doanh nghiep tu ke khai, khong khau tru.
+  tax_code        String?
+  tax_entity_type String  @default("household")
 
   approved_at DateTime?
   approved_by BigInt?
@@ -127,12 +141,14 @@ model Shop {
   deleted_at  DateTime?
 
   // relations
-  owner           User            @relation("ShopOwner", fields: [owner_id], references: [id])
-  products        Product[]
-  orders          Order[]
-  coupons         Coupon[]
-  chats           Chat[]
-  return_requests ReturnRequest[]
+  owner            User             @relation("ShopOwner", fields: [owner_id], references: [id])
+  products         Product[]
+  orders           Order[]
+  coupons          Coupon[]
+  chats            Chat[]
+  return_requests  ReturnRequest[]
+  invoices         Invoice[]
+  tax_withholdings TaxWithholding[]
 
   @@index([status])
   @@index([slug])
@@ -140,10 +156,10 @@ model Shop {
 }
 
 model ProductEmbedding {
-  product_id BigInt   @id
+  product_id BigInt                @id
   content    String?
   embedding  Unsupported("vector")
-  updated_at DateTime @default(now())
+  updated_at DateTime              @default(now())
 
   product Product @relation("ProductEmbedding", fields: [product_id], references: [id])
 
@@ -152,19 +168,42 @@ model ProductEmbedding {
 
 // Per-color inventory for a product
 model ProductColor {
-  id          BigInt   @id @default(autoincrement())
-  product_id  BigInt
-  name        String?
-  code        String?
-  quantity    Int      @default(0)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  deleted_at  DateTime?
+  id         BigInt    @id @default(autoincrement())
+  product_id BigInt
+  name       String?
+  code       String?
+  quantity   Int       @default(0)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
 
   product Product @relation(fields: [product_id], references: [id])
 
   @@unique([product_id, code])
   @@map("product_colors")
+}
+
+// Bien the ban duoc (SKU): mot to hop thuoc tinh (mau, dung luong...) co ton
+// kho va chenh lech gia rieng. San pham co bien the thi mua phai chon bien the;
+// san pham khong co bien the van di luong mau/ton tong cu.
+model ProductVariant {
+  id          BigInt    @id @default(autoincrement())
+  product_id  BigInt
+  sku         String    @unique
+  name        String
+  attributes  Json      @default("{}")
+  price_delta Decimal   @default(0.0) @db.Decimal(10, 2)
+  quantity    Int       @default(0)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  deleted_at  DateTime?
+
+  product     Product     @relation(fields: [product_id], references: [id])
+  cart_items  CartItem[]
+  order_items OrderItem[]
+
+  @@index([product_id])
+  @@map("product_variants")
 }
 
 model ProductSpec {
@@ -179,25 +218,27 @@ model ProductSpec {
 }
 
 model User {
-  id              BigInt    @id @default(autoincrement())
-  name            String?
-  email           String?   @unique
-  password_digest String?
-  email_verified  Boolean   @default(false)
-  verification_code String?
+  id                      BigInt    @id @default(autoincrement())
+  name                    String?
+  email                   String?   @unique
+  password_digest         String?
+  email_verified          Boolean   @default(false)
+  verification_code       String?
   verification_expires_at DateTime?
-  reset_code      String?
-  reset_expires_at DateTime?
-  role            String?   @default("user")
-  phone           String?
-  address         String?
-  avatar          String?
+  reset_code              String?
+  reset_expires_at        DateTime?
+  role                    String?   @default("user")
+  phone                   String?
+  // Dat khi xac thuc OTP; mot so da xac thuc chi thuoc mot tai khoan.
+  phone_verified_at       DateTime?
+  address                 String?
+  avatar                  String?
   // Loyalty & segmentation
-  loyalty_points  Int       @default(0)
-  segment         String?   // e.g. BRONZE, SILVER, GOLD, PLATINUM
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-  deleted_at      DateTime?
+  loyalty_points          Int       @default(0)
+  segment                 String? // e.g. BRONZE, SILVER, GOLD, PLATINUM
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+  deleted_at              DateTime?
 
   // relations
   orders          Order[]
@@ -218,9 +259,9 @@ model User {
 model LoyaltyPointTransaction {
   id          BigInt   @id @default(autoincrement())
   user_id     BigInt
-  order_id    BigInt?  // nếu điểm đến từ đơn hàng
-  points      Int      // dương = cộng điểm, âm = trừ điểm
-  type        String   // EARN | REDEEM | ADJUST
+  order_id    BigInt? // nếu điểm đến từ đơn hàng
+  points      Int // dương = cộng điểm, âm = trừ điểm
+  type        String // EARN | REDEEM | ADJUST
   description String?
   created_at  DateTime @default(now())
 
@@ -249,13 +290,15 @@ model CartItem {
   product_id BigInt
   quantity   Int       @default(1)
   color      Json
+  variant_id BigInt?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
 
   // relations
-  cart    Cart    @relation(fields: [cart_id], references: [id])
-  product Product @relation(fields: [product_id], references: [id])
+  cart    Cart            @relation(fields: [cart_id], references: [id])
+  product Product         @relation(fields: [product_id], references: [id])
+  variant ProductVariant? @relation(fields: [variant_id], references: [id])
 
   @@map("cart_items")
 }
@@ -277,6 +320,12 @@ model OrderGroup {
   shipping_address Json?
   receiver_name    String?
   receiver_phone   String?
+  // Yeu cau xuat hoa don cong ty: { company_name, tax_code, address, email }
+  invoice_request  Json?
+  // Dau vet chong gian lan (khong phai dinh danh tuyet doi, chi de doi chieu).
+  client_ip        String?
+  device_id        String?
+  risk_score       Int       @default(0)
   created_at       DateTime  @default(now())
   updated_at       DateTime  @updatedAt
   deleted_at       DateTime?
@@ -312,14 +361,18 @@ model Order {
   deleted_at       DateTime?
 
   // relations
-  user           User           @relation(fields: [user_id], references: [id])
-  shop           Shop           @relation(fields: [shop_id], references: [id])
-  order_group    OrderGroup     @relation(fields: [order_group_id], references: [id])
-  order_items    OrderItem[]
-  coupon         Coupon?        @relation(fields: [coupon_id], references: [id])
-  return_request ReturnRequest?
+  user            User            @relation(fields: [user_id], references: [id])
+  shop            Shop            @relation(fields: [shop_id], references: [id])
+  order_group     OrderGroup      @relation(fields: [order_group_id], references: [id])
+  order_items     OrderItem[]
+  coupon          Coupon?         @relation(fields: [coupon_id], references: [id])
+  return_request  ReturnRequest?
+  shipment        Shipment?
+  invoice         Invoice?
+  tax_withholding TaxWithholding?
 
   @@index([shop_id])
+  @@index([status, created_at])
   @@index([order_group_id])
   @@map("orders")
 }
@@ -327,15 +380,15 @@ model Order {
 // Buyer-initiated return/refund request for a delivered shop-order.
 // One request per order; seller (or admin) approves/rejects.
 model ReturnRequest {
-  id              BigInt    @id @default(autoincrement())
-  order_id        BigInt    @unique
+  id              BigInt   @id @default(autoincrement())
+  order_id        BigInt   @unique
   user_id         BigInt
   shop_id         BigInt
   reason          String
-  status          String    @default("pending") // pending | approved | rejected
+  status          String   @default("pending") // pending | approved | rejected
   resolution_note String?
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
 
   // relations
   order Order @relation(fields: [order_id], references: [id])
@@ -349,14 +402,14 @@ model ReturnRequest {
 
 // Thông báo hệ thống gửi cho người dùng
 model Notification {
-  id          BigInt   @id @default(autoincrement())
-  user_id     BigInt?  // null = broadcast
-  title       String
-  message     String
-  type        String?  // ORDER, PROMO, SYSTEM...
-  is_read     Boolean  @default(false)
-  created_at  DateTime @default(now())
-  read_at     DateTime?
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt? // null = broadcast
+  title      String
+  message    String
+  type       String? // ORDER, PROMO, SYSTEM...
+  is_read    Boolean   @default(false)
+  created_at DateTime  @default(now())
+  read_at    DateTime?
 
   @@index([user_id, created_at])
   @@index([is_read, created_at])
@@ -364,15 +417,15 @@ model Notification {
 }
 
 model AuditLog {
-  id         BigInt   @id @default(autoincrement())
-  user_id    BigInt?
-  action     String   // ví dụ: LOGIN, ORDER_STATUS_UPDATE, PRODUCT_CREATE...
-  resource   String?  // e.g. "order", "product", "user"
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt?
+  action      String // ví dụ: LOGIN, ORDER_STATUS_UPDATE, PRODUCT_CREATE...
+  resource    String? // e.g. "order", "product", "user"
   resource_id BigInt?
-  ip         String?
-  user_agent String?
-  metadata   Json?    @default("{}")
-  created_at DateTime @default(now())
+  ip          String?
+  user_agent  String?
+  metadata    Json?    @default("{}")
+  created_at  DateTime @default(now())
 
   @@index([user_id, created_at])
   @@index([resource, resource_id])
@@ -388,13 +441,15 @@ model OrderItem {
   unit_price  Decimal?  @db.Decimal(10, 2)
   total_price Decimal?  @db.Decimal(10, 2)
   color       String?
+  variant_id  BigInt?
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
   deleted_at  DateTime?
 
   // relations
-  order   Order   @relation(fields: [order_id], references: [id])
-  product Product @relation(fields: [product_id], references: [id])
+  order   Order           @relation(fields: [order_id], references: [id])
+  product Product         @relation(fields: [product_id], references: [id])
+  variant ProductVariant? @relation(fields: [variant_id], references: [id])
 
   @@map("order_items")
 }
@@ -405,6 +460,8 @@ model Review {
   product_id BigInt
   rating     Int?
   comment    String?
+  client_ip  String?
+  device_id  String?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   deleted_at DateTime?
@@ -451,7 +508,7 @@ model Coupon {
   shop         Shop?        @relation(fields: [shop_id], references: [id])
   orders       Order[]
   order_groups OrderGroup[]
-  users        User[]  @relation("UserCoupons")
+  users        User[]       @relation("UserCoupons")
 
   @@index([shop_id])
   @@map("coupons")
@@ -470,7 +527,7 @@ model FilterKey {
   deleted_at  DateTime?
 
   // relations
-  filter_options FilterOption[]
+  filter_options        FilterOption[]
   product_filter_values ProductFilterValue[]
 
   @@index([key])
@@ -491,8 +548,8 @@ model FilterOption {
   deleted_at    DateTime?
 
   // relations
-  filter_key FilterKey  @relation(fields: [filter_key_id], references: [id])
-  category   Category? @relation(fields: [category_id], references: [id])
+  filter_key            FilterKey            @relation(fields: [filter_key_id], references: [id])
+  category              Category?            @relation(fields: [category_id], references: [id])
   product_filter_values ProductFilterValue[]
 
   // Postgres treats every NULL as distinct, so this alone doesn't dedupe
@@ -596,14 +653,14 @@ model Message {
 }
 
 model AiChat {
-  id         BigInt     @id @default(autoincrement())
+  id         BigInt   @id @default(autoincrement())
   user_id    BigInt
   title      String?
-  thread_key String     @unique
-  created_at DateTime   @default(now())
-  updated_at DateTime   @updatedAt
+  thread_key String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  user     User       @relation(fields: [user_id], references: [id])
+  user     User        @relation(fields: [user_id], references: [id])
   messages AiMessage[]
 
   @@index([user_id])
@@ -630,7 +687,7 @@ model AiFeedback {
   id            BigInt   @id @default(autoincrement())
   ai_message_id BigInt
   user_id       BigInt
-  rating        Int      // 1-5
+  rating        Int // 1-5
   comment       String?
   created_at    DateTime @default(now())
 
@@ -645,9 +702,9 @@ model AiFeedback {
 model UserBehavior {
   id         BigInt   @id @default(autoincrement())
   user_id    BigInt?
-  session_id String?  // cho user chưa đăng nhập
+  session_id String? // cho user chưa đăng nhập
   product_id BigInt?
-  event_type String   // view | click | add_to_cart | purchase ...
+  event_type String // view | click | add_to_cart | purchase ...
   event_time DateTime @default(now())
   metadata   Json?    @default("{}")
 
@@ -692,12 +749,12 @@ model ProductSimilarity {
 
 // Log kết quả gợi ý đã được precompute để API trả nhanh.
 model RecommendationLog {
-  id         BigInt   @id @default(autoincrement())
-  user_id    BigInt?
-  session_id String?
-  strategy   String   // e.g. "personalized_cf", "cold_start_best_seller"
+  id          BigInt   @id @default(autoincrement())
+  user_id     BigInt?
+  session_id  String?
+  strategy    String // e.g. "personalized_cf", "cold_start_best_seller"
   product_ids BigInt[]
-  created_at DateTime @default(now())
+  created_at  DateTime @default(now())
 
   @@index([user_id, created_at])
   @@index([session_id, created_at])
@@ -706,19 +763,176 @@ model RecommendationLog {
 }
 
 model ProductFilterValue {
-  id          BigInt  @id @default(autoincrement())
-  product_id  BigInt
+  id            BigInt  @id @default(autoincrement())
+  product_id    BigInt
   filter_key_id BigInt
-  option_id   BigInt?
+  option_id     BigInt?
 
-  raw_value   String?  
-  created_at  DateTime @default(now())
+  raw_value  String?
+  created_at DateTime @default(now())
 
-  product     Product     @relation(fields: [product_id], references: [id])
-  filter_key  FilterKey   @relation(fields: [filter_key_id], references: [id])
-  option      FilterOption? @relation(fields: [option_id], references: [id])
+  product    Product       @relation(fields: [product_id], references: [id])
+  filter_key FilterKey     @relation(fields: [filter_key_id], references: [id])
+  option     FilterOption? @relation(fields: [option_id], references: [id])
 
+  @@unique([product_id, filter_key_id])
   @@index([product_id])
   @@index([filter_key_id])
-  @@unique([product_id, filter_key_id])
+}
+
+// ---------------------------------------------------------------------------
+// Van chuyen + COD
+// ---------------------------------------------------------------------------
+
+// Mot van don cho mot don con (mot shop). Tien te cua fee/cod_amount la VND
+// vi day la so lieu cua don vi van chuyen, khong phai gia ban (USD).
+model Shipment {
+  id                BigInt    @id @default(autoincrement())
+  order_id          BigInt    @unique
+  carrier           String // mock | ghn | ghtk
+  tracking_code     String?   @unique
+  status            String    @default("created") // created | picking | in_transit | delivered | returned | cancelled | failed
+  fee_vnd           Int       @default(0)
+  cod_amount_vnd    Int       @default(0)
+  weight_grams      Int       @default(0)
+  label_url         String?
+  raw               Json?     @default("{}")
+  cod_collected_at  DateTime?
+  cod_settlement_id BigInt?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  order          Order           @relation(fields: [order_id], references: [id])
+  events         ShipmentEvent[]
+  cod_settlement CodSettlement?  @relation(fields: [cod_settlement_id], references: [id])
+
+  @@index([status, updated_at])
+  @@index([carrier, cod_collected_at])
+  @@map("shipments")
+}
+
+model ShipmentEvent {
+  id          BigInt   @id @default(autoincrement())
+  shipment_id BigInt
+  status      String
+  description String?
+  occurred_at DateTime @default(now())
+  raw         Json?    @default("{}")
+  created_at  DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipment_id], references: [id], onDelete: Cascade)
+
+  @@index([shipment_id, occurred_at])
+  @@map("shipment_events")
+}
+
+// Mot dot doi soat COD voi don vi van chuyen: tien hang ho thu duoc chuyen ve.
+model CodSettlement {
+  id                  BigInt   @id @default(autoincrement())
+  carrier             String
+  reference           String? // ma bang ke cua don vi van chuyen
+  expected_amount_vnd Int
+  received_amount_vnd Int
+  difference_vnd      Int
+  note                String?
+  created_by          BigInt?
+  created_at          DateTime @default(now())
+
+  shipments Shipment[]
+
+  @@index([carrier, created_at])
+  @@map("cod_settlements")
+}
+
+// ---------------------------------------------------------------------------
+// Chong gian lan
+// ---------------------------------------------------------------------------
+
+model OtpCode {
+  id          BigInt    @id @default(autoincrement())
+  user_id     BigInt
+  phone       String
+  purpose     String    @default("verify_phone")
+  code_hash   String
+  attempts    Int       @default(0)
+  expires_at  DateTime
+  consumed_at DateTime?
+  created_at  DateTime  @default(now())
+
+  @@index([phone, created_at])
+  @@index([user_id, created_at])
+  @@map("otp_codes")
+}
+
+model FraudFlag {
+  id          BigInt    @id @default(autoincrement())
+  type        String // COUPON_ABUSE | ORDER_RISK | SELF_DEALING | REVIEW_SUSPECT
+  subject     String // order_group | review | user
+  subject_id  BigInt
+  user_id     BigInt?
+  score       Int       @default(0)
+  reasons     Json      @default("[]")
+  status      String    @default("open") // open | confirmed | dismissed
+  resolved_by BigInt?
+  resolved_at DateTime?
+  created_at  DateTime  @default(now())
+
+  @@unique([type, subject, subject_id])
+  @@index([status, created_at])
+  @@index([user_id])
+  @@map("fraud_flags")
+}
+
+// ---------------------------------------------------------------------------
+// Hoa don + thue
+// ---------------------------------------------------------------------------
+
+model Invoice {
+  id             BigInt    @id @default(autoincrement())
+  order_id       BigInt    @unique
+  shop_id        BigInt
+  invoice_number String    @unique
+  series         String
+  provider       String    @default("internal")
+  provider_ref   String?
+  seller         Json // snapshot: name, tax_code, address
+  buyer          Json // snapshot: name, phone, address, company_name?, tax_code?, email?
+  items          Json // snapshot cac dong hang
+  subtotal       Decimal   @db.Decimal(12, 2) // chua VAT
+  vat_rate       Decimal   @db.Decimal(5, 4)
+  vat_amount     Decimal   @db.Decimal(12, 2)
+  total          Decimal   @db.Decimal(12, 2) // da gom VAT
+  currency       String    @default("USD")
+  status         String    @default("issued") // issued | cancelled
+  issued_at      DateTime  @default(now())
+  cancelled_at   DateTime?
+  created_at     DateTime  @default(now())
+
+  order Order @relation(fields: [order_id], references: [id])
+  shop  Shop  @relation(fields: [shop_id], references: [id])
+
+  @@index([shop_id, issued_at])
+  @@map("invoices")
+}
+
+// Thue san khau tru thay ho kinh doanh tren tung don giao thanh cong.
+model TaxWithholding {
+  id          BigInt    @id @default(autoincrement())
+  order_id    BigInt    @unique
+  shop_id     BigInt
+  period      String // YYYY-MM
+  base_amount Decimal   @db.Decimal(12, 2)
+  vat_rate    Decimal   @db.Decimal(5, 4)
+  vat_amount  Decimal   @db.Decimal(12, 2)
+  pit_rate    Decimal   @db.Decimal(5, 4)
+  pit_amount  Decimal   @db.Decimal(12, 2)
+  reversed_at DateTime?
+  created_at  DateTime  @default(now())
+
+  order Order @relation(fields: [order_id], references: [id])
+  shop  Shop  @relation(fields: [shop_id], references: [id])
+
+  @@index([shop_id, period])
+  @@index([period])
+  @@map("tax_withholdings")
 }

@@ -1,8 +1,5 @@
 import { prisma } from "../lib/db.js";
-import {
-  earnPointsForOrder,
-  revertPointsForOrder,
-} from "../services/loyalty.service.js";
+import { earnPointsForOrder } from "../services/loyalty.service.js";
 import { writeAuditLog } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { ROLES } from "../constants/roles.js";
@@ -12,10 +9,19 @@ import {
   ORDER_STATUS_FLOW,
   FINAL_ORDER_STATUSES,
   BUYER_CANCELLABLE_STATUSES,
-  PAYMENT_STATUS,
 } from "../constants/status.js";
 import { getSettingNumber } from "../lib/settings.js";
-import { restockOrderItems } from "../lib/restock.js";
+import {
+  actorFromReq,
+  cancelInTx,
+  logRefundOwed,
+  transitionOrderStatus,
+} from "../services/orderLifecycle.service.js";
+import { quoteShippingForGroups } from "../services/shipping/index.js";
+import {
+  assessCheckoutRisk,
+  recordCheckoutRisk,
+} from "../services/fraud.service.js";
 
 // Quy tac tinh tien nam o services/pricing.service.js. Controller nay chi con
 // lo phan doc du lieu, kiem tra quyen, ghi don va tra ve HTTP.
@@ -24,7 +30,6 @@ import {
   TIER_AUTO_DISCOUNT_RATE,
   getTierFromPoints,
   groupItemsByShop,
-  applyShopShipping,
   computeTierDiscount,
   resolveCouponDiscount,
   allocateMerchandise,
@@ -33,80 +38,31 @@ import {
 import { parsePagination } from "../lib/pagination.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
-// Housekeeping after a suborder is cancelled/deleted:
-// 1. Void the checkout's un-paid payments - their amount no longer matches,
-//    so the buyer must re-initiate payment (recomputed from active orders).
-// 2. When EVERY suborder of the checkout is gone, give the voucher use back.
-// 3. If the checkout was already PAID, cancelling this suborder means the
-//    buyer is now owed a partial refund. There's no refund ledger in the
-//    schema, so the caller is told to record it (as an audit log) instead of
-//    the paid/owed amounts silently diverging with no trace anywhere.
-const onSuborderCancelled = async (tx, order) => {
-  await tx.payment.updateMany({
-    where: { order_group_id: order.order_group_id, status: PAYMENT_STATUS.PENDING },
-    data: {
-      status: PAYMENT_STATUS.CANCELED,
-      message: "Voided: an order in this checkout was cancelled",
-    },
-  });
+const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409 };
 
-  const paidPayment = await tx.payment.findFirst({
-    where: { order_group_id: order.order_group_id, status: PAYMENT_STATUS.PAID },
-  });
-
-  const activeCount = await tx.order.count({
-    where: {
-      order_group_id: order.order_group_id,
-      status: { not: ORDER_STATUS.CANCELLED },
-      deleted_at: null,
-    },
-  });
-  if (activeCount === 0) {
-    const group = await tx.orderGroup.findUnique({
-      where: { id: order.order_group_id },
-      select: { coupon_id: true },
-    });
-    if (group?.coupon_id) {
-      await tx.coupon.updateMany({
-        where: { id: group.coupon_id, used_count: { gt: 0 } },
-        data: { used_count: { decrement: 1 } },
-      });
+// Yeu cau hoa don cong ty tu checkout: chi giu cac truong chuoi da biet, cat
+// do dai - day la du lieu nguoi dung go, se in len hoa don.
+const sanitizeInvoiceRequest = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  for (const key of ["company_name", "tax_code", "address", "email"]) {
+    if (typeof raw[key] === "string" && raw[key].trim()) {
+      out[key] = raw[key].trim().slice(0, 255);
     }
   }
-
-  return paidPayment
-    ? {
-        refundOwed: {
-          amount: order.total_amount,
-          paymentId: paidPayment.id,
-          orderGroupId: order.order_group_id,
-        },
-      }
-    : null;
-};
-
-const logRefundOwed = (req, order, refundOwed) => {
-  if (!refundOwed) return;
-  writeAuditLog({
-    userId: req.user?.id,
-    action: "REFUND_OWED",
-    resource: "order",
-    resourceId: order.id,
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
-    metadata: {
-      order_group_id: refundOwed.orderGroupId.toString(),
-      payment_id: refundOwed.paymentId.toString(),
-      amount: refundOwed.amount?.toString?.() ?? refundOwed.amount,
-      reason: "Suborder cancelled after checkout was already paid",
-    },
-  });
+  return out.company_name && out.tax_code ? out : null;
 };
 
 export const createOrder = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { items, shipping_address, payment_method, coupon_code } = req.body;
+    const {
+      items,
+      shipping_address,
+      payment_method,
+      coupon_code,
+      invoice_request,
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "No order items provided" });
@@ -209,18 +165,35 @@ export const createOrder = async (req, res) => {
         color: colorVal,
         productName: product.name,
         shop: product.shop,
+        weightGrams: (product.weight_grams || 0) * Number(it.quantity),
       });
     }
 
     // Gom hang theo gian hang: moi shop se thanh mot don con doc lap.
     const shopGroups = groupItemsByShop(preparedItems);
+    for (const group of shopGroups.values()) {
+      group.weightGrams = group.items.reduce((s, it) => s + (it.weightGrams || 0), 0);
+    }
+
+    // Parse shipping_address if it's a string
+    let parsedShippingAddress = shipping_address;
+    if (typeof shipping_address === "string") {
+      try {
+        parsedShippingAddress = JSON.parse(shipping_address);
+      } catch {
+        parsedShippingAddress = shipping_address;
+      }
+    }
 
     // Phi van chuyen tinh rieng tung gian hang, mac dinh lay tu cau hinh san.
     const [platformShippingFee, platformFreeThreshold] = await Promise.all([
       getSettingNumber("shipping_fee", 9.99),
       getSettingNumber("free_shipping_threshold", 199),
     ]);
-    const shippingTotal = applyShopShipping(shopGroups, {
+    // Che do "flat" (mac dinh) giu nguyen applyShopShipping; che do "carrier"
+    // bao gia theo can nang + dia chi qua don vi van chuyen.
+    const shippingTotal = await quoteShippingForGroups(shopGroups, {
+      address: parsedShippingAddress,
       platformShippingFee,
       platformFreeThreshold,
     });
@@ -280,14 +253,27 @@ export const createOrder = async (req, res) => {
     );
     const finalAmount = round2(merchandiseTotal + shippingTotal);
 
-    // Parse shipping_address if it's a string
-    let parsedShippingAddress = shipping_address;
-    if (typeof shipping_address === "string") {
-      try {
-        parsedShippingAddress = JSON.parse(shipping_address);
-      } catch {
-        parsedShippingAddress = shipping_address;
-      }
+    const riskCtx = {
+      userId,
+      paymentMethod: payment_method ?? null,
+      receiverPhone: parsedShippingAddress?.phone || null,
+      address: parsedShippingAddress ?? null,
+      coupon: appliedCoupon,
+      clientIp: req.ip || null,
+      deviceId: String(req.headers["x-device-id"] || "").slice(0, 100) || null,
+      finalAmount,
+      shopOwnerIds: [...shopGroups.values()].map((g) => g.shopOwnerId),
+    };
+    const risk = await assessCheckoutRisk(riskCtx);
+    if (risk.block || risk.couponBlocked) {
+      return res.status(403).json({
+        message:
+          risk.message ||
+          (risk.couponBlocked
+            ? "This voucher cannot be used with this account."
+            : "This order cannot be placed. Please contact support."),
+        code: risk.couponBlocked ? "COUPON_ABUSE" : "ORDER_BLOCKED",
+      });
     }
 
     // Phan bo tien hang cho tung don con. Bat bien: tong cac don con phai
@@ -316,6 +302,10 @@ export const createOrder = async (req, res) => {
           shipping_address: parsedShippingAddress ?? null,
           receiver_name: parsedShippingAddress?.name || null,
           receiver_phone: parsedShippingAddress?.phone || null,
+          invoice_request: sanitizeInvoiceRequest(invoice_request),
+          client_ip: riskCtx.clientIp,
+          device_id: riskCtx.deviceId,
+          risk_score: risk.score || 0,
         },
       });
 
@@ -416,6 +406,11 @@ export const createOrder = async (req, res) => {
 
       return { orderGroup, orders: createdOrders };
     });
+
+    // Ghi co nghi van (neu co) ngoai giao dich: loi o day khong lam hong don.
+    recordCheckoutRisk(created.orderGroup, risk, riskCtx).catch((err) =>
+      console.error("[fraud] recordCheckoutRisk failed:", err?.message || err)
+    );
 
     // Audit log + seller notifications per suborder
     for (const order of created.orders) {
@@ -644,96 +639,18 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Invalid status" });
   }
 
-  const order = await prisma.order.findFirst({
-    where: { id: BigInt(id), deleted_at: null },
-    include: { order_items: true },
+  const result = await transitionOrderStatus({
+    orderId: id,
+    status,
+    actor: actorFromReq(req),
   });
-  if (!order) {
-    return res.status(404).json({ message: "Order not found" });
+  if (!result.ok) {
+    return res.status(HTTP_BY_CODE[result.code] || 400).json({ message: result.message });
   }
-
-  // Enforce a legal transition (finals: delivered/cancelled/returned)
-  const currentStatus = order.status || ORDER_STATUS.PENDING;
-  if (!(ORDER_STATUS_FLOW[currentStatus] || []).includes(status)) {
-    return res.status(400).json({
-      message: `Cannot change order status from "${currentStatus}" to "${status}"`,
-    });
-  }
-
-  // Statuses this transition may legally start from - re-checked
-  // atomically inside the transaction so two concurrent requests can't
-  // both pass the check above and both restock/revert points for the
-  // same order (a classic check-then-act race).
-  const allowedFromStatuses = Object.entries(ORDER_STATUS_FLOW)
-    .filter(([, nexts]) => nexts.includes(status))
-    .map(([from]) => from);
-
-  let updatedOrder;
-  let refundOwed = null;
-  try {
-    updatedOrder = await prisma.$transaction(async (tx) => {
-      const claimed = await tx.order.updateMany({
-        where: { id: BigInt(id), status: { in: allowedFromStatuses } },
-        data: { status },
-      });
-      if (claimed.count === 0) {
-        throw new Error("ORDER_STATUS_CONFLICT");
-      }
-      if (status === ORDER_STATUS.CANCELLED) {
-        // Cancelling puts the items back in stock and claws back earned points
-        await restockOrderItems(tx, order.order_items);
-        await revertPointsForOrder(tx, order.user_id, order.id);
-      }
-      const updated = await tx.order.findUniqueOrThrow({
-        where: { id: BigInt(id) },
-        include: { user: { select: { id: true, name: true, email: true } } },
-      });
-      if (status === ORDER_STATUS.CANCELLED) {
-        const result = await onSuborderCancelled(tx, updated);
-        refundOwed = result?.refundOwed || null;
-      }
-      return updated;
-    });
-  } catch (err) {
-    if (err.message === "ORDER_STATUS_CONFLICT") {
-      return res.status(409).json({
-        message: "Order status was already changed by another request",
-      });
-    }
-    throw err;
-  }
-
-  logRefundOwed(req, updatedOrder, refundOwed);
-
-  writeAuditLog({
-    userId: req.user.id,
-    action: "ORDER_STATUS_UPDATE",
-    resource: "order",
-    resourceId: id,
-    ip: req.ip,
-    userAgent: req.headers["user-agent"],
-    metadata: { status, previous: currentStatus },
-  });
-
-  // Keep the buyer in the loop about their order's progress
-  const STATUS_LABEL = {
-    processing: "is being prepared 📦",
-    shipped: "is on the way 🚚",
-    delivered: "has been delivered ✅",
-    cancelled: "was cancelled ❌",
-  };
-  notifyUser({
-    userId: order.user_id,
-    title: "Order update",
-    message: `Order ${order.order_number || `#${order.id}`} ${
-      STATUS_LABEL[status] || `status changed to ${status}`
-    }`,
-    type: "ORDER",
-  });
 
   res.json({
     message: "Order status updated successfully",
-    order: updatedOrder,
+    order: result.order,
   });
 });
 
@@ -771,10 +688,7 @@ export const deleteOrder = asyncHandler(async (req, res) => {
       if (claimed.count === 0) {
         throw new Error("ORDER_ALREADY_RESOLVED");
       }
-      await restockOrderItems(tx, order.order_items);
-      await revertPointsForOrder(tx, order.user_id, order.id);
-      const result = await onSuborderCancelled(tx, order);
-      refundOwed = result?.refundOwed || null;
+      refundOwed = await cancelInTx(tx, order);
     });
   } catch (err) {
     if (err.message === "ORDER_ALREADY_RESOLVED") {
@@ -785,7 +699,7 @@ export const deleteOrder = asyncHandler(async (req, res) => {
     throw err;
   }
 
-  logRefundOwed(req, order, refundOwed);
+  logRefundOwed(actorFromReq(req), order, refundOwed);
 
   res.json({ message: "Order deleted successfully" });
 });
@@ -825,39 +739,23 @@ export const cancelOrder = asyncHandler(async (req, res) => {
       .status(400)
       .json({ success: false, message: "Cannot cancel in current status" });
 
-  let updated;
-  let refundOwed = null;
-  try {
-    updated = await prisma.$transaction(async (tx) => {
-      // Re-check status atomically - closes the gap between the read
-      // above and this write so a double-click or two concurrent
-      // requests can't both restock/revert points for the same order.
-      const claimed = await tx.order.updateMany({
-        where: { id: BigInt(id), status: { in: cancellableStatuses } },
-        data: { status: ORDER_STATUS.CANCELLED },
-      });
-      if (claimed.count === 0) {
-        throw new Error("ORDER_ALREADY_RESOLVED");
-      }
-      await restockOrderItems(tx, order.order_items);
-      await revertPointsForOrder(tx, order.user_id, order.id);
-      const cancelled = await tx.order.findUniqueOrThrow({
-        where: { id: BigInt(id) },
-      });
-      const result = await onSuborderCancelled(tx, cancelled);
-      refundOwed = result?.refundOwed || null;
-      return cancelled;
+  const result = await transitionOrderStatus({
+    orderId: id,
+    status: ORDER_STATUS.CANCELLED,
+    allowedFrom: cancellableStatuses,
+    actor: actorFromReq(req),
+    auditAction: "ORDER_CANCEL",
+    // Nguoi mua tu huy thi khong can bao lai cho chinh ho.
+    notifyBuyer: order.user_id.toString() !== userId,
+  });
+  if (!result.ok) {
+    return res.status(result.code === "NOT_FOUND" ? 404 : 409).json({
+      success: false,
+      message:
+        result.code === "NOT_FOUND" ? "Order not found" : "Order status already changed",
     });
-  } catch (err) {
-    if (err.message === "ORDER_ALREADY_RESOLVED") {
-      return res
-        .status(409)
-        .json({ success: false, message: "Order status already changed" });
-    }
-    throw err;
   }
-
-  logRefundOwed(req, updated, refundOwed);
+  const updated = result.order;
 
   // Let the seller know the buyer cancelled
   if (order.user_id.toString() === userId) {

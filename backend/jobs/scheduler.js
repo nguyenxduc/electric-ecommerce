@@ -1,12 +1,11 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dailyJobsScript = path.join(__dirname, "runDailyRecommendationJobs.js");
+import { JOBS } from "./registry.js";
 
-const DEFAULT_INTERVAL_HOURS = 24;
-const MIN_INTERVAL_HOURS = 1;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const asBoolean = (value, fallback) => {
   if (value == null || String(value).trim() === "") return fallback;
@@ -15,62 +14,62 @@ const asBoolean = (value, fallback) => {
   );
 };
 
-const intervalMs = () => {
-  const parsed = Number(process.env.DAILY_JOBS_INTERVAL_HOURS);
-  const hours =
-    Number.isFinite(parsed) && parsed >= MIN_INTERVAL_HOURS
-      ? parsed
-      : DEFAULT_INTERVAL_HOURS;
-  return hours * 60 * 60 * 1000;
-};
+// Moi job mot co "dang chay": chu ky toi ma lan truoc chua xong thi bo qua,
+// khong chong hai process cung lam mot viec.
+const running = new Map();
 
-let runningChild = null;
-
-const runDailyJobs = (reason) => {
-  if (runningChild) {
-    console.log(`[daily-jobs-scheduler] Skipping ${reason}: jobs are still running.`);
+const runJob = (job, reason) => {
+  if (running.get(job.name)) {
+    console.log(`[scheduler] Skip ${job.name} (${reason}): still running.`);
+    return;
+  }
+  const script = path.join(__dirname, job.file);
+  if (!fs.existsSync(script)) {
+    console.error(`[scheduler] ${job.name}: missing ${job.file}, skipped.`);
     return;
   }
 
-  console.log(`[daily-jobs-scheduler] Starting daily jobs (${reason}).`);
-  runningChild = spawn(process.execPath, [dailyJobsScript], {
+  const child = spawn(process.execPath, [script], {
     cwd: path.join(__dirname, ".."),
     env: process.env,
     stdio: "inherit",
   });
+  running.set(job.name, child);
 
-  runningChild.on("error", (error) => {
-    console.error("[daily-jobs-scheduler] Unable to start daily jobs:", error);
-    runningChild = null;
+  child.on("error", (error) => {
+    console.error(`[scheduler] ${job.name}: unable to start:`, error);
+    running.delete(job.name);
   });
-
-  runningChild.on("exit", (code, signal) => {
-    if (code === 0) {
-      console.log("[daily-jobs-scheduler] Daily jobs finished successfully.");
-    } else {
-      console.error(
-        `[daily-jobs-scheduler] Daily jobs stopped with code=${code} signal=${signal}.`
-      );
+  child.on("exit", (code, signal) => {
+    if (code !== 0) {
+      console.error(`[scheduler] ${job.name} exited code=${code} signal=${signal}.`);
     }
-    runningChild = null;
+    running.delete(job.name);
   });
 };
 
+export const startScheduler = () => {
+  for (const job of JOBS) {
+    if (!asBoolean(process.env[`${job.envKey}_ENABLED`], true)) {
+      console.log(`[scheduler] ${job.name} disabled by ${job.envKey}_ENABLED.`);
+      continue;
+    }
+    console.log(`[scheduler] ${job.name}: every ${job.everyMinutes} min.`);
+    if (job.runOnStart) runJob(job, "startup");
+    const timer = setInterval(
+      () => runJob(job, "interval"),
+      job.everyMinutes * 60 * 1000
+    );
+    timer.unref();
+  }
+};
+
+// API process: JOBS_IN_API=0 khi da chay worker rieng (jobs/worker.js), de
+// job khong chiem CPU cua process phuc vu request.
 export const startDailyJobsScheduler = () => {
-  if (!asBoolean(process.env.DAILY_JOBS_ENABLED, true)) {
-    console.log("[daily-jobs-scheduler] Disabled by DAILY_JOBS_ENABLED.");
+  if (!asBoolean(process.env.JOBS_IN_API, true)) {
+    console.log("[scheduler] Jobs run in the worker process (JOBS_IN_API=0).");
     return;
   }
-
-  const delay = intervalMs();
-  console.log(
-    `[daily-jobs-scheduler] Enabled. Interval: ${delay / (60 * 60 * 1000)} hour(s).`
-  );
-
-  if (asBoolean(process.env.DAILY_JOBS_RUN_ON_START, true)) {
-    runDailyJobs("server startup");
-  }
-
-  const timer = setInterval(() => runDailyJobs("scheduled interval"), delay);
-  timer.unref();
+  startScheduler();
 };
