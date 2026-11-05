@@ -67,6 +67,7 @@ import auditRoutes from "./routes/audit.route.js";
 import behaviorRoutes from "./routes/behavior.route.js";
 import shopRoutes from "./routes/shop.route.js";
 import returnRoutes from "./routes/return.route.js";
+import healthRoutes from "./routes/health.route.js";
 import { startDailyJobsScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
@@ -82,6 +83,7 @@ import {
   notFoundHandler,
   errorHandler,
 } from "./middleware/error.middleware.js";
+import { metricsMiddleware } from "./middleware/metrics.middleware.js";
 
 const app = express();
 dotenv.config();
@@ -125,6 +127,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 app.use(cookieParser());
 
+// Dat TRUOC apiLimiter: de ca response bi chan boi rate limit (429) van duoc
+// dem vao metrics, neu khong thi luc he thong bi dap manh nhat lai la luc so
+// lieu trong nhat.
+app.use(metricsMiddleware);
+
 // Giới hạn tần suất: mức chung cho toàn bộ /api, mức chặt hơn cho xác thực
 // và cho các endpoint gọi Gemini.
 app.use("/api", apiLimiter);
@@ -153,6 +160,7 @@ app.use("/api/audit-logs", auditRoutes);
 app.use("/api/behavior", behaviorRoutes);
 app.use("/api/shops", shopRoutes);
 app.use("/api/returns", returnRoutes);
+app.use("/api/health", healthRoutes);
 
 // Phai dung sau moi route: 404 cho endpoint la, roi mot cho duy nhat xu ly loi.
 // Express 4 khong tu bat promise reject, nen neu thieu luoi nay thi mot handler

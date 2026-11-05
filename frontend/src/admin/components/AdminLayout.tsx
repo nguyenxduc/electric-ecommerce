@@ -22,7 +22,8 @@ import {
   MessageCircle,
   ScrollText,
   Bell,
-  Bot
+  Bot,
+  Activity
 } from 'lucide-react'
 import { useValidateToken } from '../../client/hooks/useAuth'
 import { useAllChats } from '../../client/hooks/useChat'
@@ -83,6 +84,12 @@ const sections: NavSection[] = [
         to: '/admin/ai-feedback',
         label: 'AI Feedback',
         icon: Bot,
+        end: true
+      },
+      {
+        to: '/admin/health',
+        label: 'System Health',
+        icon: Activity,
         end: true
       },
       { to: '/admin/settings', label: 'Settings', icon: Settings2, end: true }

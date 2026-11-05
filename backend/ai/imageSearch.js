@@ -3,6 +3,7 @@ import {
   GEMINI_BASE_URL,
   IMAGE_SEARCH_FALLBACK_MODEL,
   IMAGE_SEARCH_MODEL,
+  incrementAiCallCounter,
   normalizeGeminiModelName,
 } from "./geminiConfig.js";
 
@@ -44,6 +45,7 @@ const requestGeminiText = async ({
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), IMAGE_SEARCH_TIMEOUT_MS);
     try {
+      incrementAiCallCounter();
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

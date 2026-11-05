@@ -38,6 +38,7 @@ import AdminSettingsList from './admin/pages/settings/List'
 import AdminChatList from './admin/pages/chat/List'
 import AdminAuditLogList from './admin/pages/audit/List'
 import AdminAiFeedbackList from './admin/pages/ai-feedback/List'
+import AdminHealthPage from './admin/pages/health'
 import AdminNotificationsList from './admin/pages/notifications/List'
 import AdminShopsList from './admin/pages/shops/List'
 import Cart from './client/pages/Cart'
@@ -215,6 +216,7 @@ function App() {
             <Route path="chat" element={<AdminChatList />} />
             <Route path="audit-logs" element={<AdminAuditLogList />} />
             <Route path="ai-feedback" element={<AdminAiFeedbackList />} />
+            <Route path="health" element={<AdminHealthPage />} />
             <Route path="notifications" element={<AdminNotificationsList />} />
             <Route path="settings" element={<AdminSettingsList />} />
           </Route>
