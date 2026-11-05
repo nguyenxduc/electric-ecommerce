@@ -292,6 +292,7 @@ const evaluateTriad = async () => {
         ttft: firstTokenAt ? firstTokenAt - started : null,
         totalMs,
         toolCalls: result.toolCalls.map((t) => t.name),
+        candidates: (result.meta?.contextText?.match(/product_id=/g) || []).length,
       });
       process.stdout.write(".");
     } finally {
@@ -399,6 +400,15 @@ const main = async () => {
       "",
       "Tach lam hai moc vi streaming chi cai thien moc thu nhat. Bao cao mot con",
       "so tong nhu truoc day che mat dung phan ma nguoi dung cam nhan duoc.",
+      "",
+      "## 4. Diem theo tung cau trong mau",
+      "",
+      "| Cau hoi | Nhom | F | AR | CR | So ung vien |",
+      "|---|---|---|---|---|---|",
+      ...triad.rows.map(
+        (r) =>
+          "| " + r.q + " | " + r.loai + " | " + r.faithfulness + " | " + r.answerRelevance + " | " + r.contextRelevance + " | " + r.candidates + " |"
+      ),
       ""
     );
   }

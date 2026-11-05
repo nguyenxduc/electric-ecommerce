@@ -73,8 +73,8 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 | Truy hồi đúng sản phẩm trong top 5 | > 75% | 62.5% | **100%** (30/30) | Đạt |
 | MRR của truy hồi | - | chưa đo | **0.919** | Có số |
 | Faithfulness (Ragas) | > 0.75 | chưa đo | **1.0** | Đạt |
-| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.8** (2026-11-05, cỡ mẫu 8; 4 lần đo trong ngày: 0.725-0.925) | Đạt ở lần đo cuối, dao động quanh mốc |
-| Context Relevance (Ragas) | - | chưa đo | **0.425** (2026-11-05; các lần trước 0.363-0.425, từ 0.275 ban đầu, xem T9) | Dao động 0.36-0.43, vẫn còn nhiễu |
+| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.925** (2026-11-05, cỡ mẫu 8; các lần trong ngày 0.725-1.0) | Đạt |
+| Context Relevance (Ragas) | - | chưa đo | **0.625** (2026-11-05; từ 0.275 ban đầu, 0.425 trước khi sửa nội dung embedding, xem T9) | Đạt mốc tự đặt 0.5 |
 | Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **1.17-1.87 s** trung vị 30 câu qua 3 lần đo cùng mã (2026-11-05; một lần 3.06 s lúc Gemini quá tải). Phần do hệ thống: truy hồi ~2 ms ở 13/30 câu hỏi theo tên (bỏ embedding), ~0.5 s ở câu còn lại; phần LLM Gemini 0.9-2.8 s mỗi lượt | Đạt khi Gemini bình thường, không ổn định |
 | Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **1.4-2.2 s** trung vị 30 câu (2026-11-05) | Đạt |
 | Độ chính xác giá / tồn kho | > 85% | chưa đo được | khớp tuyệt đối với DB | Đạt, xem ghi chú |
@@ -186,12 +186,18 @@ có tụt dưới ngưỡng hay không.
   lập, dọn sạch sau khi đo. **nDCG@5 = 0.610**.
 - **Nghiệm thu**: bảng ở mục 2 không còn ô "chưa đo". Đạt.
 
-#### T9. Nâng Context Relevance — có tiến triển, chưa tới mốc 0.5
+#### T9. Nâng Context Relevance — xong (2026-11-05)
 
 - `pickConfidentSubset` trong `ai/retrieval.js`, áp dụng sau `retrieveHybrid`
-  (không đụng chính hàm đó, vì Recall@5 đo trực tiếp trên nó).
-- **Kết quả đo**: Context Relevance 0.275 → 0.425, Recall@5 giữ nguyên 100%.
-  **Chưa đạt 0.5.**
+  (không đụng chính hàm đó, vì Recall@5 đo trực tiếp trên nó). 0.275 → 0.425.
+- **Lỗi gốc tìm thấy 2026-11-05**: `scripts/embed-products.js` đọc `specs_detail`
+  (dạng nhóm `[{category, items}]`) như mảng phẳng, nên nội dung embedding của MỌI
+  sản phẩm là `Specs: : "" | : ""`. Vector không biết thông số, và chatbot
+  không thấy thông số trong ngữ cảnh (câu "laptop có card RTX 4060" bị chấm CR 0).
+  Đã sửa + test; DB cũ cần `npm run embed:products:force`.
+- Câu qua cổng từ khoá (tên đã khớp) chỉ đưa 1 ứng viên vào ngữ cảnh thay vì 2.
+- **Kết quả đo**: Context Relevance **0.625**, Recall@5 100%, AR 0.925, F 1.0.
+  `eval:rag` nay in điểm từng câu (mục 4 của `docs/rag-evaluation.md`).
 
 ### P2 — nếu còn thời gian
 
@@ -255,3 +261,4 @@ có tụt dưới ngưỡng hay không.
 | 2026-11-05 | Đo lại sau khi Gemini hết 503. `eval:ai`: kiểm duyệt 34 mẫu (30 sạch, 4 độc hại), chặn nhầm 0/30, recall 4/4; mẫu lỗi gọi model được gọi lại tối đa 2 lần, cùng mẫu cùng nhãn. `eval:rag` (đã tắt cache): Recall@5 100%, MRR 0.919, F 1.0, AR 0.85, CR 0.363, TTFT 1.61 s, tổng 1.88 s. TTFT vẫn trên mốc 1.5 s; độ trễ phụ thuộc mạnh vào tải phía Gemini (cùng ngày có lúc một lượt kiểm duyệt mất 21 s) | Claude Code |
 | 2026-11-05 | Dọn nợ: (1) màn hình `/admin/health`. (2) `tsc -b` frontend từ 27 lỗi về 0; xoá `PriceRangeFilter`/`ToggleFilter` không ai dùng; hook `useAdminFilterOption` trước trả `AxiosResponse` nên form sửa filter đọc nhầm lớp và để trống, nay unwrap `.data` trong hook. (3) `npm audit`: frontend 0 lỗ hổng (`audit fix` + `overrides` ép `minimatch ^11.0.4` cho `typescript-estree`/`glob`); backend nâng `@langchain/core` 1.3, `@langchain/google-genai` 2.3, `nodemailer` 10, còn 3 lỗ hổng high trong chuỗi CLI `prisma` 6 (`@prisma/config`, `effect`, `deepmerge-ts`), chỉ hết khi lên Prisma 7 (driver adapter + `prisma.config.ts`), để quyết riêng. Test 139/140 (ca đỏ vẫn là MoMo sandbox). `eval:rag` sau nâng cấp: Recall@5 100%, MRR 0.919, F 1, AR 0.875, CR 0.425, TTFT 1.42 s, tổng 1.81 s | Claude Code |
 | 2026-11-05 | T7: đo tách TTFT (truy hồi từ khoá ~2 ms, embedding ~0.5 s, LLM 0.9-2.8 s). Tắt thinking không giúp. Thêm cổng từ khoá trong `retrieveHybrid`: bỏ embedding khi full-text + trigram cùng chọn hạng 1 và tên khớp đủ token (13/30 câu, Recall@5 vẫn 100%, MRR 0.919). Bản đầu chỉ xét đồng thuận đã mở nhầm cho "sạc nhanh cho iPhone" và làm AR tụt 0.725; siết thêm điều kiện tên + chặn câu phụ kiện/so sánh. `eval:rag` đo TTFT trên đủ 30 câu. Cảnh báo hiệu năng gửi in-app cho admin, chỉ khi route vừa vượt ngưỡng (c5xx là bộ đếm trọn đời, báo theo trạng thái sẽ lặp mãi). Test 144/145 | Claude Code |
+| 2026-11-05 | T9: bảng điểm theo câu cho thấy câu hỏi theo thông số có CR 0. Nguyên nhân: nội dung embedding bỏ trống toàn bộ thông số (`buildContent` đọc sai dạng nhóm của `specs_detail`). Sửa + test + embed lại. Câu đã qua cổng tên chỉ giữ 1 ứng viên. CR 0.425 → 0.625, AR 0.925, TTFT 1.43 s trung vị 30 câu. Test 145/146 + 1 bỏ qua có chủ đích (bảng embedding rỗng ngay sau reseed) | Claude Code |
