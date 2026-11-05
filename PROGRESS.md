@@ -1,6 +1,6 @@
 # Tiến độ & việc cần làm — NGX E-Commerce
 
-> Cập nhật: 2026-09-09. File này là **nguồn sự thật duy nhất** về "đang tới đâu".
+> Cập nhật: 2026-11-05. File này là **nguồn sự thật duy nhất** về "đang tới đâu".
 > Đọc hết mục 0 → 4 trước khi viết dòng code nào. Xong việc thì ghi vào mục 6.
 
 ---
@@ -12,9 +12,13 @@
 - Database dev chạy ở **port 55432** (không phải 5432) vì máy dev đã có PostgreSQL 18 chiếm 5432. Xem `README.md` mục 1.
 - Sau khi seed lại: dùng `npm run seed:full` (seed + sinh embedding). Nếu chỉ chạy `npm run seed`, bảng `product_embeddings` rỗng và chatbot RAG **âm thầm** tụt về tìm theo từ khoá — mọi số đo AI sẽ sai.
 - **Quy tắc phân tầng**: route → controller → service → dữ liệu, một chiều. Controller **không được import controller khác**; service **không được biết `req`/`res`**. Xem `backend/docs/architecture.md` mục 1.
-- Trước khi commit: `cd backend && npm test` (15 bộ test + `demo-readiness`, 123 ca). Test HTTP cần server đang chạy: mở một terminal khác chạy `node server.js` trước. Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
+- Trước khi commit: `cd backend && npm test` (18 bộ test + `demo-readiness`, 140 ca). Test HTTP cần server đang chạy: mở một terminal khác chạy `node server.js` trước. Không commit khi test đỏ. Lệnh này **seed lại DB**, chạy xong nhớ `npm run embed:products`.
 - Đo lại AI: `npm run eval:ai` → `backend/docs/ai-evaluation.md`.
 - Đo truy hồi và RAG Triad: `npm run eval:rag` → `backend/docs/rag-evaluation.md`. Thêm `-- --quick` để chạy nhanh. Bản miễn phí của Gemini giới hạn 15 lượt/phút nên script tự giãn nhịp, chạy đầy đủ mất khoảng 4 phút.
+- Đo tìm kiếm bằng ảnh: `npm run eval:image` — cần server đang chạy (`node server.js`), dùng thẳng ảnh có sẵn của sản phẩm seed, không cần chuẩn bị gì thêm.
+- Đo nDCG gợi ý cá nhân hoá: `npm run eval:reco` — tự tạo dữ liệu giả lập cô lập rồi dọn sạch, không cần chuẩn bị gì thêm. Nếu script bị ngắt giữa chừng, chạy lại một lần sẽ tự dọn phần dữ liệu giả lập còn sót trước khi đo tiếp.
+- Đo tải: khởi động backend với `RATE_LIMIT_ENABLED=0 node server.js` (chỉ khi đo, **không** ghi vào `.env`), rồi `npm run eval:load` → `backend/docs/load-test.md`. Thêm `LOAD_CONCURRENCY=300` để đo mức 300.
+- Đo kiểm duyệt khi Gemini chậm: `REVIEW_MODERATION_TIMEOUT_MS=60000 npm run eval:ai`. Script từ chối ghi kết quả nếu có mẫu bị skip.
 - Chuẩn hoá tiếng Việt: dùng `lib/vietnamese.js`, **đừng tự viết lại** `normalize("NFD")` vì chữ "đ" không tách được bằng cách đó.
 - Sinh lại ERD: `npm run docs:erd` → `backend/docs/erd.md`.
 - Tài liệu hành vi hệ thống: `backend/docs/architecture.md` (Mermaid). **Sửa code lõi thì sửa luôn tài liệu này.**
@@ -48,11 +52,11 @@
 | **Phòng thủ tiêm lệnh ba lớp** (gồm tiêm gián tiếp qua mô tả người bán) | Xong | `backend/ai/guard.js` | `tests/12-ai-guard` 15/15 |
 | **Trả lời theo luồng (SSE)** | Xong | `controllers/aiAssistant.controller.js` | sự kiện `token`/`replace`/`done` |
 | Chatbot RAG điều phối chung | Xong | `backend/ai/agent.js` | `docs/rag-evaluation.md` |
-| Tìm kiếm bằng hình ảnh | Xong, chưa đo | `ai/imageSearch.js`, `controllers/productImageSearch.controller.js` | — |
+| Tìm kiếm bằng hình ảnh | Xong, đã đo | `ai/imageSearch.js`, `controllers/productImageSearch.controller.js` | `scripts/evaluate-image-search.js`, 100% (20/20) |
 | So sánh sản phẩm bằng AI (trả JSON có cấu trúc) | Xong | `ai/productComparison.js` | — |
 | Kiểm duyệt đánh giá tự động | Xong | `ai/reviewModeration.js` | `docs/ai-evaluation.md` mục 2 |
 | Thu thập phản hồi chất lượng trả lời AI | Xong | `controllers/aiFeedback.controller.js` | — |
-| Gợi ý cá nhân hoá (lọc cộng tác chạy nền) | Xong phần job, chưa đo chất lượng | `jobs/computeProductSimilarity.js`, `jobs/computeUserRecommendations.js`, `jobs/scheduler.js` | `docs/ai-evaluation.md` mục 3 |
+| Gợi ý cá nhân hoá (lọc cộng tác chạy nền) | Xong, đã đo | `jobs/computeProductSimilarity.js`, `jobs/computeUserRecommendations.js`, `jobs/scheduler.js` | `scripts/evaluate-recommendations.js`, nDCG@5 0.610 |
 | Hardening API (helmet, rate limit, guard ID, error handler) | Xong | `middleware/` | `tests/10-api-contract` |
 | Đóng gói Docker + seed dữ liệu mẫu | Xong | `docker-compose.yml`, `seed/index.js` | `tests/demo-readiness` |
 | Tài liệu kiến trúc + ERD sinh tự động | Xong | `docs/architecture.md`, `docs/erd.md` | `npm run docs:erd` |
@@ -68,16 +72,19 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 |---|---|---|---|---|
 | Truy hồi đúng sản phẩm trong top 5 | > 75% | 62.5% | **100%** (30/30) | Đạt |
 | MRR của truy hồi | - | chưa đo | **0.919** | Có số |
-| Faithfulness (Ragas) | > 0.75 | chưa đo | **0.875** | Đạt |
-| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.825** | Đạt |
-| Context Relevance (Ragas) | - | chưa đo | **0.275** | Thấp, xem ghi chú |
-| Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **4.0 s** | **Chưa đạt** |
-| Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **4.5 s** | Đạt |
+| Faithfulness (Ragas) | > 0.75 | chưa đo | **1.0** | Đạt |
+| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.875** (2026-11-05, sau khi nâng LangChain 1.x; dao động 0.78-0.9 giữa các lần, cỡ mẫu 8) | Đạt |
+| Context Relevance (Ragas) | - | chưa đo | **0.425** (2026-11-05; các lần trước 0.363-0.425, từ 0.275 ban đầu, xem T9) | Dao động 0.36-0.43, vẫn còn nhiễu |
+| Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **1.42 s** (2026-11-05, đã tắt cache khi đo, n = 8; lần trước cùng ngày 1.61 s, nên dao động quanh mốc theo tải Gemini) | Đạt ở lần đo mới nhất, chưa ổn định |
+| Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **1.81 s** (2026-11-05; trước đó ~3.0-3.8 s) | Đạt |
 | Độ chính xác giá / tồn kho | > 85% | chưa đo được | khớp tuyệt đối với DB | Đạt, xem ghi chú |
 | Chặn tấn công tiêm lệnh | 100% | chưa có | **11/11**, chặn nhầm 0/10 | Đạt |
-| Phát hiện bình luận vi phạm | > 80% | 100% (n = 10) | 100% | Đạt, cỡ mẫu nhỏ |
-| Nhận diện đúng khi tìm bằng ảnh | > 70% | chưa đo | **chưa đo** | Còn thiếu |
-| nDCG của gợi ý cá nhân hoá | > 0.60 | chưa đo | **chưa đo** | Còn thiếu |
+| Phát hiện bình luận vi phạm | > 80% | 100% (n = 10) | 100% (4/4) | Đạt, cỡ mẫu độc hại nhỏ |
+| Chặn nhầm bình luận sạch | < 5% | chưa đo | **0%** (0/30, `npm run eval:ai`, 2026-11-05) | Đạt |
+| API danh sách sản phẩm, 200 người đồng thời | p95 < 500 ms | 594 ms | **424 ms** (0 lỗi; `/products/:id` 191 ms, `/categories` 101 ms; lần đo trước 431 ms) | Đạt |
+| Ổn định ở 300 người đồng thời | 0 lỗi | chưa đo | **0 lỗi / 4500 request**, p95 danh sách 650 ms | Ổn định, độ trễ vượt 500 ms |
+| Nhận diện đúng khi tìm bằng ảnh | > 70% | chưa đo | **100%** (20/20, `npm run eval:image`) | Đạt |
+| nDCG của gợi ý cá nhân hoá | > 0.60 | chưa đo | **0.610** (13 ca, `npm run eval:reco`) | Đạt, sát ngưỡng |
 
 **Ghi chú ba con số cần giải thích khi bảo vệ:**
 
@@ -118,15 +125,29 @@ nghĩa là token gửi xuống không khớp được với thứ đã lập ch�
 tiếng Việt có chữ "đ" đều bị ảnh hưởng. Gom về `lib/vietnamese.js`, sửa luôn cả
 `frontend/src/client/utils/productSlug.ts`.
 
+### Đã đóng (2026-10-27)
+
+| Mã | Vấn đề | Đã xử lý thế nào | Bằng chứng |
+|---|---|---|---|
+| G8 (một phần) | Chưa có bộ nhớ đệm, TTFT chưa đạt | Cache thứ hạng RRF (id + điểm, KHÔNG cache giá/tồn kho — luôn đọc lại tươi qua `fetchRowsByIds`) theo câu hỏi đã chuẩn hoá; chỉ `bindTools()` khi ngữ cảnh rỗng hoặc câu hỏi chạm màu/ship. TTFT giảm từ 4.0s xuống còn ~2.5-3.6s (dao động giữa các lần chạy) — **chưa đạt mốc 1.5s**. Xem T7 ở mục 4 để biết vì sao và hướng còn lại | `ai/retrieval.js` (rankCache), `ai/agent.js` (`needsTools`), `tests/16-retrieval-cache.test.mjs`, `npm run eval:rag` |
+| G9 | Hai KPI vẫn chưa có phép đo | Tìm ảnh: dùng chính ảnh thứ hai trong thư viện sản phẩm seed (đã có sẵn, nhiều CDN thật) làm ảnh truy vấn, không cần gán nhãn tay — `scripts/evaluate-image-search.js`, **100% (20/20)**. Gợi ý cá nhân hoá: vì seed thật không có tín hiệu đồng mua/hành vi, dựng tập giả lập CÔ LẬP (4 nhóm sản phẩm cùng gu từ 20 sản phẩm seed thật, xoay vòng giấu 1 sản phẩm làm ground-truth), chạy qua đúng thuật toán CF thật rồi dọn sạch + tính lại `product_similarity` từ dữ liệu thật sau khi đo — `scripts/evaluate-recommendations.js`, **nDCG@5 = 0.610** (13 ca, sát ngưỡng) | `npm run eval:image`, `npm run eval:reco` |
+| — (một phần của T9/G2) | Context Relevance thấp (0.275) | Chỉ giữ 1-2 ứng viên trong ngữ cảnh LLM khi cả 3 nhánh tìm kiếm cùng đồng ý hạng 1 (tín hiệu "hỏi đích danh sản phẩm"); **không** đụng vào `retrieveHybrid` vì Recall@5 đo trực tiếp trên hàm đó. Context Relevance tăng 0.275 → 0.425, Recall@5 không đổi (100%) | `ai/retrieval.js` (`pickConfidentSubset`), `npm run eval:rag` |
+
 ### Còn lại
 
-**G8 — Chưa có bộ nhớ đệm, và TTFT chưa đạt.**
-Mỗi câu hỏi hiện tốn 1 lượt gọi model khi ngữ cảnh đã đủ, 2 lượt khi phải gọi
-công cụ (trước đây là 3). Đo riêng lượt sinh không bind công cụ cho TTFT 1.4 s;
-khi bind công cụ, model dừng lại cân nhắc và TTFT lên 4.0 s. Xem T7.
+**T7 chưa đóng hẳn — TTFT vẫn trên 1.5s.** Cache + bỏ bind tool không đủ: đo
+thực tế cho thấy không câu nào trong 30 câu của tập eval khớp từ khoá
+màu/ship, nghĩa là tool-binding gần như luôn đã bị tắt, nhưng TTFT đo được
+(gồm cả bước truy hồi + gọi embedding) vẫn quanh 2.5-3.6s. Phần còn lại nằm ở
+độ trễ gọi API nhúng câu hỏi + 3 nhánh tìm kiếm (cache chỉ giúp khi CÙNG một
+câu hỏi lặp lại — vô ích trên một tập 30 câu khác nhau từng câu một, chỉ có
+tác dụng thật trên traffic thật). Hướng còn lại: chạy nhánh nhúng song song
+sớm hơn nữa, hoặc giảm số nhánh fan-out khi đã có lịch sử hội thoại rõ ràng.
 
-**G9 — Hai KPI vẫn chưa có phép đo:** độ chính xác tìm kiếm bằng ảnh và nDCG
-của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-truth cho gợi ý.
+**nDCG 0.610 sát ngưỡng 0.60** — nên coi là "vừa đạt", không phải dư dả. Nếu
+thay đổi thuật toán CF (`jobs/computeUserRecommendations.js`,
+`jobs/computeProductSimilarity.js`) thì chạy lại `npm run eval:reco` để biết
+có tụt dưới ngưỡng hay không.
 
 ---
 
@@ -143,35 +164,41 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 | T5 | Khung đánh giá theo RAG Triad | `npm run eval:rag` xuất Recall@5, MRR, Faithfulness, Answer Relevance, Context Relevance |
 | T6 | Ca biên nghiệp vụ thanh toán | `tests/14-concurrency` xanh; test IPN phát lại được kiểm chứng là **đỏ khi gỡ guard** |
 
-### Còn lại
+### Đã làm 2026-10-27 (một phần)
 
-#### T7. Hạ thời gian tới ký tự đầu tiên xuống dưới 1.5 s
+#### T7. Hạ thời gian tới ký tự đầu tiên xuống dưới 1.5 s — chưa đạt mốc
 
-- **Việc**:
-  1. Chỉ bind công cụ khi câu hỏi thực sự cần, ví dụ khi ngữ cảnh truy hồi rỗng
-     hoặc câu hỏi chạm tới màu sắc / phí ship. Đo cho thấy chỉ riêng việc bind
-     công cụ đã đẩy TTFT từ 1.4 s lên 4.0 s.
-  2. Cache embedding của câu hỏi lặp lại và kết quả truy hồi theo câu đã chuẩn hoá.
-  3. Thử tắt chế độ suy nghĩ của model nếu thư viện hỗ trợ. Bản
-     `@langchain/google-genai@0.2.18` hiện không có tham số này.
-- **Nghiệm thu**: TTFT trung vị dưới 1.5 s trên tập 30 câu, Faithfulness không tụt.
+- **Đã làm**: (1) chỉ bind tool khi ngữ cảnh rỗng hoặc câu hỏi chạm màu/ship
+  (`needsTools` trong `ai/agent.js`); (2) cache thứ hạng RRF theo câu hỏi đã
+  chuẩn hoá, KHÔNG cache giá/tồn kho (`ai/retrieval.js`, `fetchRowsByIds`
+  trong `lib/productSearch.js` đọc lại tươi mỗi lần).
+- **Việc 3 còn treo**: tắt chế độ suy nghĩ của model — `@langchain/google-genai`
+  hiện dùng vẫn không có tham số này.
+- **Kết quả đo**: TTFT 4.0s → ~2.5-3.6s. Faithfulness không tụt (lên 1.0).
+  **Chưa đạt 1.5s** — xem phân tích ở mục 3.
+- **Nghiệm thu gốc chưa đạt đủ**: TTFT trung vị dưới 1.5s trên tập 30 câu.
 
-#### T8. Đo hai KPI còn thiếu
+#### T8. Đo hai KPI còn thiếu — xong
 
-- Tập từ 20 ảnh gắn nhãn cho tìm kiếm bằng ảnh; tập ground-truth cho gợi ý để
-  tính nDCG@5.
-- **Nghiệm thu**: bảng ở mục 2 không còn ô "chưa đo".
+- `scripts/evaluate-image-search.js` (`npm run eval:image`): dùng ảnh thứ hai
+  trong thư viện mỗi sản phẩm seed làm ảnh truy vấn. **100% (20/20)**.
+- `scripts/evaluate-recommendations.js` (`npm run eval:reco`): tập giả lập cô
+  lập, dọn sạch sau khi đo. **nDCG@5 = 0.610**.
+- **Nghiệm thu**: bảng ở mục 2 không còn ô "chưa đo". Đạt.
 
-#### T9. Nâng Context Relevance
+#### T9. Nâng Context Relevance — có tiến triển, chưa tới mốc 0.5
 
-- Giảm `topK` động: câu hỏi nêu đích danh tên sản phẩm thì chỉ cần 1-2 ứng viên.
-- **Nghiệm thu**: Context Relevance trên 0.5 mà Recall@5 không tụt dưới 90%.
+- `pickConfidentSubset` trong `ai/retrieval.js`, áp dụng sau `retrieveHybrid`
+  (không đụng chính hàm đó, vì Recall@5 đo trực tiếp trên nó).
+- **Kết quả đo**: Context Relevance 0.275 → 0.425, Recall@5 giữ nguyên 100%.
+  **Chưa đạt 0.5.**
 
 ### P2 — nếu còn thời gian
 
-- Bảng phân tích giữ chân người dùng và tỉ lệ chuyển đổi giỏ hàng cho admin.
-- Báo cáo tỉ lệ phản hồi tích cực về trả lời AI. Dữ liệu đã thu, chỉ thiếu màn hình thống kê.
-- Giám sát thời gian thực: cảnh báo lỗi, đo độ trễ API, quản lý hạn mức gọi dịch vụ AI.
+- **Xong (2026-11-05)** — Giữ chân + phễu chuyển đổi: `GET /api/dashboard/behavior?days=30` (admin), khối "Retention & phễu chuyển đổi" ở `/admin`. Test: `tests/17-behavior-analytics`.
+- **Xong (2026-11-05)** — Tỉ lệ phản hồi tích cực so với mốc 80%: trang `/admin/ai-feedback`, hiện "Chưa đủ mẫu" khi n < 20 thay vì một tỉ lệ vô nghĩa.
+- **Xong (2026-11-05)** — Nhật ký lượt bị chặn do nghi tiêm lệnh: lọc `AI_GUARD_BLOCK` ở `/admin/audit`.
+- **Xong một phần (2026-11-05)** — Giám sát: `middleware/metrics.middleware.js` đo p50/p95/5xx theo mẫu route (không đọc body/query/header), cảnh báo `console.error` có throttle 60s khi p95 > 500 ms hoặc ≥ 5 lỗi 5xx; `GET /api/health` (admin) trả số đo + số lượt gọi Gemini trong ngày. Test: `tests/18-metrics`. Màn hình `/admin/health` (menu System Health) hiện uptime, tổng 5xx, số route p95 > 500 ms, lượt gọi Gemini trong ngày và bảng route xếp theo p95, tự làm mới 15 s. **Chưa có**: kênh cảnh báo ngoài log.
 
 ---
 
@@ -219,3 +246,11 @@ của gợi ý cá nhân hoá. Cần tập ảnh gắn nhãn và tập ground-tr
 | 2026-09-09 | Bọc 129 handler bằng `asyncHandler`, gỡ 129 khối `try/catch` chỉ để log rồi trả 500. Hạ tầng xử lý lỗi đã viết sẵn từ trước nhưng chưa nơi nào dùng. Lỗi Prisma giờ được ánh xạ sang status có nghĩa thay vì 500 cho tất cả | Claude Code |
 | 2026-09-09 | Chuyển khả năng tìm kiếm từ `ai/retrieval.js` sang `lib/productSearch.js`. Nhờ đó ô tìm kiếm sản phẩm dùng chung full-text + trigram với chatbot, đóng nốt phần còn lại của G3. Thêm `fetchRankedProducts` vì `where id in [...]` làm mất thứ hạng RRF | Claude Code |
 | 2026-09-09 | Tách `syncFilterOptionsFromProducts` (179 dòng) và bộ giải bộ lọc động (186 dòng) ra khỏi controller thành `services/filterSync.service.js` và `services/productFilter.service.js` | Claude Code |
+| 2026-10-27 | T7 (một phần): cache thứ hạng RRF (không cache giá/tồn kho) + chỉ bind tool khi cần. TTFT 4.0s → ~2.5-3.6s, chưa đạt 1.5s. `ai/retrieval.js`, `ai/agent.js`, `lib/productSearch.js` (`fetchRowsByIds`), `tests/16-retrieval-cache.test.mjs` | Claude Code |
+| 2026-10-27 | T9: `pickConfidentSubset` giảm ngữ cảnh LLM còn 1-2 ứng viên khi cả 3 nhánh tìm kiếm đồng ý hạng 1 (tách khỏi `retrieveHybrid` để không ảnh hưởng Recall@5). Context Relevance 0.275 → 0.425, Recall@5 không đổi | Claude Code |
+| 2026-10-27 | T8: đo xong 2 KPI còn thiếu. Tìm ảnh dùng ảnh thứ hai có sẵn của từng sản phẩm seed, không cần gán nhãn tay — 100% (20/20). nDCG@5 dùng tập giả lập cô lập, dọn sạch sau khi đo — 0.610. `scripts/evaluate-image-search.js`, `scripts/evaluate-recommendations.js`, export + guard `main()` trong `jobs/computeUserRecommendations.js` để eval import được mà không chạy nhầm job thật | Claude Code |
+| 2026-11-05 | Đo tải 200 người đồng thời: danh sách sản phẩm p95 594 ms, vượt mốc 500 ms. CPU profile cho thấy nút cổ chai là parse kết quả Prisma + `JSON.stringify` trên một thread, không phải DB (nâng pool lên 60 còn tệ hơn). Bỏ `specs_detail` khỏi các endpoint danh sách (`lib/productQuery.js`, chỉ trang chi tiết đọc cột này qua `/products/:id`): payload 62 KB → 52 KB, p95 594 → 431 ms. Ở 300 người: 0 lỗi, p95 650 ms | Claude Code |
+| 2026-11-05 | Review code + bảo mật diff chưa commit. Sửa trong `ai/retrieval.js`: cache thứ hạng có trần 1000 khoá (trước đó tăng vô hạn theo câu hỏi người dùng), khoá cache tách có/không nhánh vector, không cache khi một nhánh lỗi, cache hit bỏ sản phẩm đã xoá thay vì trả mục rỗng (từng sinh `product_id: NaN` trong công cụ). Sửa `getBehaviorAnalytics`: tử số giỏ hàng → đơn chỉ đếm người mua nằm trong tập đã thêm giỏ (trước đó có thể > 100%), bỏ khoá `sess:unknown` gộp mọi khách vô danh thành một | Claude Code |
+| 2026-11-05 | `eval:rag` từng đo TTFT khi cache thứ hạng đã nóng từ phần A của chính script, nên con số ~2.5-3.6 s có thể thấp hơn thực tế. Thêm `scripts/_disable-rank-cache.js` (import đầu tiên), `AI_RETRIEVAL_CACHE_TTL_MS<=0` tắt hẳn cache. `eval:ai` và `eval:rag` chưa chạy lại được vì Gemini trả `503 Service Unavailable` (high demand) | Claude Code |
+| 2026-11-05 | Đo lại sau khi Gemini hết 503. `eval:ai`: kiểm duyệt 34 mẫu (30 sạch, 4 độc hại), chặn nhầm 0/30, recall 4/4; mẫu lỗi gọi model được gọi lại tối đa 2 lần, cùng mẫu cùng nhãn. `eval:rag` (đã tắt cache): Recall@5 100%, MRR 0.919, F 1.0, AR 0.85, CR 0.363, TTFT 1.61 s, tổng 1.88 s. TTFT vẫn trên mốc 1.5 s; độ trễ phụ thuộc mạnh vào tải phía Gemini (cùng ngày có lúc một lượt kiểm duyệt mất 21 s) | Claude Code |
+| 2026-11-05 | Dọn nợ: (1) màn hình `/admin/health`. (2) `tsc -b` frontend từ 27 lỗi về 0; xoá `PriceRangeFilter`/`ToggleFilter` không ai dùng; hook `useAdminFilterOption` trước trả `AxiosResponse` nên form sửa filter đọc nhầm lớp và để trống, nay unwrap `.data` trong hook. (3) `npm audit`: frontend 0 lỗ hổng (`audit fix` + `overrides` ép `minimatch ^11.0.4` cho `typescript-estree`/`glob`); backend nâng `@langchain/core` 1.3, `@langchain/google-genai` 2.3, `nodemailer` 10, còn 3 lỗ hổng high trong chuỗi CLI `prisma` 6 (`@prisma/config`, `effect`, `deepmerge-ts`), chỉ hết khi lên Prisma 7 (driver adapter + `prisma.config.ts`), để quyết riêng. Test 139/140 (ca đỏ vẫn là MoMo sandbox). `eval:rag` sau nâng cấp: Recall@5 100%, MRR 0.919, F 1, AR 0.875, CR 0.425, TTFT 1.42 s, tổng 1.81 s | Claude Code |

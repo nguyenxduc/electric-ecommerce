@@ -18,3 +18,6 @@ build/
 
 # Claude Code: settings.json dung chung, ban local rieng tung may
 .claude/settings.local.json
+
+# oh-my-claudecode: trang thai phien cuc bo
+.omc/
