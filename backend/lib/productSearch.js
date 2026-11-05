@@ -161,6 +161,27 @@ export const searchVector = async (
 };
 
 /**
+ * Doc lai hang hoa tuoi theo mot danh sach id da co san (vd. tu bang xep hang
+ * da cache). Dung khi thu hang (id + diem) duoc cache nhung gia/ton kho thi
+ * khong duoc cache - phai doc lai moi lan de giu dung bat bien "gia/ton kho
+ * la so lieu tai thoi diem hoi".
+ */
+export const fetchRowsByIds = async (
+  prisma,
+  ids,
+  { activeShopsOnly = true } = {}
+) => {
+  if (!ids || ids.length === 0) return [];
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT ${SELECT_COLUMNS}
+     ${fromJoins(activeShopsOnly)}
+     WHERE p.deleted_at IS NULL AND p.id = ANY($1::bigint[])`,
+    ids.map((id) => String(id))
+  );
+  return rows || [];
+};
+
+/**
  * Tim id san pham khop voi mot cau tim kiem, chiu duoc loi go phim nhe.
  *
  * Dung cho o tim kiem cua nguoi dung. Khong co nhanh vector o day: o tim kiem

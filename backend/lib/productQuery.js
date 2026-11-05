@@ -61,6 +61,10 @@ export const SORT_ORDER_BY = {
 export const resolveOrderBy = (sort) =>
   SORT_ORDER_BY[sort] || { created_at: "desc" };
 
+// Danh sach khong tra bang thong so chi tiet: chi trang chi tiet doc no, qua
+// GET /products/:id. Bo cot nay giam payload va CPU parse/serialize khi tai cao.
+const LIST_OMIT = { specs_detail: true };
+
 export const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
   const [total_count, products] = await Promise.all([
     prisma.product.count({ where }),
@@ -70,6 +74,7 @@ export const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
       skip,
       take,
       include: { product_colors: true, shop: { select: shopSelect } },
+      omit: LIST_OMIT,
     }),
   ]);
   return { total_count, products };
@@ -87,6 +92,7 @@ export const fetchRankedProducts = async (where, rankedIds, skip, take) => {
   const products = await prisma.product.findMany({
     where,
     include: { product_colors: true, shop: { select: shopSelect } },
+    omit: LIST_OMIT,
   });
 
   const rank = new Map(rankedIds.map((id, i) => [id.toString(), i]));

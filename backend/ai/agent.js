@@ -10,8 +10,9 @@ import {
   GEMINI_API_KEY,
   GEMINI_CHAT_MODEL,
   hasGeminiApiKey,
+  incrementAiCallCounter,
 } from "./geminiConfig.js";
-import { retrieveHybrid } from "./retrieval.js";
+import { pickConfidentSubset, retrieveHybrid } from "./retrieval.js";
 import {
   normalizeText,
   slugifyText,
@@ -72,6 +73,22 @@ const logDebugError = (label, err, extra = {}) => {
 };
 
 const normalizeTokens = (text) => tokenizeText(text, 3);
+
+// Gemini dung lai "can nhac" co goi cong cu hay khong moi khi tools duoc bind,
+// day la phan lon do tre toi ky tu dau tien (do thuc te: 1.4s khong bind vs
+// 4.0s co bind). Khoi ngu canh da co san gia/ton kho cho tung san pham, nen
+// chi thuc su can cong cu khi: chua tim duoc san pham nao (can lookup_product),
+// hoi theo mau/bien the (can check_stock) hoac hoi phi/thoi gian ship (can
+// get_shop_policy).
+const TOOL_CUES = [
+  "mau", "mau sac", "phien ban mau", "size",
+  "ship", "van chuyen", "phi ship", "phi van chuyen", "giao hang", "freeship",
+];
+export const needsTools = (question, retrieved) => {
+  if (!retrieved || retrieved.length === 0) return true;
+  const normalized = normalizeText(question);
+  return TOOL_CUES.some((cue) => normalized.includes(cue));
+};
 
 const hasFollowUpCue = (text) => {
   const normalized = normalizeText(text);
@@ -331,7 +348,10 @@ export const runAgent = async (prisma, chatId, { onToken = null } = {}) => {
         ? retrieveHybrid(prisma, lastUser, {
             topK,
             embedQuery: embeddings
-              ? (text) => embeddings.embedQuery(text)
+              ? (text) => {
+                  incrementAiCallCounter();
+                  return embeddings.embedQuery(text);
+                }
               : null,
             onError: (branch, err) =>
               logDebugError(`retrieveHybrid ${branch} error:`, err),
@@ -351,7 +371,14 @@ export const runAgent = async (prisma, chatId, { onToken = null } = {}) => {
         : history;
 
     const nonce = createContextNonce();
-    const { block, removedInstructions } = buildContextBlock(retrieved, nonce);
+    // Cau hoi neu dich danh mot san pham (diem RRF vuot troi) thi chi can 1-2
+    // ung vien trong ngu canh thay vi ca 5 - giam nhieu tu cac ung vien khong
+    // lien quan, nang Context Relevance ma khong doi Recall@5 (do do tren
+    // chinh retrieveHybrid, khong qua buoc nay).
+    const { block, removedInstructions } = buildContextBlock(
+      pickConfidentSubset(retrieved),
+      nonce
+    );
 
     const systemText = [
       SYSTEM_PROMPT,
@@ -369,7 +396,10 @@ export const runAgent = async (prisma, chatId, { onToken = null } = {}) => {
     );
 
     const { tools, byName } = createShoppingTools(prisma);
-    const model = createChatModel().bindTools(tools);
+    const bindTools = needsTools(lastUser, retrieved);
+    const model = bindTools
+      ? createChatModel().bindTools(tools)
+      : createChatModel();
 
     // Kết quả công cụ được nạp lại dưới dạng khối số liệu, chứ không đẩy
     // ngược AIMessage chứa functionCall vào lịch sử theo kiểu ReAct chuẩn.
