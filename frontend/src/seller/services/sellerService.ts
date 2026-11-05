@@ -73,3 +73,96 @@ export const resolveReturn = async (
   })
   return data
 }
+
+// ---- Shop settings (pickup address + tax) ----
+export const updateShopSettings = async (payload: Record<string, string>) => {
+  const { data } = await axiosClient.patch('/shops/me', payload)
+  return data
+}
+
+// ---- Shipments ----
+export type ShipmentEvent = {
+  id: number
+  status: string
+  description: string | null
+  occurred_at: string
+}
+export type Shipment = {
+  id: number
+  order_id: number
+  carrier: string
+  tracking_code: string | null
+  status: string
+  fee_vnd: number | null
+  cod_amount_vnd: number | null
+  events?: ShipmentEvent[]
+}
+
+export const getOrderShipment = async (
+  orderId: number
+): Promise<Shipment | null> => {
+  const { data } = await axiosClient.get(`/shipments/orders/${orderId}`)
+  return data.data || null
+}
+export const createShipment = async (orderId: number) =>
+  (await axiosClient.post(`/shipments/orders/${orderId}`)).data
+export const cancelShipment = async (id: number) =>
+  (await axiosClient.delete(`/shipments/${id}`)).data
+export const simulateShipment = async (id: number, status: string) =>
+  (await axiosClient.post(`/shipments/${id}/simulate`, { status })).data
+
+// Fetch an authenticated HTML document and open it in a new tab.
+const openHtml = async (url: string) => {
+  const { data } = await axiosClient.get(url, { responseType: 'text' })
+  const blob = new Blob([data], { type: 'text/html' })
+  window.open(URL.createObjectURL(blob), '_blank')
+}
+export const openShipmentLabel = (id: number) => openHtml(`/shipments/${id}/label`)
+export const openInvoiceHtml = (id: number) => openHtml(`/invoices/${id}/html`)
+
+// ---- Invoices & tax ----
+export type Invoice = {
+  id: number
+  invoice_number: string
+  series?: string
+  status: 'issued' | 'cancelled'
+  total: string
+  currency?: string
+  issued_at: string
+  buyer?: { name?: string; company_name?: string }
+}
+
+export const getOrderInvoice = async (orderId: number): Promise<Invoice | null> => {
+  try {
+    const { data } = await axiosClient.get(`/invoices/orders/${orderId}`)
+    return data.data || null
+  } catch (e: any) {
+    if (e?.response?.status === 404) return null
+    throw e
+  }
+}
+
+export const getMyInvoices = async (page = 1, limit = 10) => {
+  const { data } = await axiosClient.get('/invoices/shop/mine', {
+    params: { page, limit }
+  })
+  return data.data as {
+    invoices: Invoice[]
+    pagination: { current_page: number; total_pages: number; total_count: number }
+  }
+}
+
+export type TaxMonth = {
+  period: string
+  orders: number
+  base: number | string
+  vat: number | string
+  pit: number | string
+  total_withheld: number | string
+}
+export const getMyTaxSummary = async (year: number) => {
+  const { data } = await axiosClient.get('/tax/shop/mine/summary', {
+    params: { year }
+  })
+  return data.data as { year: number; months: TaxMonth[] }
+}

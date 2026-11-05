@@ -43,6 +43,11 @@ const Order = () => {
         name: oi.product?.name || 'Product',
         quantity: oi.quantity,
         price: oi.unit_price,
+        variant: oi.variant_id
+          ? (oi as any).variant?.name ||
+            oi.product?.variants?.find(v => v.id === oi.variant_id)?.name ||
+            `Variant #${oi.variant_id}`
+          : undefined,
         image:
           (Array.isArray(oi.product?.img) && oi.product?.img?.[0]) ||
           oi.product?.image_url ||

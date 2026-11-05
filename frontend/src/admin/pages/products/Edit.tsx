@@ -7,6 +7,12 @@ import {
   useUpdateAdminProduct,
   useAdminCategories
 } from '../../hooks'
+import VariantsEditor, {
+  VariantRow,
+  variantsFromProduct,
+  variantsToPayload,
+  variantsTotal
+} from './VariantsEditor'
 
 export default function AdminProductEdit({
   basePath = '/admin/products'
@@ -36,6 +42,7 @@ export default function AdminProductEdit({
   const [specsDetail, setSpecsDetail] = useState<
     { label: string; value: any }[]
   >([])
+  const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
@@ -70,6 +77,7 @@ export default function AdminProductEdit({
           : []
       ) as any
       setColors(colorArr)
+      setVariants(variantsFromProduct((p as any).variants))
       setSpecs(Array.isArray(p.specs) ? (p.specs as any) : [])
       setSpecsDetail(
         Array.isArray(p.specs_detail) ? (p.specs_detail as any) : []
@@ -127,10 +135,10 @@ export default function AdminProductEdit({
       code: c.code,
       quantity: Number(c.quantity || 0)
     }))
-    const totalQty = colorsPayload.reduce(
-      (s, c) => s + Number(c.quantity || 0),
-      0
-    )
+    const totalQty = variants.length
+      ? variantsTotal(variants)
+      : colorsPayload.reduce((s, c) => s + Number(c.quantity || 0), 0)
+    const variantsPayload = variantsToPayload(variants)
     try {
       if (isNew) {
         await (create as any).mutateAsync({
@@ -144,7 +152,8 @@ export default function AdminProductEdit({
           color: colorsPayload,
           product_colors: colorsPayload,
           specs,
-          specs_detail: specsDetail
+          specs_detail: specsDetail,
+          variants: variantsPayload.length ? variantsPayload : undefined
         })
       } else {
         const discountAmount =
@@ -161,7 +170,8 @@ export default function AdminProductEdit({
           img: [...existingImages, ...imageUrls], // Combine existing and new URL images
           images, // New file uploads
           specs, // ✅ ADD: specs
-          specs_detail: specsDetail // ✅ ADD: specs_detail
+          specs_detail: specsDetail, // ✅ ADD: specs_detail
+          variants: variantsPayload // full set; missing ones are removed
         })
       }
       toast.success(isNew ? 'Product created' : 'Product updated')
@@ -383,6 +393,7 @@ export default function AdminProductEdit({
               </div>
             </div>
           </div>
+          <VariantsEditor rows={variants} onChange={setVariants} />
         </form>
 
         <div className="space-y-4">

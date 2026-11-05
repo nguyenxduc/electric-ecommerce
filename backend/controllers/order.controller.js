@@ -38,7 +38,7 @@ import {
 import { parsePagination } from "../lib/pagination.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
-const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409 };
+const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409, SHIPMENT_ACTIVE: 409 };
 
 // Yeu cau hoa don cong ty tu checkout: chi giu cac truong chuoi da biet, cat
 // do dai - day la du lieu nguoi dung go, se in len hoa don.
@@ -72,6 +72,11 @@ export const createOrder = async (req, res) => {
     // One entry per cart item: { data (OrderItem row), color, shopId }
     const preparedItems = [];
     for (const it of items) {
+      // So luong am/le se lam am tien hang va cong nguoc ton kho khi tru kho.
+      if (!Number.isInteger(Number(it?.quantity)) || Number(it.quantity) < 1) {
+        return res.status(400).json({ message: "Item quantity must be a positive integer" });
+      }
+      it.quantity = Number(it.quantity);
       const product = await prisma.product.findFirst({
         where: { id: BigInt(it.product_id), deleted_at: null },
         include: {
@@ -173,6 +178,11 @@ export const createOrder = async (req, res) => {
           Number(product.discount || 0) +
           Number(variant?.price_delta || 0)
       );
+      // Chan gia <= 0: mot dong am (bien the price_delta am) se bu tru tien hang
+      // cua shop khac trong cung checkout -> mua hang shop khac gan nhu mien phi.
+      if (!(unitPrice > 0)) {
+        return res.status(400).json({ message: `Invalid price for ${product.name}` });
+      }
       const totalPrice = Number(unitPrice) * Number(it.quantity);
       totalAmount += totalPrice;
       preparedItems.push({
@@ -524,7 +534,10 @@ export const getOrderById = asyncHandler(async (req, res) => {
         select: { id: true, group_number: true, total_amount: true },
       },
       order_items: {
-        include: { product: { select: { id: true, name: true, img: true } } },
+        include: {
+          product: { select: { id: true, name: true, img: true } },
+          variant: { select: { id: true, sku: true, name: true } },
+        },
       },
     },
   });
@@ -564,6 +577,7 @@ export const getUserOrders = asyncHandler(async (req, res) => {
       order_items: {
         include: {
           product: true,
+          variant: { select: { id: true, sku: true, name: true } },
         },
       },
     },
@@ -783,7 +797,11 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     return res.status(result.code === "NOT_FOUND" ? 404 : 409).json({
       success: false,
       message:
-        result.code === "NOT_FOUND" ? "Order not found" : "Order status already changed",
+        result.code === "NOT_FOUND"
+          ? "Order not found"
+          : result.code === "SHIPMENT_ACTIVE"
+            ? result.message
+            : "Order status already changed",
     });
   }
   const updated = result.order;

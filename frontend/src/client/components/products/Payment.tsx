@@ -9,6 +9,7 @@ import {
   useWishlist
 } from '../../hooks/useWishlist'
 import { useValidateToken } from '../../hooks/useAuth'
+import type { ProductVariant } from '../../types/product'
 
 interface ProductProps {
   discount: number
@@ -19,6 +20,8 @@ interface ProductProps {
   colors: { name: string; code: string; quantity?: number }[]
   id: number
   quantity: number // total (fallback)
+  variants?: ProductVariant[]
+  selectedVariant?: ProductVariant | null
 }
 
 const Payment = ({
@@ -29,7 +32,9 @@ const Payment = ({
   selectedColor,
   colors,
   id,
-  quantity
+  quantity,
+  variants = [],
+  selectedVariant = null
 }: ProductProps) => {
   const navigate = useNavigate()
   const addToCartMutation = useAddToCart()
@@ -55,10 +60,12 @@ const Payment = ({
   }, [wishlistData?.items, id])
 
   // Use final_price from backend if available, otherwise calculate
+  const hasVariants = variants.length > 0
+  const priceDelta = Number(selectedVariant?.price_delta ?? 0)
   const finalPrice =
-    final_price !== undefined
+    (final_price !== undefined
       ? Number(final_price)
-      : Number(price) - Number(discount)
+      : Number(price) - Number(discount)) + priceDelta
 
   // Use discount_percentage from backend if available, otherwise calculate
   const discountPercent =
@@ -74,9 +81,17 @@ const Payment = ({
       (colors.length ? colors[0] : undefined),
     [colors, selectedColor]
   )
-  const selectedQty = selectedColorObj?.quantity ?? quantity
+  const selectedQty = hasVariants
+    ? selectedVariant?.quantity ?? 0
+    : selectedColorObj?.quantity ?? quantity
+  const stockQty = hasVariants && selectedVariant ? selectedVariant.quantity : quantity
+  const canBuy = hasVariants ? !!selectedVariant && selectedQty > 0 : quantity > 0
 
   const handleAddToCart = () => {
+    if (hasVariants && !selectedVariant) {
+      toast.error('Please select a variant')
+      return
+    }
     if (selectedQty <= 0) {
       toast.error('Selected color is out of stock')
       return
@@ -96,7 +111,8 @@ const Payment = ({
         productId: id,
         payload: {
           quantity: 1,
-          color: colorPayload
+          color: colorPayload,
+          variant_id: selectedVariant?.id
         }
       },
       {
@@ -117,6 +133,10 @@ const Payment = ({
   }
 
   const handleBuyNow = async () => {
+    if (hasVariants && !selectedVariant) {
+      toast.error('Please select a variant')
+      return
+    }
     if (selectedQty <= 0) {
       toast.error('Selected color is out of stock')
       return
@@ -137,7 +157,8 @@ const Payment = ({
         productId: id,
         payload: {
           quantity: 1,
-          color: colorPayload
+          color: colorPayload,
+          variant_id: selectedVariant?.id
         }
       },
       {
@@ -208,17 +229,23 @@ const Payment = ({
           </div>
           {discountPercent > 0 && (
             <p className="text-sm text-gray-500 line-through">
-              ${Number(price).toFixed(2)}
+              ${(Number(price) + priceDelta).toFixed(2)}
             </p>
           )}
         </div>
 
         {/* Stock Status */}
         <div className="mb-6">
-          {quantity > 0 ? (
+          {hasVariants && !selectedVariant ? (
+            <span className="text-sm text-gray-500">
+              Select a variant to see stock
+            </span>
+          ) : stockQty > 0 ? (
             <div className="flex items-center gap-2 text-green-600">
               <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-              <span className="text-sm font-medium">In Stock</span>
+              <span className="text-sm font-medium">
+                In Stock{hasVariants ? ` (${stockQty} left)` : ''}
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-red-600">
@@ -232,9 +259,9 @@ const Payment = ({
         <div className="space-y-3">
           <button
             onClick={handleBuyNow}
-            disabled={quantity <= 0 || addToCartMutation.isPending}
+            disabled={!canBuy || addToCartMutation.isPending}
             className={`w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3.5 rounded-lg font-semibold transition-all ${
-              quantity > 0 && !addToCartMutation.isPending
+              canBuy && !addToCartMutation.isPending
                 ? 'hover:bg-blue-700 shadow-md hover:shadow-lg'
                 : 'opacity-50 cursor-not-allowed'
             }`}
@@ -245,9 +272,9 @@ const Payment = ({
 
           <button
             onClick={handleAddToCart}
-            disabled={quantity <= 0 || addToCartMutation.isPending}
+            disabled={!canBuy || addToCartMutation.isPending}
             className={`w-full flex items-center justify-center gap-2 bg-white text-blue-600 py-3.5 rounded-lg font-semibold border-2 border-blue-600 transition-all ${
-              quantity > 0 && !addToCartMutation.isPending
+              canBuy && !addToCartMutation.isPending
                 ? 'hover:bg-blue-50 hover:border-blue-700'
                 : 'opacity-50 cursor-not-allowed'
             }`}

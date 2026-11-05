@@ -35,13 +35,19 @@ export const quote = asyncHandler(async (req, res) => {
     }
     const product = await prisma.product.findFirst({
       where: { id: BigInt(it.product_id), deleted_at: null },
-      include: { shop: true },
+      include: { shop: true, variants: { where: { deleted_at: null }, select: { id: true, price_delta: true } } },
     });
     if (!product) throw bad(`Product ${it.product_id} not found`);
+    // Giong checkout: san pham co bien the thi bat buoc chon bien the cua chinh san pham do
+    let variant = null;
+    if (product.variants.length > 0) {
+      variant = product.variants.find((v) => it.variant_id != null && v.id.toString() === String(it.variant_id));
+      if (!variant) throw bad(`Valid variant required for product ${it.product_id}`);
+    }
     prepared.push({
       shop: product.shop,
       weightGrams: (product.weight_grams || 0) * qty,
-      data: { total_price: round2((Number(product.price) - Number(product.discount || 0)) * qty) },
+      data: { total_price: round2((Number(product.price) - Number(product.discount || 0) + Number(variant?.price_delta || 0)) * qty) },
     });
   }
   const groups = groupItemsByShop(prepared);
@@ -189,12 +195,18 @@ ${carrierUrl ? `<p><a href="${esc(carrierUrl)}">Carrier label</a></p>` : ""}
 
 const sha = (s) => crypto.createHash("sha256").update(String(s)).digest();
 
-// POST /api/shipments/webhook/:carrier?token=...
+// POST /api/shipments/webhook/:carrier (token o header x-webhook-token hoac ?token=)
 export const webhook = asyncHandler(async (req, res) => {
-  const secret = process.env.SHIPPING_WEBHOOK_SECRET;
+  const carrierKey = String(req.params.carrier).toUpperCase().replace(/[^A-Z0-9]/g, "_");
+  const secret = process.env[`SHIPPING_WEBHOOK_SECRET_${carrierKey}`] || process.env.SHIPPING_WEBHOOK_SECRET;
+  const token = req.headers["x-webhook-token"] || req.query.token;
   // Hash truoc de timingSafeEqual nhan hai buffer cung do dai
-  if (!secret || !req.query.token || !crypto.timingSafeEqual(sha(secret), sha(req.query.token))) {
+  if (!secret || !token || !crypto.timingSafeEqual(sha(secret), sha(token))) {
     return res.status(401).json({ success: false, error: "Invalid webhook token" });
+  }
+  // Carrier mock chi de dev/test: o production khong ai duoc gia lap su kien giao hang qua webhook
+  if (process.env.NODE_ENV === "production" && req.params.carrier === "mock") {
+    throw bad("Unknown carrier", 404);
   }
   const provider = getProvider(req.params.carrier);
   if (!provider) throw bad("Unknown carrier", 404);
@@ -212,8 +224,8 @@ const SIM_STATUSES = ["picking", "in_transit", "delivered", "returned", "cancell
 
 // POST /api/shipments/:id/simulate {status} - chi van don mock
 export const simulate = asyncHandler(async (req, res) => {
-  if (process.env.NODE_ENV === "production" && req.user.role !== ROLES.ADMIN) {
-    throw bad("Simulation is admin-only in production", 403);
+  if (req.user.role !== ROLES.ADMIN && process.env.SHIPMENT_SIMULATE_ENABLED !== "1") {
+    throw bad("Simulation is disabled", 403);
   }
   const shipment = await prisma.shipment.findUnique({ where: { id: BigInt(req.params.id) } });
   if (!shipment) throw bad("Shipment not found", 404);

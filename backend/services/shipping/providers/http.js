@@ -2,14 +2,14 @@
 // de controller tra thong bao ro rang thay vi sap request.
 import { AppError } from "../../../middleware/error.middleware.js";
 
-export const callCarrier = async (carrier, url, { method = "GET", headers = {}, body } = {}) => {
+export const callCarrier = async (carrier, url, { method = "GET", headers = {}, body, timeoutMs = 15000 } = {}) => {
   let res;
   try {
     res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json", ...headers },
       ...(body !== undefined && { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
     throw new AppError(`${carrier}: khong ket noi duoc (${err.message})`, 502);

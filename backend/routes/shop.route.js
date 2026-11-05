@@ -9,6 +9,7 @@ import {
   approveShop,
   rejectShop,
   suspendShop,
+  adminUpdateShopTax,
 } from "../controllers/shop.controller.js";
 import { getProductsByShop } from "../controllers/product.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
@@ -29,6 +30,7 @@ router.get("/admin/all", protectRoute, adminRoute, adminListShops);
 router.patch("/admin/:id/approve", protectRoute, adminRoute, approveShop);
 router.patch("/admin/:id/reject", protectRoute, adminRoute, rejectShop);
 router.patch("/admin/:id/suspend", protectRoute, adminRoute, suspendShop);
+router.patch("/:id/tax", protectRoute, adminRoute, adminUpdateShopTax);
 
 // Seller self-service
 router.post("/apply", protectRoute, shopImages, applyForShop);

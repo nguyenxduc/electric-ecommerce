@@ -20,6 +20,7 @@ import { useSimilarProducts } from '../../hooks/useProducts'
 import ListProduct from './ListProduct'
 import ReviewComponent from './Review'
 import { getProductColors } from '../../utils/productColors'
+import VariantPicker from './VariantPicker'
 
 interface ProductDetailProps {
   product: Product
@@ -32,6 +33,12 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
   )
   const [selectedColor, setSelectedColor] = useState<string>('')
   const [expanded, setExpanded] = useState(false)
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
+    null
+  )
+  const variants = product.variants ?? []
+  const selectedVariant =
+    variants.find(v => v.id === selectedVariantId) ?? null
   const visibleCount = expanded ? product.specs.length : 5
 
   const { data: similarProducts } = useSimilarProducts(Number(product.id), 6)
@@ -62,6 +69,10 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
       setSelectedColor('')
     }
   }, [product, colors])
+
+  useEffect(() => {
+    setSelectedVariantId(null)
+  }, [product?.id])
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -156,6 +167,15 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 </div>
               )}
 
+              {variants.length > 0 && (
+                <VariantPicker
+                  key={product.id}
+                  variants={variants}
+                  selectedId={selectedVariantId}
+                  onSelect={setSelectedVariantId}
+                />
+              )}
+
               {/* Specifications */}
               {product.specs && product.specs.length > 0 && (
                 <div>
@@ -200,6 +220,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 colors={colors}
                 id={product.id}
                 quantity={product.quantity}
+                variants={variants}
+                selectedVariant={selectedVariant}
               />
             </div>
           </div>

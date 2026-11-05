@@ -65,8 +65,7 @@ const parseVariantsInput = (raw) => {
   return { variants };
 };
 
-// Dong bo bien the cua san pham: upsert theo id, xoa mem cai bi bo, tinh lai
-// product.quantity = tong ton kho bien the. Nem VARIANT_SKU_CONFLICT /
+// Dong bo bien the cua san pham: upsert theo id, xoa mem cai bi bo. Nem VARIANT_SKU_CONFLICT /
 // VARIANT_FOREIGN neu sku trung hoac id khong thuoc san pham.
 const syncVariants = async (tx, productId, variants) => {
   const existing = await tx.productVariant.findMany({
@@ -101,18 +100,33 @@ const syncVariants = async (tx, productId, variants) => {
       });
     }
   }
-  if (variants.length > 0) {
-    const sumQty = variants.reduce((s, v) => s + v.quantity, 0);
-    await tx.product.update({ where: { id: productId }, data: { quantity: sumQty } });
-    return sumQty;
+};
+
+// Chay sau moi lan luu san pham (ke ca khi payload khong co variants): gia hieu dung
+// = price - discount + price_delta phai > 0 va quantity = tong ton kho bien the con hieu luc,
+// de colors/quantity trong payload khong ghi de ton kho bien the.
+const settleVariants = async (tx, productId, price, discount) => {
+  const active = await tx.productVariant.findMany({
+    where: { product_id: productId, deleted_at: null },
+    select: { price_delta: true, quantity: true },
+  });
+  if (active.length === 0) return null;
+  if (active.some((v) => price - discount + Number(v.price_delta) <= 0)) {
+    throw new Error("VARIANT_PRICE");
   }
-  return null;
+  const sumQty = active.reduce((s, v) => s + v.quantity, 0);
+  await tx.product.update({ where: { id: productId }, data: { quantity: sumQty } });
+  return sumQty;
 };
 
 // Map loi sync bien the sang HTTP; tra true neu da xu ly.
 const respondVariantError = (err, res) => {
   if (err?.message === "VARIANT_FOREIGN") {
     res.status(400).json({ message: "Variant does not belong to this product" });
+    return true;
+  }
+  if (err?.message === "VARIANT_PRICE") {
+    res.status(400).json({ message: "Variant price must be greater than 0 after discount" });
     return true;
   }
   if (err?.code === "P2002") {
@@ -268,10 +282,9 @@ export const createProduct = asyncHandler(async (req, res) => {
       savedProduct.quantity = sumQty;
     }
 
-    if (variantsInput?.length) {
-      const sumQty = await syncVariants(tx, savedProduct.id, variantsInput);
-      savedProduct.quantity = sumQty;
-    }
+    if (variantsInput?.length) await syncVariants(tx, savedProduct.id, variantsInput);
+    const sumQty = await settleVariants(tx, savedProduct.id, numericPrice, numericDiscount);
+    if (sumQty !== null) savedProduct.quantity = sumQty;
 
     return savedProduct;
   });
@@ -581,9 +594,15 @@ export const updateProduct = asyncHandler(async (req, res) => {
     }
 
     if (variantsInput !== undefined) {
-      const sumQty = await syncVariants(tx, BigInt(req.params.id), variantsInput);
-      if (sumQty !== null) updated.quantity = sumQty;
+      await syncVariants(tx, BigInt(req.params.id), variantsInput);
     }
+    const settledQty = await settleVariants(
+      tx,
+      BigInt(req.params.id),
+      numericPrice,
+      numericDiscount
+    );
+    if (settledQty !== null) updated.quantity = settledQty;
 
     return updated;
   });

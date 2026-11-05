@@ -114,8 +114,10 @@ const STATUS_LABEL = {
  *   actorUserId null = he thong (webhook, job)
  * @param {string} [opts.auditAction] mac dinh ORDER_STATUS_UPDATE
  * @param {boolean} [opts.notifyBuyer] mac dinh true
+ * @param {boolean} [opts.skipShipmentCheck] chi webhook/van don dat true: ho
+ *   biet van don da ket thuc (hoan hang) nen huy don la dung
  * @returns {Promise<{ok:true, order:object, previous:string}
- *   | {ok:false, code:"NOT_FOUND"|"INVALID_TRANSITION"|"CONFLICT", message:string}>}
+ *   | {ok:false, code:"NOT_FOUND"|"INVALID_TRANSITION"|"CONFLICT"|"SHIPMENT_ACTIVE", message:string}>}
  */
 export const transitionOrderStatus = async ({
   orderId,
@@ -125,6 +127,7 @@ export const transitionOrderStatus = async ({
   auditAction = "ORDER_STATUS_UPDATE",
   notifyBuyer = true,
   auditMetadata = {},
+  skipShipmentCheck = false,
 }) => {
   const order = await prisma.order.findFirst({
     where: { id: BigInt(orderId), deleted_at: null },
@@ -147,6 +150,22 @@ export const transitionOrderStatus = async ({
       code: "INVALID_TRANSITION",
       message: `Cannot change order status from "${currentStatus}" to "${status}"`,
     };
+  }
+
+  // Huy don khi van don con song: kho duoc tra lai nhung hang van di, nha van
+  // chuyen van giao va thu COD cho mot don da huy. Phai huy van don truoc.
+  if (status === ORDER_STATUS.CANCELLED && !skipShipmentCheck) {
+    const live = await prisma.shipment.findFirst({
+      where: { order_id: order.id, status: { notIn: ["cancelled", "returned"] } },
+      select: { status: true },
+    });
+    if (live) {
+      return {
+        ok: false,
+        code: "SHIPMENT_ACTIVE",
+        message: "This order is already with the carrier. Cancel the shipment first.",
+      };
+    }
   }
 
   let refundOwed = null;

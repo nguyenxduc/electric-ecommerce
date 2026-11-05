@@ -10,8 +10,22 @@ const headers = () => {
   }
   return { Token: process.env.GHN_TOKEN, ShopId: process.env.GHN_SHOP_ID };
 };
-const call = (path, body, method = "POST") =>
-  callCarrier("GHN", `${base()}/shiip/public-api/${path}`, { method, headers: headers(), body });
+const call = (path, body, method = "POST", timeoutMs) =>
+  callCarrier("GHN", `${base()}/shiip/public-api/${path}`, { method, headers: headers(), body, timeoutMs });
+
+// Master data tinh/huyen/xa gan nhu khong doi: cache RAM 24h, bao gia (checkout) khong goi lai moi lan.
+// shortcut: cache theo process, khong chia se giua worker, du dung vi du lieu nho.
+const MASTER_TTL_MS = 24 * 60 * 60 * 1000;
+const QUOTE_TIMEOUT_MS = 5000;
+const masterCache = new Map();
+const master = async (path, body, method) => {
+  const key = `${path}:${JSON.stringify(body ?? "")}`;
+  const hit = masterCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.data;
+  const data = (await call(path, body, method, QUOTE_TIMEOUT_MS)).data || [];
+  masterCache.set(key, { data, exp: Date.now() + MASTER_TTL_MS });
+  return data;
+};
 
 const STATUS = {
   ready_to_pick: "created",
@@ -39,13 +53,13 @@ const findByName = (list, key, name) =>
   list.find((x) => (x.NameExtension || []).some((n) => norm(n) === norm(name)));
 
 const resolveDest = async (to) => {
-  const provinces = (await call("master-data/province", undefined, "GET")).data || [];
+  const provinces = await master("master-data/province", undefined, "GET");
   const prov = findByName(provinces, "ProvinceName", to.province);
   if (!prov) throw new AppError("GHN: khong tim thay tinh/thanh", 502);
-  const districts = (await call("master-data/district", { province_id: prov.ProvinceID })).data || [];
+  const districts = await master("master-data/district", { province_id: prov.ProvinceID });
   const dist = findByName(districts, "DistrictName", to.district);
   if (!dist) throw new AppError("GHN: khong tim thay quan/huyen", 502);
-  const wards = (await call("master-data/ward", { district_id: dist.DistrictID })).data || [];
+  const wards = await master("master-data/ward", { district_id: dist.DistrictID });
   const ward = findByName(wards, "WardName", to.ward);
   return { district_id: dist.DistrictID, ward_code: ward?.WardCode };
 };
@@ -54,14 +68,19 @@ export default {
   name: "ghn",
   async quote({ to, weightGrams, codVnd = 0, valueVnd = 0 }) {
     const d = await resolveDest(to);
-    const r = await call("v2/shipping-order/fee", {
-      service_type_id: 2,
-      to_district_id: d.district_id,
-      to_ward_code: d.ward_code,
-      weight: weightGrams,
-      insurance_value: Math.min(valueVnd, 5_000_000),
-      cod_value: codVnd,
-    });
+    const r = await call(
+      "v2/shipping-order/fee",
+      {
+        service_type_id: 2,
+        to_district_id: d.district_id,
+        to_ward_code: d.ward_code,
+        weight: weightGrams,
+        insurance_value: Math.min(valueVnd, 5_000_000),
+        cod_value: codVnd,
+      },
+      "POST",
+      QUOTE_TIMEOUT_MS
+    );
     return { feeVnd: Number(r.data?.total) || 0 };
   },
   async createShipment({ order, shop, from, to, weightGrams, codVnd, items, receiver }) {

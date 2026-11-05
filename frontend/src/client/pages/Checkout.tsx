@@ -17,7 +17,12 @@ import { useCart, useClearCart } from '../hooks/useCart'
 import { useValidateToken } from '../hooks/useAuth'
 import { usePublicSettings } from '../hooks/useSettings'
 
-import { createOrder } from '../services/orderService'
+import {
+  createOrder,
+  quoteShipping,
+  type ShippingQuote
+} from '../services/orderService'
+import PhoneVerification from '../components/profile/PhoneVerification'
 import { toast } from 'sonner'
 import {
   createMomoPayment,
@@ -44,6 +49,18 @@ const Checkout = () => {
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
+  const [province, setProvince] = useState('')
+  const [district, setDistrict] = useState('')
+  const [ward, setWard] = useState('')
+  const [wantInvoice, setWantInvoice] = useState(false)
+  const [invoice, setInvoice] = useState({
+    company_name: '',
+    tax_code: '',
+    address: '',
+    email: ''
+  })
+  const [quote, setQuote] = useState<ShippingQuote | null>(null)
+  const [needPhoneVerify, setNeedPhoneVerify] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod')
   const [processing, setProcessing] = useState(false)
   // setProcessing(true) only takes effect after a re-render, so a double
@@ -108,10 +125,15 @@ const Checkout = () => {
         (sum, it) => sum + it.final_price * it.quantity,
         0
       )
-      const shipping = subtotal >= threshold ? 0 : round2(fee)
+      const estimated = subtotal >= threshold ? 0 : round2(fee)
+      // Server quote wins when available; the estimate is the fallback
+      const quoted = quote?.shops.find(
+        s => String(s.shop_id) === String(group.key)
+      )
+      const shipping = quoted ? round2(Number(quoted.shipping)) : estimated
       return { ...group, subtotal, shipping, freeShipping: shipping === 0 }
     })
-  }, [items, settingsData])
+  }, [items, settingsData, quote])
 
   const totals = useMemo(() => {
     const subtotal = cart?.total_original_price || 0
@@ -143,6 +165,54 @@ const Checkout = () => {
     }
   }, [userData?.user, name, phone, address])
 
+  // Debounced server-side shipping quote; failures fall back to the estimate
+  const quoteKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',')
+  useEffect(() => {
+    if (!quoteKey || !address.trim() || !localStorage.getItem('accessToken')) {
+      setQuote(null)
+      return
+    }
+    let cancelled = false
+    const t = setTimeout(() => {
+      quoteShipping({
+        items: items.map(i => ({
+          product_id: i.product_id,
+          quantity: i.quantity
+        })),
+        shipping_address: {
+          name,
+          phone,
+          address,
+          province: province || undefined,
+          district: district || undefined,
+          ward: ward || undefined
+        }
+      })
+        .then(q => !cancelled && setQuote(q))
+        .catch(() => !cancelled && setQuote(null))
+    }, 600)
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey, address, province, district, ward])
+
+  // Shared error handling for order creation (fraud/OTP 403 codes)
+  const handleOrderError = (err: any, fallback: string) => {
+    if (err?.message === 'NOT_AUTHENTICATED') {
+      toast.error('Please login to place an order')
+      return
+    }
+    const data = err?.response?.data
+    if (err?.response?.status === 403 && data?.code === 'PHONE_VERIFICATION_REQUIRED') {
+      setNeedPhoneVerify(true)
+      toast.error(data.message || 'Please verify your phone number to continue')
+      return
+    }
+    toast.error(data?.message || data?.error || fallback)
+  }
+
   const createOrderFromCart = async (paymentMethod: string) => {
     const token = localStorage.getItem('accessToken')
     if (!token) {
@@ -152,7 +222,8 @@ const Checkout = () => {
     const orderItems = items.map(item => ({
       product_id: item.product_id,
       quantity: item.quantity,
-      color: item.color || null
+      color: item.color || null,
+      variant_id: item.variant?.id
     }))
 
     const orderPayload = {
@@ -160,8 +231,20 @@ const Checkout = () => {
       shipping_address: {
         name,
         phone,
-        address
+        address,
+        province: province.trim() || undefined,
+        district: district.trim() || undefined,
+        ward: ward.trim() || undefined
       },
+      invoice_request:
+        wantInvoice && invoice.company_name.trim() && invoice.tax_code.trim()
+          ? {
+              company_name: invoice.company_name.trim(),
+              tax_code: invoice.tax_code.trim(),
+              address: invoice.address.trim() || undefined,
+              email: invoice.email.trim() || undefined
+            }
+          : undefined,
       payment_method: paymentMethod,
       coupon_code: appliedCoupon || undefined
     }
@@ -221,11 +304,7 @@ const Checkout = () => {
           )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
         )
       } catch (err: any) {
-        if (err?.message === 'NOT_AUTHENTICATED') {
-          toast.error('Please login to place an order')
-        } else {
-          toast.error(err?.response?.data?.message || 'Failed to create order')
-        }
+        handleOrderError(err, 'Failed to create order')
       } finally {
         isSubmittingRef.current = false
         setProcessing(false)
@@ -284,7 +363,7 @@ const Checkout = () => {
       setQrData(momoData)
       setShowQRModal(true)
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create MoMo payment')
+      handleOrderError(err, 'Failed to create MoMo payment')
     } finally {
       isSubmittingRef.current = false
       setProcessing(false)
@@ -323,11 +402,7 @@ const Checkout = () => {
         )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
       )
     } catch (err: any) {
-      if (err?.message === 'NOT_AUTHENTICATED') {
-        toast.error('Please login to place an order')
-      } else {
-        toast.error(err?.response?.data?.message || 'Failed to create order')
-      }
+      handleOrderError(err, 'Failed to create order')
     } finally {
       isSubmittingRef.current = false
       setProcessing(false)
@@ -517,12 +592,76 @@ const Checkout = () => {
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <Home className="w-5 h-5" /> Shipping address
             </h2>
+            <div className="grid gap-4 md:grid-cols-3 mb-4">
+              <input
+                className="border rounded-lg px-4 py-3"
+                placeholder="Province / City"
+                value={province}
+                onChange={e => setProvince(e.target.value)}
+              />
+              <input
+                className="border rounded-lg px-4 py-3"
+                placeholder="District"
+                value={district}
+                onChange={e => setDistrict(e.target.value)}
+              />
+              <input
+                className="border rounded-lg px-4 py-3"
+                placeholder="Ward"
+                value={ward}
+                onChange={e => setWard(e.target.value)}
+              />
+            </div>
             <textarea
               className="w-full border rounded-lg px-4 py-3 min-h-[120px]"
               placeholder="Street, city, district..."
               value={address}
               onChange={e => setAddress(e.target.value)}
             />
+          </div>
+
+          {needPhoneVerify && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-amber-800">
+                Your phone number must be verified before placing this order.
+                Verify it below, then place your order again.
+              </p>
+              <PhoneVerification onVerified={() => setNeedPhoneVerify(false)} />
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg shadow p-6">
+            <label className="flex items-center gap-2 font-semibold cursor-pointer">
+              <input
+                type="checkbox"
+                checked={wantInvoice}
+                onChange={e => setWantInvoice(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Request company VAT invoice
+            </label>
+            {wantInvoice && (
+              <div className="grid gap-4 md:grid-cols-2 mt-4">
+                {(
+                  [
+                    ['company_name', 'Company name'],
+                    ['tax_code', 'Tax code'],
+                    ['address', 'Company address'],
+                    ['email', 'Invoice email']
+                  ] as const
+                ).map(([key, label]) => (
+                  <input
+                    key={key}
+                    className="border rounded-lg px-4 py-3"
+                    placeholder={label}
+                    value={invoice[key]}
+                    onChange={e =>
+                      setInvoice(v => ({ ...v, [key]: e.target.value }))
+                    }
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -565,7 +704,8 @@ const Checkout = () => {
                     MoMo Wallet (QR)
                   </p>
                   <p className="text-sm text-gray-500">
-                    Pay through the MoMo sandbox.
+                    Pay through the MoMo sandbox. Unpaid orders are held for
+                    30 minutes, then cancelled automatically.
                   </p>
                 </div>
               </label>
@@ -618,6 +758,11 @@ const Checkout = () => {
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{item.name}</p>
+                        {item.variant && (
+                          <p className="text-xs text-gray-500">
+                            {item.variant.name}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-500">
                           Qty: {item.quantity}
                         </p>

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BadgeCheck, Clock, Ban, CircleSlash, Store } from 'lucide-react'
 import { getMyShop, updateMyShop } from '../../../client/services/shopService'
+import { updateShopSettings } from '../../services/sellerService'
 
 const STATUS_INFO: Record<
   string,
@@ -45,9 +46,26 @@ export default function SellerShopProfile() {
   const [address, setAddress] = useState('')
   const [shippingFee, setShippingFee] = useState('')
   const [freeShippingThreshold, setFreeShippingThreshold] = useState('')
+  const [ext, setExt] = useState({
+    pickup_province: '',
+    pickup_district: '',
+    pickup_ward: '',
+    pickup_address: '',
+    tax_code: '',
+    tax_entity_type: 'household'
+  })
 
   useEffect(() => {
     if (shop) {
+      const sx = shop as any
+      setExt({
+        pickup_province: sx.pickup_province || '',
+        pickup_district: sx.pickup_district || '',
+        pickup_ward: sx.pickup_ward || '',
+        pickup_address: sx.pickup_address || '',
+        tax_code: sx.tax_code || '',
+        tax_entity_type: sx.tax_entity_type || 'household'
+      })
       setName(shop.name || '')
       setDescription(shop.description || '')
       setContactEmail(shop.contact_email || '')
@@ -67,8 +85,9 @@ export default function SellerShopProfile() {
   }, [shop])
 
   const updateMut = useMutation({
-    mutationFn: () =>
-      updateMyShop({
+    mutationFn: async () => {
+      await updateShopSettings(ext)
+      return updateMyShop({
         name,
         description,
         contact_email: contactEmail,
@@ -76,7 +95,8 @@ export default function SellerShopProfile() {
         address,
         shipping_fee_override: shippingFee,
         free_shipping_threshold_override: freeShippingThreshold
-      }),
+      })
+    },
     onSuccess: () => {
       toast.success(
         shop?.status === 'rejected'
@@ -237,6 +257,66 @@ export default function SellerShopProfile() {
               Orders from your shop above this amount ship free.
             </p>
           </div>
+        </div>
+        <div className="border-t pt-4 space-y-3">
+          <div className="font-medium">Pickup address</div>
+          <div className="grid md:grid-cols-3 gap-4">
+            {(
+              [
+                ['pickup_province', 'Province / City'],
+                ['pickup_district', 'District'],
+                ['pickup_ward', 'Ward']
+              ] as const
+            ).map(([k, label]) => (
+              <div key={k}>
+                <label className="block text-sm font-medium mb-1">{label}</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={ext[k]}
+                  onChange={e => setExt({ ...ext, [k]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+          <input
+            className="w-full border rounded-lg px-3 py-2"
+            placeholder="Street address"
+            value={ext.pickup_address}
+            onChange={e => setExt({ ...ext, pickup_address: e.target.value })}
+          />
+        </div>
+        <div className="border-t pt-4 space-y-3">
+          <div className="font-medium">Tax</div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Tax code</label>
+              <input
+                className="w-full border rounded-lg px-3 py-2"
+                placeholder="10 digits, optionally -XXX"
+                value={ext.tax_code}
+                onChange={e => setExt({ ...ext, tax_code: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Entity type
+              </label>
+              <select
+                className="w-full border rounded-lg px-3 py-2"
+                value={ext.tax_entity_type}
+                onChange={e =>
+                  setExt({ ...ext, tax_entity_type: e.target.value })
+                }
+              >
+                <option value="household">Household / individual</option>
+                <option value="company">Company</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500">
+            Household sellers have 1% VAT + 0.5% PIT withheld by the platform
+            per Decree 117/2025.
+          </p>
         </div>
         <button
           type="submit"

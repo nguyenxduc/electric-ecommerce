@@ -11,6 +11,7 @@ export type AuthUser = {
   phone: string | null
   address: string | null
   avatar: string | null
+  phone_verified?: boolean
   loyalty_points?: number
   segment?: string | null
 }

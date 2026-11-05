@@ -15,7 +15,7 @@ const shutdown = async (signal) => {
   stopping = true;
   console.log(`[worker] ${signal}: stop scheduling, waiting for running jobs.`);
   clearInterval(keepAlive);
-  await stopScheduler(25_000);
+  await stopScheduler(8000);
   process.exit(0);
 };
 process.on("SIGTERM", () => shutdown("SIGTERM"));

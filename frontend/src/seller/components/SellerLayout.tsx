@@ -12,7 +12,8 @@ import {
   ArrowLeft,
   TicketPercent,
   PackageX,
-  MessageCircle
+  MessageCircle,
+  Receipt
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -41,6 +42,7 @@ const sections: NavSection[] = [
         end: true
       },
       { to: '/seller/chat', label: 'Buyer Chat', icon: MessageCircle, end: true },
+      { to: '/seller/tax', label: 'Tax & Invoices', icon: Receipt, end: true },
       { to: '/seller/shop', label: 'Shop Profile', icon: Settings2, end: true }
     ]
   },

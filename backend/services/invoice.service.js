@@ -1,6 +1,4 @@
 // Hoa don dien tu + khau tru thue cho don giao thanh cong.
-import { getSettingNumber } from "../lib/settings.js";
-import { prisma } from "../lib/db.js";
 import { round2 } from "./pricing.service.js";
 
 // Nha cung cap hoa don. Chi co 'internal' (danh so noi bo, khong co gia tri
@@ -9,11 +7,6 @@ import { round2 } from "./pricing.service.js";
 // Provider moi: { issue(invoiceData) -> { provider_ref } }.
 export const INVOICE_PROVIDERS = {
   internal: { issue: async () => ({ provider_ref: null }) },
-};
-
-const getSettingString = async (key, fallback) => {
-  const s = await prisma.setting.findFirst({ where: { key, deleted_at: null } });
-  return s?.value?.trim() || fallback;
 };
 
 // Thang thue theo gio VN, tranh lech thang khi server chay UTC.
@@ -30,12 +23,22 @@ const vnPeriod = (d) =>
 export const onOrderDelivered = async (tx, order) => {
   if (await tx.invoice.findUnique({ where: { order_id: order.id } })) return;
 
-  const [vatRate, wVat, wPit, seriesSetting] = await Promise.all([
-    getSettingNumber("invoice_vat_rate", 0.1),
-    getSettingNumber("tax_withhold_vat_rate", 0.01),
-    getSettingNumber("tax_withhold_pit_rate", 0.005),
-    getSettingString("invoice_series", ""),
-  ]);
+  // Doc setting qua tx de cung snapshot voi giao dich, khong mo them connection
+  const rows = await tx.setting.findMany({
+    where: {
+      key: { in: ["invoice_vat_rate", "tax_withhold_vat_rate", "tax_withhold_pit_rate", "invoice_series"] },
+      deleted_at: null,
+    },
+  });
+  const raw = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  const num = (key, fallback) => {
+    const n = raw[key] == null ? NaN : Number(raw[key]);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  const vatRate = num("invoice_vat_rate", 0.1);
+  const wVat = num("tax_withhold_vat_rate", 0.01);
+  const wPit = num("tax_withhold_pit_rate", 0.005);
+  const seriesSetting = raw.invoice_series?.trim() || "";
 
   const full = await tx.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -51,7 +54,7 @@ export const onOrderDelivered = async (tx, order) => {
   const now = new Date();
 
   const series =
-    seriesSetting || `C${String(now.getFullYear()).slice(-2)}TNG`;
+    seriesSetting || `C${vnPeriod(now).slice(2, 4)}TNG`;
   const [{ nextval }] = await tx.$queryRaw`SELECT nextval('invoice_number_seq')`;
   const invoice_number = `${series}-${String(nextval).padStart(8, "0")}`;
 
@@ -71,6 +74,13 @@ export const onOrderDelivered = async (tx, order) => {
       unit_price: shipping,
       total: shipping,
     });
+  }
+
+  // Coupon/giam gia: them dong am de cac dong cong lai bang total
+  const itemsSum = items.reduce((sum, i) => sum + i.total, 0);
+  const discountLine = round2(Number(full.total_amount) - itemsSum);
+  if (discountLine !== 0) {
+    items.push({ name: "Giam gia", variant: null, quantity: 1, unit_price: discountLine, total: discountLine });
   }
 
   // Gia da gom VAT: tach VAT ra, subtotal + vat == total tuyet doi.

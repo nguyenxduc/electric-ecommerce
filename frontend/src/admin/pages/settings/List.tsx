@@ -182,6 +182,8 @@ export default function SettingsList() {
         )}
       </div>
 
+      <OperationsSection />
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <ConfirmModal
@@ -534,6 +536,107 @@ function AddSettingModal({
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+type OpDef = {
+  key: string
+  label: string
+  type: 'number' | 'boolean' | 'select' | 'text'
+  options?: string[]
+  fallback: string
+  category: string
+}
+const OPS: OpDef[] = [
+  { key: 'shipping_provider', label: 'Shipping provider', type: 'select', options: ['mock', 'ghn', 'ghtk'], fallback: 'mock', category: 'shipping' },
+  { key: 'shipping_rate_mode', label: 'Shipping rate mode', type: 'select', options: ['flat', 'carrier'], fallback: 'flat', category: 'shipping' },
+  { key: 'order_payment_timeout_minutes', label: 'Unpaid order timeout (minutes)', type: 'number', fallback: '30', category: 'general' },
+  { key: 'cod_require_verified_phone', label: 'COD requires verified phone', type: 'boolean', fallback: 'false', category: 'general' },
+  { key: 'fraud_block_score', label: 'Fraud block score', type: 'number', fallback: '', category: 'general' },
+  { key: 'fraud_review_score', label: 'Fraud review score', type: 'number', fallback: '', category: 'general' },
+  { key: 'fraud_velocity_orders_per_hour', label: 'Fraud velocity (orders/hour)', type: 'number', fallback: '', category: 'general' },
+  { key: 'fraud_new_account_cod_amount', label: 'Fraud new-account COD amount', type: 'number', fallback: '', category: 'general' },
+  { key: 'invoice_vat_rate', label: 'Invoice VAT rate', type: 'number', fallback: '', category: 'general' },
+  { key: 'invoice_series', label: 'Invoice series', type: 'text', fallback: '', category: 'general' },
+  { key: 'tax_withhold_vat_rate', label: 'Tax withhold VAT rate', type: 'number', fallback: '', category: 'general' },
+  { key: 'tax_withhold_pit_rate', label: 'Tax withhold PIT rate', type: 'number', fallback: '', category: 'general' }
+]
+
+function OperationsSection() {
+  const { data } = useSettings()
+  const upsert = useUpsertSetting()
+  const [draft, setDraft] = useState<Record<string, string>>({})
+  const existing = (key: string) => data?.settings.find(s => s.key === key)
+
+  const save = async (def: OpDef) => {
+    const raw = draft[def.key] ?? existing(def.key)?.value ?? def.fallback
+    if (raw === '') return toast.error('Value is required')
+    if (def.type === 'number' && isNaN(Number(raw))) return toast.error('Invalid number')
+    try {
+      await upsert.mutateAsync({
+        key: def.key,
+        value: def.type === 'number' ? Number(raw) : def.type === 'boolean' ? raw === 'true' : raw,
+        category: def.category,
+        data_type: def.type === 'select' || def.type === 'text' ? 'string' : def.type,
+        description: def.label,
+        is_public: existing(def.key)?.is_public ?? false
+      })
+      setDraft(d => {
+        const { [def.key]: _, ...rest } = d
+        return rest
+      })
+      toast.success(`${def.label} saved`)
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save setting')
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-lg border">
+      <div className="p-4 border-b font-semibold">Operations</div>
+      <div className="divide-y">
+        {OPS.map(def => {
+          const value = draft[def.key] ?? existing(def.key)?.value ?? def.fallback
+          const set = (v: string) => setDraft(d => ({ ...d, [def.key]: v }))
+          return (
+            <div key={def.key} className="p-4 flex items-center gap-4">
+              <div className="flex-1">
+                <div className="text-sm font-medium">{def.label}</div>
+                <div className="text-xs font-mono text-gray-500">
+                  {def.key}
+                  {!existing(def.key) && ' (not set)'}
+                </div>
+              </div>
+              {def.type === 'select' || def.type === 'boolean' ? (
+                <select value={value} onChange={e => set(e.target.value)} className="w-48 px-3 py-2 border rounded-lg">
+                  {(def.options ?? ['true', 'false']).map(o => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={def.type === 'number' ? 'number' : 'text'}
+                  step="any"
+                  value={value}
+                  onChange={e => set(e.target.value)}
+                  className="w-48 px-3 py-2 border rounded-lg"
+                />
+              )}
+              <button
+                onClick={() => save(def)}
+                disabled={upsert.isPending}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+              >
+                <Save className="w-3 h-3" />
+                Save
+              </button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

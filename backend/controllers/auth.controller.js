@@ -678,10 +678,6 @@ export const sendPhoneOtp = asyncHandler(async (req, res) => {
   }
   const userId = BigInt(req.user.id);
 
-  if (await phoneTakenBy(prisma, phone, userId)) {
-    return res.status(409).json({ success: false, error: "Phone number already verified by another account" });
-  }
-
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const [last, byUser, byPhone] = await Promise.all([
     prisma.otpCode.findFirst({ where: { user_id: userId }, orderBy: { created_at: "desc" } }),
@@ -694,6 +690,15 @@ export const sendPhoneOtp = asyncHandler(async (req, res) => {
   }
   if (byUser >= OTP_MAX_PER_HOUR || byPhone >= OTP_MAX_PER_HOUR) {
     return res.status(429).json({ success: false, error: "Too many codes requested. Try again later." });
+  }
+
+  // SDT da thuoc tai khoan khac: tra 200 chung, khong gui SMS/khong tao row de khong lo SDT nao da dang ky.
+  if (await phoneTakenBy(prisma, phone, userId)) {
+    return res.json({
+      success: true,
+      message: "Verification code sent",
+      data: { phone, expires_in: OTP_TTL_MS / 1000 },
+    });
   }
 
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");

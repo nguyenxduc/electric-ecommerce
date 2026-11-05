@@ -71,7 +71,7 @@ import returnRoutes from "./routes/return.route.js";
 import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
 import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
-import { startDailyJobsScheduler } from "./jobs/scheduler.js";
+import { startDailyJobsScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
 import cors from "cors";
@@ -354,3 +354,16 @@ server.listen(PORT, () => {
   startStartupTasks();
   startDailyJobsScheduler();
 });
+
+// Docker cho 10s truoc SIGKILL: doi job con chay toi da 8s, dong HTTP roi thoat.
+let shuttingDown = false;
+const shutdown = async (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal}: stopping scheduler and closing server.`);
+  await stopScheduler(8000);
+  server.close(() => process.exit(0));
+  server.closeAllConnections?.();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

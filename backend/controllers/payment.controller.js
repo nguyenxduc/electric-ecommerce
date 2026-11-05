@@ -410,8 +410,10 @@ export const momoIpnHandler = async (req, res) => {
       }
     }
 
-    // true khi tien ve sau khi moi don cua checkout da bi huy (vd. het han giu cho)
-    let paidAfterCancel = false;
+    // Tien thu thua so voi cac don con song cua checkout (USD). Lon hon 0 khi
+    // tien ve sau khi mot phan hay toan bo don da bi huy (vd. het han giu cho,
+    // hoac job huy tung don con mot va IPN chen vao giua).
+    let refundOwedAmount = 0;
 
     await prisma.$transaction(async tx => {
       // Cong thanh toan phat lai callback la chuyen binh thuong: gateway tu
@@ -442,14 +444,18 @@ export const momoIpnHandler = async (req, res) => {
       // (Avoid overriding cancelled/shipped orders.)
       if (isPaid) {
         // Khong hoi sinh don da huy (kho da tra); tien da thu nen ghi no hoan tien.
-        const liveCount = await tx.order.count({
+        const live = await tx.order.aggregate({
           where: {
             order_group_id: payment.order_group_id,
             status: { not: ORDER_STATUS.CANCELLED },
             deleted_at: null,
           },
+          _sum: { total_amount: true },
         });
-        paidAfterCancel = liveCount === 0;
+        refundOwedAmount =
+          Math.round(
+            (Number(payment.amount) - Number(live._sum.total_amount || 0)) * 100
+          ) / 100;
         await tx.order.updateMany({
           where: {
             order_group_id: payment.order_group_id,
@@ -461,7 +467,7 @@ export const momoIpnHandler = async (req, res) => {
       }
     });
 
-    if (paidAfterCancel) {
+    if (refundOwedAmount > 0) {
       const group = await prisma.orderGroup.findUnique({
         where: { id: payment.order_group_id },
         select: { user_id: true },
@@ -474,7 +480,8 @@ export const momoIpnHandler = async (req, res) => {
         metadata: {
           order_group_id: payment.order_group_id.toString(),
           payment_id: payment.id.toString(),
-          amount: payment.amount?.toString?.() ?? payment.amount,
+          amount: refundOwedAmount.toFixed(2),
+          paid_amount: payment.amount?.toString?.() ?? payment.amount,
           reason: "payment received after orders cancelled",
         },
       });

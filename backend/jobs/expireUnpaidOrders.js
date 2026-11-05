@@ -19,7 +19,9 @@ export const selectExpiredUnpaidOrders = async (now = new Date()) => {
     where: {
       status: ORDER_STATUS.PENDING,
       deleted_at: null,
-      payment_method: { in: ["momo", "vnpay"] },
+      // Chi momo: VNPay chua co IPN/return danh dau PAID, huy theo gio se huy
+      // ca don khach da tra tien. Them "vnpay" khi co IPN da xac minh.
+      payment_method: { in: ["momo"] },
       created_at: { lt: cutoff },
       order_group: { payments: { none: { status: PAYMENT_STATUS.PAID } } },
     },

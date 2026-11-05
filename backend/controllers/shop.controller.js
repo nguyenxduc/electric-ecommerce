@@ -104,6 +104,17 @@ export const getMyShop = asyncHandler(async (req, res) => {
   return res.json({ success: true, data: shop });
 });
 
+// Tra thong bao loi neu MST / loai hinh thue khong hop le, nguoc lai null.
+const validateTax = (tax_code, tax_entity_type) => {
+  if (tax_entity_type !== undefined && !["household", "company"].includes(tax_entity_type)) {
+    return "tax_entity_type must be 'household' or 'company'";
+  }
+  if (tax_code !== undefined && tax_code !== null && tax_code !== "" && !/^\d{10}(-\d{3})?$/.test(String(tax_code).trim())) {
+    return "tax_code must be 10 digits (or 13 digits with -XXX branch suffix)";
+  }
+  return null;
+};
+
 // PATCH /api/shops/me — owner edits profile; a rejected application is
 // resubmitted (status back to pending). Ownership via owner_id, not role,
 // so pending/rejected applicants (still role "user") can edit too.
@@ -133,16 +144,14 @@ export const updateMyShop = asyncHandler(async (req, res) => {
     tax_entity_type,
   } = req.body || {};
 
-  if (tax_entity_type !== undefined && !["household", "company"].includes(tax_entity_type)) {
-    return res
-      .status(400)
-      .json({ success: false, error: "tax_entity_type must be 'household' or 'company'" });
-  }
-  if (tax_code !== undefined && tax_code !== null && tax_code !== "" && !/^\d{10}(-\d{3})?$/.test(String(tax_code).trim())) {
-    return res.status(400).json({
-      success: false,
-      error: "tax_code must be 10 digits (or 13 digits with -XXX branch suffix)",
-    });
+  const taxError = validateTax(tax_code, tax_entity_type);
+  if (taxError) return res.status(400).json({ success: false, error: taxError });
+  // Shop da duyet: doi MST/loai hinh anh huong hoa don da phat hanh nen phai qua admin
+  const taxChanged =
+    (tax_code !== undefined && (String(tax_code ?? "").trim() || null) !== (shop.tax_code || null)) ||
+    (tax_entity_type !== undefined && tax_entity_type !== shop.tax_entity_type);
+  if (shop.status === SHOP_STATUS.ACTIVE && taxChanged) {
+    return res.status(403).json({ success: false, error: "Tax info changes require admin review" });
   }
   // "" xoa gia tri; undefined = khong doi
   const text = (v, max) => (v === undefined ? undefined : String(v ?? "").trim().slice(0, max) || null);
@@ -421,6 +430,38 @@ export const rejectShop = asyncHandler(async (req, res) => {
     type: "SHOP",
   });
 
+  return res.json({ success: true, data: updated });
+});
+
+// PATCH /api/shops/:id/tax - admin doi MST/loai hinh thue cua shop da duyet
+export const adminUpdateShopTax = asyncHandler(async (req, res) => {
+  const shopId = BigInt(req.params.id);
+  const { tax_code, tax_entity_type } = req.body || {};
+  const taxError = validateTax(tax_code, tax_entity_type);
+  if (taxError) return res.status(400).json({ success: false, error: taxError });
+  const shop = await prisma.shop.findUnique({ where: { id: shopId } });
+  if (!shop || shop.deleted_at) {
+    return res.status(404).json({ success: false, error: "Shop not found" });
+  }
+  const updated = await prisma.shop.update({
+    where: { id: shopId },
+    data: {
+      tax_code: tax_code === undefined ? undefined : String(tax_code ?? "").trim().slice(0, 20) || null,
+      tax_entity_type,
+    },
+  });
+  writeAuditLog({
+    userId: req.user.id,
+    action: "SHOP_TAX_UPDATE",
+    resource: "shop",
+    resourceId: shopId,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+    metadata: {
+      from: { tax_code: shop.tax_code, tax_entity_type: shop.tax_entity_type },
+      to: { tax_code: updated.tax_code, tax_entity_type: updated.tax_entity_type },
+    },
+  });
   return res.json({ success: true, data: updated });
 });
 

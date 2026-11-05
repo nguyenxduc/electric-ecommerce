@@ -12,15 +12,20 @@ export const normalizeVnPhone = (raw) => {
 
 const PROVIDERS = {
   console: async (phone, text) => {
-    console.log(`[sms:console] ${phone}: ${text}`);
+    const prod = process.env.NODE_ENV === "production";
+    // Production: che ma OTP de log khong bi lo ma that.
+    if (prod) console.warn("[sms:console] CANH BAO: SMS_PROVIDER=console o production, SMS KHONG duoc gui that, can cau hinh provider that");
+    console.log(`[sms:console] ${phone}: ${prod ? text.replace(/\d{6}/g, "******") : text}`);
   },
 };
 
 export const smsProvider = () => (process.env.SMS_PROVIDER || "console").toLowerCase();
 
-// Dev-only: cho phep tra ma OTP trong response de test/demo khong can SMS that.
+// Dev-only: tra ma OTP trong response, phai bat tuong minh bang OTP_EXPOSE_DEV_CODE=1.
 export const exposeDevCode = () =>
-  process.env.NODE_ENV !== "production" && smsProvider() === "console";
+  process.env.OTP_EXPOSE_DEV_CODE === "1" &&
+  process.env.NODE_ENV !== "production" &&
+  smsProvider() === "console";
 
 export const sendSms = async (phone, text) => {
   const send = PROVIDERS[smsProvider()];

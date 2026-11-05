@@ -25,6 +25,9 @@ axiosClient.interceptors.request.use(
         localStorage.setItem(key, sid)
       }
       config.headers['X-Session-Id'] = sid
+      // Cung gia tri, ten rieng cho chong gian lan: backend doi chieu thiet bi
+      // giua cac tai khoan (dung chung voucher, tu dat don cho shop minh).
+      config.headers['X-Device-Id'] = sid
     } catch {
       /* ignore */
     }

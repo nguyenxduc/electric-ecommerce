@@ -22,6 +22,15 @@ export type ProductShop = {
   status?: string
 }
 
+export type ProductVariant = {
+  id: number
+  sku: string
+  name: string
+  attributes?: Record<string, string> | null
+  price_delta: number
+  quantity: number
+}
+
 export type Product = {
   id: number
   name: string
@@ -37,6 +46,7 @@ export type Product = {
   specs_detail: ProductSpecDetail[]
   color?: ProductColor[] | ProductColor | string | null
   available_colors?: ProductColor[]
+  variants?: ProductVariant[]
   shop?: ProductShop | null
   category_id: number
   sub_category_id: number

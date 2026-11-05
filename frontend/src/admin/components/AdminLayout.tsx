@@ -23,7 +23,10 @@ import {
   ScrollText,
   Bell,
   Bot,
-  Activity
+  Activity,
+  Banknote,
+  ShieldAlert,
+  Receipt
 } from 'lucide-react'
 import { useValidateToken } from '../../client/hooks/useAuth'
 import { useAllChats } from '../../client/hooks/useChat'
@@ -92,6 +95,9 @@ const sections: NavSection[] = [
         icon: Activity,
         end: true
       },
+      { to: '/admin/cod', label: 'COD Reconciliation', icon: Banknote, end: true },
+      { to: '/admin/fraud', label: 'Fraud Flags', icon: ShieldAlert, end: true },
+      { to: '/admin/tax', label: 'Tax & Invoices', icon: Receipt, end: true },
       { to: '/admin/settings', label: 'Settings', icon: Settings2, end: true }
     ]
   },

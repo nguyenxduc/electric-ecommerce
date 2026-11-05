@@ -46,35 +46,36 @@ export const quoteShippingForGroups = async (shopGroups, opts) => {
   });
   const pickup = new Map(shops.map((s) => [s.id.toString(), s]));
 
-  let total = 0;
-  for (const group of shopGroups.values()) {
-    const threshold =
-      group.freeShippingThresholdOverride != null
-        ? Number(group.freeShippingThresholdOverride)
-        : opts.platformFreeThreshold;
-    const s = pickup.get(group.shopId.toString());
-    const from = s && {
-      province: s.pickup_province,
-      district: s.pickup_district,
-      ward: s.pickup_ward,
-      address: s.pickup_address,
-    };
-    if (group.subtotal >= threshold) {
-      group.shipping = 0;
-    } else if (from?.province && to.province) {
-      try {
-        const { feeVnd } = await provider.quote({
-          from,
-          to,
-          weightGrams: Math.max(group.weightGrams || 0, 1),
-          valueVnd: usdToVnd(group.subtotal),
-        });
-        group.shipping = vndToUsd(feeVnd);
-      } catch (err) {
-        console.error(`[shipping] quote ${provider.name} failed, dung phi co dinh:`, err.message);
+  // Song song theo shop: moi group chi ghi group.shipping cua chinh no
+  await Promise.all(
+    [...shopGroups.values()].map(async (group) => {
+      const threshold =
+        group.freeShippingThresholdOverride != null
+          ? Number(group.freeShippingThresholdOverride)
+          : opts.platformFreeThreshold;
+      const s = pickup.get(group.shopId.toString());
+      const from = s && {
+        province: s.pickup_province,
+        district: s.pickup_district,
+        ward: s.pickup_ward,
+        address: s.pickup_address,
+      };
+      if (group.subtotal >= threshold) {
+        group.shipping = 0;
+      } else if (from?.province && to.province) {
+        try {
+          const { feeVnd } = await provider.quote({
+            from,
+            to,
+            weightGrams: Math.max(group.weightGrams || 0, 1),
+            valueVnd: usdToVnd(group.subtotal),
+          });
+          group.shipping = vndToUsd(feeVnd);
+        } catch (err) {
+          console.error(`[shipping] quote ${provider.name} failed, dung phi co dinh:`, err.message);
+        }
       }
-    }
-    total += group.shipping;
-  }
-  return total;
+    })
+  );
+  return [...shopGroups.values()].reduce((t, g) => t + g.shipping, 0);
 };

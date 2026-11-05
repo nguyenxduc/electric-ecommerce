@@ -56,20 +56,28 @@ const checkCouponAbuse = async (ctx, reasons) => {
   const prior = await prisma.orderGroup.findMany({
     where: { coupon_id: ctx.coupon.id, user_id: { not: BigInt(ctx.userId) } },
     select: { receiver_phone: true, device_id: true, client_ip: true, shipping_address: true },
+    orderBy: { created_at: "desc" },
     take: 200,
   });
+  // Khop thiet bi chinh xac khong duoc phep bi day ra ngoai cua so 200 dong
+  const sameDevice = ctx.deviceId
+    ? await prisma.orderGroup.findFirst({
+        where: { coupon_id: ctx.coupon.id, user_id: { not: BigInt(ctx.userId) }, device_id: ctx.deviceId },
+        select: { id: true },
+      })
+    : null;
   const phone = phoneKey(ctx.receiverPhone);
   const addr = addressKey(ctx.address);
   let blocked = false;
   let ipShared = false;
+  if (sameDevice) {
+    blocked = true;
+    reasons.add("COUPON_SAME_DEVICE");
+  }
   for (const g of prior) {
     if (phone && phoneKey(g.receiver_phone) === phone) {
       blocked = true;
       reasons.add("COUPON_SAME_PHONE");
-    }
-    if (ctx.deviceId && g.device_id === ctx.deviceId) {
-      blocked = true;
-      reasons.add("COUPON_SAME_DEVICE");
     }
     if (addr && addressKey(g.shipping_address) === addr) {
       blocked = true;
@@ -125,7 +133,12 @@ export const assessCheckoutRisk = async (ctx) => {
 
   const result = { block: false, couponBlocked: false, score: 0, reasons: [], flag: false };
 
-  if (cfg.cod_require_verified_phone && isCod && !user?.phone_verified_at) {
+  // Phai xac thuc SDT va SDT nhan hang phai la chinh SDT da xac thuc, neu khong OTP chi la thu tuc
+  if (
+    cfg.cod_require_verified_phone &&
+    isCod &&
+    (!user?.phone_verified_at || phoneKey(ctx.receiverPhone) !== phoneKey(user.phone))
+  ) {
     return {
       ...result,
       block: true,
@@ -176,6 +189,11 @@ export const assessCheckoutRisk = async (ctx) => {
     score += 10;
   }
   score += selfScore;
+  // Thieu device id lam yeu tin hieu chong lam dung coupon/tu mua; chi cong nhe de khong chan nham
+  if (!ctx.deviceId) {
+    reasons.add("NO_DEVICE_ID");
+    score += 10;
+  }
 
   result.score = score;
   result.reasons = [...reasons];

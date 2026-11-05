@@ -5,6 +5,15 @@ export type SpecEntry = { label: string; value: any }
 
 export type ProductColor = { name: string; code: string; quantity?: number }
 
+export type ProductVariant = {
+  id?: number
+  sku: string
+  name: string
+  attributes?: Record<string, string>
+  price_delta?: number
+  quantity?: number
+}
+
 export type AdminProduct = {
   id: number
   name: string
@@ -23,6 +32,7 @@ export type AdminProduct = {
   final_price?: number
   in_stock?: boolean
   available_colors?: ProductColor[]
+  variants?: ProductVariant[]
   category?: Pick<AdminCategory, 'id' | 'name'>
   sub_category?: { id: number; name: string }
 }
@@ -41,6 +51,7 @@ export type CreateProductRequest = {
     specs?: SpecEntry[]
     specs_detail?: SpecEntry[]
     color?: ProductColor[]
+    variants?: ProductVariant[]
   }
 }
 

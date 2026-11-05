@@ -4,6 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useCreateAdminProduct, useAdminCategories } from '../../hooks'
 import { useValidateToken } from '../../../client/hooks/useAuth'
 import adminShopService from '../../services/shopService'
+import VariantsEditor, {
+  VariantRow,
+  variantsFromProduct,
+  variantsToPayload,
+  variantsTotal
+} from './VariantsEditor'
 
 export default function AdminProductCreate({
   basePath = '/admin/products'
@@ -36,6 +42,7 @@ export default function AdminProductCreate({
   const [specsDetail, setSpecsDetail] = useState<
     { label: string; value: any }[]
   >([])
+  const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [newSpecLabel, setNewSpecLabel] = useState('')
@@ -62,7 +69,9 @@ export default function AdminProductCreate({
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const totalQty = colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
+    const totalQty = variants.length
+      ? variantsTotal(variants)
+      : colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
     await (create as any).mutateAsync({
       name,
       price: Number(price),
@@ -74,7 +83,8 @@ export default function AdminProductCreate({
       color: colors,
       product_colors: colors,
       specs,
-      specs_detail: specsDetail
+      specs_detail: specsDetail,
+      variants: variants.length ? variantsToPayload(variants) : undefined
     })
     nav(basePath)
   }
@@ -266,6 +276,7 @@ export default function AdminProductCreate({
               </div>
             </div>
           </div>
+          <VariantsEditor rows={variants} onChange={setVariants} />
         </form>
 
         <div className="space-y-4">
