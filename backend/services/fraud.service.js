@@ -160,10 +160,9 @@ export const assessCheckoutRisk = async (ctx) => {
           where: {
             user_id: userId,
             payment_method: "cod",
-            OR: [
-              { shipment: { status: { in: ["returned", "failed"] } } },
-              { status: "cancelled", shipment: { isNot: null } },
-            ],
+            // Chi tinh giao that bai/hoan hang. Don huy sau khi seller tu huy
+            // van don (dat lai, het hang) khong phai loi cua nguoi mua.
+            shipment: { status: { in: ["returned", "failed"] } },
           },
         })
       : 0,

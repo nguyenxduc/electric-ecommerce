@@ -10,6 +10,9 @@ export const req = async (path, { method = 'GET', token, body } = {}) => {
       method,
       headers: {
         'Content-Type': 'application/json',
+        // Frontend luon gui header nay (lib/axios.ts); thieu no bi cong diem
+        // gian lan NO_DEVICE_ID, test khong nen mang diem do.
+        'X-Device-Id': token ? `test-${token.slice(-24)}` : 'test-anon',
         ...(token && { Authorization: `Bearer ${token}` })
       },
       ...(body && { body: JSON.stringify(body) })

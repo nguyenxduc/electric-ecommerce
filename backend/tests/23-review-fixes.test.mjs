@@ -7,7 +7,9 @@ import { req, login, ACCOUNTS, firstProductOf } from './helpers.mjs'
 
 const buyer = await login(ACCOUNTS.buyer)
 const seller = await login(ACCOUNTS.seller1)
-const product = await firstProductOf('tech-world', 'price-desc')
+// Mon re: don COD gia tri cao tu tai khoan vua seed (<24h) cong diem gian
+// lan, chay rieng file nay co the cham nguong chan va lam test sai muc dich.
+const product = await firstProductOf('tech-world', 'price-asc')
 const detail = (await req(`/products/${product.id}`)).json
 const colors = (detail?.data ?? detail)?.available_colors ?? []
 const item = (quantity = 1) => ({

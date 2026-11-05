@@ -106,6 +106,14 @@ export const createShipmentForOrder = async (order, shop, actor = {}) => {
       await cancelShipmentById(shipment).catch(() => {});
       throw new AppError(`Order changed meanwhile: ${r.message}`, 409);
     }
+  } else {
+    // Don processing bi huy trong luc goi nha van chuyen (truoc khi co van don
+    // trong DB nen chan SHIPMENT_ACTIVE chua thay): don dep tuong tu.
+    const now = await prisma.order.findUnique({ where: { id: order.id }, select: { status: true } });
+    if (now?.status === ORDER_STATUS.CANCELLED) {
+      await cancelShipmentById(shipment).catch(() => {});
+      throw new AppError("Order was cancelled meanwhile", 409);
+    }
   }
   return shipment;
 };
@@ -142,7 +150,9 @@ export const applyShipmentStatus = async (
   // buoc chuyen don - lan truoc co the da chet giua hai giao dich, gui lai la
   // cach duy nhat de don khong ket o shipped mai.
   if (shipment.status === status) {
-    if (mapOrder) await mapShipmentToOrder(shipment, status);
+    // "cancelled" khong sua lai: van don co the do chinh seller huy (mapOrder
+    // false), carrier gui lai su kien do khong duoc huy don seller da giao tay.
+    if (mapOrder && status !== "cancelled") await mapShipmentToOrder(shipment, status);
     return { changed: false, shipment };
   }
   if (
