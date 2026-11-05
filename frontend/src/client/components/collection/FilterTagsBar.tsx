@@ -1,6 +1,11 @@
 import FilterTag from './FilterTag';
 
-const FilterTagsBar = ({ tags, onRemoveTag }) => {
+type FilterTagsBarProps = {
+  tags: string[]
+  onRemoveTag: (tag: string) => void
+}
+
+const FilterTagsBar = ({ tags, onRemoveTag }: FilterTagsBarProps) => {
   return (
     <div className="border-b bg-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-4">

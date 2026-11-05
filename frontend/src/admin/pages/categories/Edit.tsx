@@ -15,7 +15,7 @@ export default function AdminCategoryEdit() {
   const [imageFile, setImageFile] = useState<File | undefined>(undefined)
 
   useEffect(() => {
-    const c = data?.data?.data
+    const c = (data?.data as any)?.data
     // depending on service response shape; fallback to data?.data
     const cat: any = c || (data as any)?.data
     if (cat) {

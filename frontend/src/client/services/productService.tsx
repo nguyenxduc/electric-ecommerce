@@ -114,7 +114,7 @@ type SearchParams = {
 export const searchProducts = async (
   params: SearchParams | string
 ): Promise<ListProductRes> => {
-  const normalized =
+  const normalized: SearchParams =
     typeof params === 'string'
       ? { query: params }
       : { sort: 'newest', page: 1, limit: 20, ...params }

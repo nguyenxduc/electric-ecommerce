@@ -20,7 +20,7 @@ export default function EditFilterKey() {
   const [formData, setFormData] = useState({
     label: '',
     description: '',
-    data_type: 'string' as const,
+    data_type: 'string' as 'string' | 'number' | 'boolean' | 'range',
     is_active: true,
     order: 0
   })

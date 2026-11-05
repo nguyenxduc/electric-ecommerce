@@ -30,7 +30,7 @@ const filterKeys = {
 export function useAdminFilters(category_id?: number) {
   return useQuery<{ success: boolean; data: FilterMetadataResponse }, Error>({
     queryKey: filterKeys.byCategory(category_id),
-    queryFn: () => adminFilterService.get(category_id)
+    queryFn: () => adminFilterService.get(category_id).then(r => r.data)
   })
 }
 
@@ -52,7 +52,7 @@ export function useAdminFilterOptions(params?: {
 export function useAdminFilterOption(id: number) {
   return useQuery<FilterOptionResponse, Error>({
     queryKey: filterKeys.admin.detail(id),
-    queryFn: () => adminFilterService.getById(id),
+    queryFn: () => adminFilterService.getById(id).then(r => r.data),
     enabled: !!id
   })
 }
@@ -60,7 +60,7 @@ export function useAdminFilterOption(id: number) {
 export function useCreateAdminFilterOption() {
   const qc = useQueryClient()
   return useMutation<FilterOptionResponse, Error, CreateFilterOptionRequest>({
-    mutationFn: payload => adminFilterService.create(payload),
+    mutationFn: payload => adminFilterService.create(payload).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: filterKeys.admin.all })
       qc.invalidateQueries({ queryKey: filterKeys.all })
@@ -71,7 +71,8 @@ export function useCreateAdminFilterOption() {
 export function useUpdateAdminFilterOption(id: number) {
   const qc = useQueryClient()
   return useMutation<FilterOptionResponse, Error, UpdateFilterOptionRequest>({
-    mutationFn: payload => adminFilterService.update(id, payload),
+    mutationFn: payload =>
+      adminFilterService.update(id, payload).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: filterKeys.admin.detail(id) })
       qc.invalidateQueries({ queryKey: filterKeys.admin.all })
@@ -83,7 +84,7 @@ export function useUpdateAdminFilterOption(id: number) {
 export function useDeleteAdminFilterOption() {
   const qc = useQueryClient()
   return useMutation<{ success: boolean; message: string }, Error, number>({
-    mutationFn: id => adminFilterService.delete(id),
+    mutationFn: id => adminFilterService.delete(id).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: filterKeys.admin.all })
       qc.invalidateQueries({ queryKey: filterKeys.all })
@@ -98,7 +99,8 @@ export function useSyncFilterOptions() {
     Error,
     number | undefined
   >({
-    mutationFn: category_id => adminFilterService.sync(category_id),
+    mutationFn: category_id =>
+      adminFilterService.sync(category_id).then(r => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: filterKeys.admin.all })
       qc.invalidateQueries({ queryKey: filterKeys.all })
