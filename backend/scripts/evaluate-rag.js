@@ -49,6 +49,7 @@ const pct = (a, b) => (b === 0 ? 0 : Math.round((a / b) * 1000) / 10);
 const avg = (arr) =>
   arr.length === 0 ? 0 : arr.reduce((s, n) => s + n, 0) / arr.length;
 const round3 = (n) => Math.round(n * 1000) / 1000;
+const fmtMs = (v) => (v == null ? "n/a" : v + "ms");
 
 /** So khop ten san pham theo dang da bo dau, tranh phu thuoc vao id sau seed. */
 const nameMatches = (actual, expected) => {
@@ -182,6 +183,32 @@ const scoreContextRelevance = (question, context) =>
     "CAU HOI: " + question + "\n\nNGU CANH:\n" + context
   );
 
+/** Mot luot hoi tro ly tren mot cuoc chat tam, chi do do tre, khong cham diem. */
+const timeAgentOnce = async (runAgent, userId, q) => {
+  const chat = await prisma.aiChat.create({
+    data: {
+      user_id: userId,
+      title: "rag-eval-latency",
+      thread_key: "rag-eval-lat-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+    },
+  });
+  try {
+    await prisma.aiMessage.create({ data: { ai_chat_id: chat.id, role: "user", content: q } });
+    await pace();
+    const started = Date.now();
+    let firstTokenAt = null;
+    await runAgent(prisma, chat.id, {
+      onToken: () => {
+        if (firstTokenAt === null) firstTokenAt = Date.now();
+      },
+    });
+    return { ttft: firstTokenAt ? firstTokenAt - started : null, totalMs: Date.now() - started };
+  } finally {
+    await prisma.aiMessage.deleteMany({ where: { ai_chat_id: chat.id } });
+    await prisma.aiChat.delete({ where: { id: chat.id } });
+  }
+};
+
 const evaluateTriad = async () => {
   if (!hasGeminiApiKey()) {
     return { skipped: true, reason: "Thieu GEMINI_API_KEY" };
@@ -203,6 +230,22 @@ const evaluateTriad = async () => {
   const { runAgent } = await import("../ai/agent.js");
   const user = await prisma.user.findFirst({ select: { id: true } });
   const rows = [];
+
+  // Do tre do tren CA 30 cau (nghiem thu T7: TTFT trung vi tren tap 30 cau),
+  // khong chi tren mau cham diem: mau 8 cau qua nho, mot lan Gemini cham la
+  // trung vi nhay qua mot.
+  const latency = [];
+  for (const item of QUICK ? sample : dataset.questions) {
+    // Mot cau loi (vd. Gemini 429) khong duoc lam mat ca luot do.
+    try {
+      latency.push(await timeAgentOnce(runAgent, user.id, item.q));
+      process.stdout.write("~");
+    } catch {
+      latency.push({ ttft: null, totalMs: null });
+      process.stdout.write("x");
+    }
+  }
+  process.stdout.write("\n");
 
   for (const item of sample) {
     const chat = await prisma.aiChat.create({
@@ -259,9 +302,16 @@ const evaluateTriad = async () => {
   process.stdout.write("\n");
 
   const pick = (k) => rows.map((r) => r[k]).filter((v) => v != null);
+  const median = (arr) => {
+    const s = arr.filter((v) => v != null).sort((a, b) => a - b);
+    return s.length ? Math.round(s[Math.floor(s.length / 2)]) : null;
+  };
   return {
     skipped: false,
     sampleSize: rows.length,
+    latencySize: latency.filter((r) => r.ttft != null).length,
+    latencyTtftMedian: median(latency.map((r) => r.ttft)),
+    latencyTotalMedian: median(latency.map((r) => r.totalMs)),
     faithfulness: round3(avg(pick("faithfulness"))),
     answerRelevance: round3(avg(pick("answerRelevance"))),
     contextRelevance: round3(avg(pick("contextRelevance"))),
@@ -343,8 +393,9 @@ const main = async () => {
       "",
       "| Chi so | Muc tieu de cuong | Do duoc |",
       "|---|---|---|",
-      "| Thoi gian toi ky tu dau tien | < 1.5s | **" + triad.ttftMedian + "ms** |",
-      "| Thoi gian hoan tat | < 8s | **" + triad.totalMedian + "ms** |",
+      "| Thoi gian toi ky tu dau tien (trung vi " + triad.latencySize + " cau) | < 1.5s | **" + fmtMs(triad.latencyTtftMedian) + "** |",
+      "| Thoi gian hoan tat (trung vi " + triad.latencySize + " cau) | < 8s | **" + fmtMs(triad.latencyTotalMedian) + "** |",
+      "| TTFT tren mau cham diem (" + triad.sampleSize + " cau) | - | " + triad.ttftMedian + "ms |",
       "",
       "Tach lam hai moc vi streaming chi cai thien moc thu nhat. Bao cao mot con",
       "so tong nhu truoc day che mat dung phan ma nguoi dung cam nhan duoc.",
@@ -359,7 +410,7 @@ const main = async () => {
   console.log("Recall@5   : " + ret.recallAt5 + "% (" + ret.hits + "/" + ret.total + "), MRR " + ret.mrr);
   if (!triad.skipped) {
     console.log("RAG Triad  : F " + triad.faithfulness + " | AR " + triad.answerRelevance + " | CR " + triad.contextRelevance);
-    console.log("Do tre     : TTFT " + triad.ttftMedian + "ms, tong " + triad.totalMedian + "ms");
+    console.log("Do tre     : TTFT " + fmtMs(triad.latencyTtftMedian) + ", tong " + fmtMs(triad.latencyTotalMedian) + " (trung vi " + triad.latencySize + " cau)");
   }
   console.log("-".repeat(58));
   console.log("Da ghi bao cao: " + path.relative(process.cwd(), out));

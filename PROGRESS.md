@@ -73,10 +73,10 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 | Truy hồi đúng sản phẩm trong top 5 | > 75% | 62.5% | **100%** (30/30) | Đạt |
 | MRR của truy hồi | - | chưa đo | **0.919** | Có số |
 | Faithfulness (Ragas) | > 0.75 | chưa đo | **1.0** | Đạt |
-| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.875** (2026-11-05, sau khi nâng LangChain 1.x; dao động 0.78-0.9 giữa các lần, cỡ mẫu 8) | Đạt |
+| Answer Relevance (Ragas) | > 0.75 | chưa đo | **0.8** (2026-11-05, cỡ mẫu 8; 4 lần đo trong ngày: 0.725-0.925) | Đạt ở lần đo cuối, dao động quanh mốc |
 | Context Relevance (Ragas) | - | chưa đo | **0.425** (2026-11-05; các lần trước 0.363-0.425, từ 0.275 ban đầu, xem T9) | Dao động 0.36-0.43, vẫn còn nhiễu |
-| Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **1.42 s** (2026-11-05, đã tắt cache khi đo, n = 8; lần trước cùng ngày 1.61 s, nên dao động quanh mốc theo tải Gemini) | Đạt ở lần đo mới nhất, chưa ổn định |
-| Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **1.81 s** (2026-11-05; trước đó ~3.0-3.8 s) | Đạt |
+| Thời gian tới ký tự đầu tiên | < 1.5 s | không có streaming | **1.17-1.87 s** trung vị 30 câu qua 3 lần đo cùng mã (2026-11-05; một lần 3.06 s lúc Gemini quá tải). Phần do hệ thống: truy hồi ~2 ms ở 13/30 câu hỏi theo tên (bỏ embedding), ~0.5 s ở câu còn lại; phần LLM Gemini 0.9-2.8 s mỗi lượt | Đạt khi Gemini bình thường, không ổn định |
+| Thời gian hoàn tất | < 8 s | p50 = 9.0 s | **1.4-2.2 s** trung vị 30 câu (2026-11-05) | Đạt |
 | Độ chính xác giá / tồn kho | > 85% | chưa đo được | khớp tuyệt đối với DB | Đạt, xem ghi chú |
 | Chặn tấn công tiêm lệnh | 100% | chưa có | **11/11**, chặn nhầm 0/10 | Đạt |
 | Phát hiện bình luận vi phạm | > 80% | 100% (n = 10) | 100% (4/4) | Đạt, cỡ mẫu độc hại nhỏ |
@@ -129,20 +129,18 @@ tiếng Việt có chữ "đ" đều bị ảnh hưởng. Gom về `lib/vietname
 
 | Mã | Vấn đề | Đã xử lý thế nào | Bằng chứng |
 |---|---|---|---|
-| G8 (một phần) | Chưa có bộ nhớ đệm, TTFT chưa đạt | Cache thứ hạng RRF (id + điểm, KHÔNG cache giá/tồn kho — luôn đọc lại tươi qua `fetchRowsByIds`) theo câu hỏi đã chuẩn hoá; chỉ `bindTools()` khi ngữ cảnh rỗng hoặc câu hỏi chạm màu/ship. TTFT giảm từ 4.0s xuống còn ~2.5-3.6s (dao động giữa các lần chạy) — **chưa đạt mốc 1.5s**. Xem T7 ở mục 4 để biết vì sao và hướng còn lại | `ai/retrieval.js` (rankCache), `ai/agent.js` (`needsTools`), `tests/16-retrieval-cache.test.mjs`, `npm run eval:rag` |
+| G8 | Chưa có bộ nhớ đệm, TTFT chưa đạt | Cache thứ hạng RRF (id + điểm, KHÔNG cache giá/tồn kho — luôn đọc lại tươi qua `fetchRowsByIds`); chỉ `bindTools()` khi cần; cổng từ khoá bỏ lượt gọi embedding (~0.5 s) khi full-text + trigram cùng chọn một sản phẩm và tên khớp ≥ 2 token, chiếm ≥ 1/2 token có nghĩa, không phải câu phụ kiện/so sánh. TTFT 4.0 s → 1.17-1.87 s trung vị 30 câu; phần còn lại là độ trễ Gemini | `ai/retrieval.js` (rankCache, `isLexicalDecisive`), `ai/agent.js` (`needsTools`), `tests/16-retrieval-cache.test.mjs`, `npm run eval:rag` |
 | G9 | Hai KPI vẫn chưa có phép đo | Tìm ảnh: dùng chính ảnh thứ hai trong thư viện sản phẩm seed (đã có sẵn, nhiều CDN thật) làm ảnh truy vấn, không cần gán nhãn tay — `scripts/evaluate-image-search.js`, **100% (20/20)**. Gợi ý cá nhân hoá: vì seed thật không có tín hiệu đồng mua/hành vi, dựng tập giả lập CÔ LẬP (4 nhóm sản phẩm cùng gu từ 20 sản phẩm seed thật, xoay vòng giấu 1 sản phẩm làm ground-truth), chạy qua đúng thuật toán CF thật rồi dọn sạch + tính lại `product_similarity` từ dữ liệu thật sau khi đo — `scripts/evaluate-recommendations.js`, **nDCG@5 = 0.610** (13 ca, sát ngưỡng) | `npm run eval:image`, `npm run eval:reco` |
 | — (một phần của T9/G2) | Context Relevance thấp (0.275) | Chỉ giữ 1-2 ứng viên trong ngữ cảnh LLM khi cả 3 nhánh tìm kiếm cùng đồng ý hạng 1 (tín hiệu "hỏi đích danh sản phẩm"); **không** đụng vào `retrieveHybrid` vì Recall@5 đo trực tiếp trên hàm đó. Context Relevance tăng 0.275 → 0.425, Recall@5 không đổi (100%) | `ai/retrieval.js` (`pickConfidentSubset`), `npm run eval:rag` |
 
 ### Còn lại
 
-**T7 chưa đóng hẳn — TTFT vẫn trên 1.5s.** Cache + bỏ bind tool không đủ: đo
-thực tế cho thấy không câu nào trong 30 câu của tập eval khớp từ khoá
-màu/ship, nghĩa là tool-binding gần như luôn đã bị tắt, nhưng TTFT đo được
-(gồm cả bước truy hồi + gọi embedding) vẫn quanh 2.5-3.6s. Phần còn lại nằm ở
-độ trễ gọi API nhúng câu hỏi + 3 nhánh tìm kiếm (cache chỉ giúp khi CÙNG một
-câu hỏi lặp lại — vô ích trên một tập 30 câu khác nhau từng câu một, chỉ có
-tác dụng thật trên traffic thật). Hướng còn lại: chạy nhánh nhúng song song
-sớm hơn nữa, hoặc giảm số nhánh fan-out khi đã có lịch sử hội thoại rõ ràng.
+**T7 — phần hệ thống đã gần sàn, phần còn lại thuộc Gemini.** Đo tách
+(2026-11-05): full-text + trigram ~2 ms, gọi embedding ~0.5 s, LLM tới token
+đầu 0.9-2.8 s tuỳ tải phía Google. Tắt "thinking" (`thinkingLevel: LOW`,
+`thinkingBudget: 0`, có từ `@langchain/google-genai` 2.x) không nhanh hơn trên
+`gemini-3.1-flash-lite`. Cổng từ khoá bỏ embedding ở 13/30 câu. Muốn chắc
+dưới 1.5 s thì phải đổi model/nhà cung cấp hoặc đặt máy gần region của API.
 
 **nDCG 0.610 sát ngưỡng 0.60** — nên coi là "vừa đạt", không phải dư dả. Nếu
 thay đổi thuật toán CF (`jobs/computeUserRecommendations.js`,
@@ -166,17 +164,19 @@ có tụt dưới ngưỡng hay không.
 
 ### Đã làm 2026-10-27 (một phần)
 
-#### T7. Hạ thời gian tới ký tự đầu tiên xuống dưới 1.5 s — chưa đạt mốc
+#### T7. Hạ thời gian tới ký tự đầu tiên xuống dưới 1.5 s — đạt khi Gemini bình thường
 
 - **Đã làm**: (1) chỉ bind tool khi ngữ cảnh rỗng hoặc câu hỏi chạm màu/ship
   (`needsTools` trong `ai/agent.js`); (2) cache thứ hạng RRF theo câu hỏi đã
   chuẩn hoá, KHÔNG cache giá/tồn kho (`ai/retrieval.js`, `fetchRowsByIds`
   trong `lib/productSearch.js` đọc lại tươi mỗi lần).
-- **Việc 3 còn treo**: tắt chế độ suy nghĩ của model — `@langchain/google-genai`
-  hiện dùng vẫn không có tham số này.
+- **Việc 3 (2026-11-05)**: tắt chế độ suy nghĩ — đã đo, không nhanh hơn trên
+  `gemini-3.1-flash-lite`, không áp dụng. (4) Cổng từ khoá bỏ embedding ở câu
+  hỏi theo tên (`isLexicalDecisive`).
 - **Kết quả đo**: TTFT 4.0s → ~2.5-3.6s. Faithfulness không tụt (lên 1.0).
   **Chưa đạt 1.5s** — xem phân tích ở mục 3.
-- **Nghiệm thu gốc chưa đạt đủ**: TTFT trung vị dưới 1.5s trên tập 30 câu.
+- **Nghiệm thu gốc**: TTFT trung vị dưới 1.5s trên tập 30 câu — `eval:rag` nay đo
+  đủ 30 câu; đạt 1.17 s ở lần Gemini bình thường, 1.59-1.87 s ở các lần khác.
 
 #### T8. Đo hai KPI còn thiếu — xong
 
@@ -198,7 +198,7 @@ có tụt dưới ngưỡng hay không.
 - **Xong (2026-11-05)** — Giữ chân + phễu chuyển đổi: `GET /api/dashboard/behavior?days=30` (admin), khối "Retention & phễu chuyển đổi" ở `/admin`. Test: `tests/17-behavior-analytics`.
 - **Xong (2026-11-05)** — Tỉ lệ phản hồi tích cực so với mốc 80%: trang `/admin/ai-feedback`, hiện "Chưa đủ mẫu" khi n < 20 thay vì một tỉ lệ vô nghĩa.
 - **Xong (2026-11-05)** — Nhật ký lượt bị chặn do nghi tiêm lệnh: lọc `AI_GUARD_BLOCK` ở `/admin/audit`.
-- **Xong một phần (2026-11-05)** — Giám sát: `middleware/metrics.middleware.js` đo p50/p95/5xx theo mẫu route (không đọc body/query/header), cảnh báo `console.error` có throttle 60s khi p95 > 500 ms hoặc ≥ 5 lỗi 5xx; `GET /api/health` (admin) trả số đo + số lượt gọi Gemini trong ngày. Test: `tests/18-metrics`. Màn hình `/admin/health` (menu System Health) hiện uptime, tổng 5xx, số route p95 > 500 ms, lượt gọi Gemini trong ngày và bảng route xếp theo p95, tự làm mới 15 s. **Chưa có**: kênh cảnh báo ngoài log.
+- **Xong (2026-11-05)** — Giám sát: `middleware/metrics.middleware.js` đo p50/p95/5xx theo mẫu route (không đọc body/query/header), cảnh báo `console.error` có throttle 60s khi p95 > 500 ms hoặc ≥ 5 lỗi 5xx; `GET /api/health` (admin) trả số đo + số lượt gọi Gemini trong ngày. Test: `tests/18-metrics`. Màn hình `/admin/health` (menu System Health) hiện uptime, tổng 5xx, số route p95 > 500 ms, lượt gọi Gemini trong ngày và bảng route xếp theo p95, tự làm mới 15 s. Kênh thứ hai: thông báo in-app cho từng admin (`notifyAdmins`, không broadcast) khi một route vừa vượt ngưỡng, throttle chung 10 phút.
 
 ---
 
@@ -254,3 +254,4 @@ có tụt dưới ngưỡng hay không.
 | 2026-11-05 | `eval:rag` từng đo TTFT khi cache thứ hạng đã nóng từ phần A của chính script, nên con số ~2.5-3.6 s có thể thấp hơn thực tế. Thêm `scripts/_disable-rank-cache.js` (import đầu tiên), `AI_RETRIEVAL_CACHE_TTL_MS<=0` tắt hẳn cache. `eval:ai` và `eval:rag` chưa chạy lại được vì Gemini trả `503 Service Unavailable` (high demand) | Claude Code |
 | 2026-11-05 | Đo lại sau khi Gemini hết 503. `eval:ai`: kiểm duyệt 34 mẫu (30 sạch, 4 độc hại), chặn nhầm 0/30, recall 4/4; mẫu lỗi gọi model được gọi lại tối đa 2 lần, cùng mẫu cùng nhãn. `eval:rag` (đã tắt cache): Recall@5 100%, MRR 0.919, F 1.0, AR 0.85, CR 0.363, TTFT 1.61 s, tổng 1.88 s. TTFT vẫn trên mốc 1.5 s; độ trễ phụ thuộc mạnh vào tải phía Gemini (cùng ngày có lúc một lượt kiểm duyệt mất 21 s) | Claude Code |
 | 2026-11-05 | Dọn nợ: (1) màn hình `/admin/health`. (2) `tsc -b` frontend từ 27 lỗi về 0; xoá `PriceRangeFilter`/`ToggleFilter` không ai dùng; hook `useAdminFilterOption` trước trả `AxiosResponse` nên form sửa filter đọc nhầm lớp và để trống, nay unwrap `.data` trong hook. (3) `npm audit`: frontend 0 lỗ hổng (`audit fix` + `overrides` ép `minimatch ^11.0.4` cho `typescript-estree`/`glob`); backend nâng `@langchain/core` 1.3, `@langchain/google-genai` 2.3, `nodemailer` 10, còn 3 lỗ hổng high trong chuỗi CLI `prisma` 6 (`@prisma/config`, `effect`, `deepmerge-ts`), chỉ hết khi lên Prisma 7 (driver adapter + `prisma.config.ts`), để quyết riêng. Test 139/140 (ca đỏ vẫn là MoMo sandbox). `eval:rag` sau nâng cấp: Recall@5 100%, MRR 0.919, F 1, AR 0.875, CR 0.425, TTFT 1.42 s, tổng 1.81 s | Claude Code |
+| 2026-11-05 | T7: đo tách TTFT (truy hồi từ khoá ~2 ms, embedding ~0.5 s, LLM 0.9-2.8 s). Tắt thinking không giúp. Thêm cổng từ khoá trong `retrieveHybrid`: bỏ embedding khi full-text + trigram cùng chọn hạng 1 và tên khớp đủ token (13/30 câu, Recall@5 vẫn 100%, MRR 0.919). Bản đầu chỉ xét đồng thuận đã mở nhầm cho "sạc nhanh cho iPhone" và làm AR tụt 0.725; siết thêm điều kiện tên + chặn câu phụ kiện/so sánh. `eval:rag` đo TTFT trên đủ 30 câu. Cảnh báo hiệu năng gửi in-app cho admin, chỉ khi route vừa vượt ngưỡng (c5xx là bộ đếm trọn đời, báo theo trạng thái sẽ lặp mãi). Test 144/145 | Claude Code |
