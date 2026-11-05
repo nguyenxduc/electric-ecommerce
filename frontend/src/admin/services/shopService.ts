@@ -13,6 +13,8 @@ export type AdminShop = {
   contact_email: string | null
   contact_phone: string | null
   address: string | null
+  tax_code?: string | null
+  tax_entity_type?: 'household' | 'company'
   approved_at: string | null
   created_at: string
   owner?: { id: number; name: string | null; email: string | null; role: string | null }
@@ -45,6 +47,9 @@ export const adminShopService = {
   },
   suspend(id: number, reason?: string) {
     return axiosClient.patch(`/shops/admin/${id}/suspend`, { reason })
+  },
+  updateTax(id: number, body: { tax_code: string; tax_entity_type: string }) {
+    return axiosClient.patch(`/shops/${id}/tax`, body)
   }
 }
 

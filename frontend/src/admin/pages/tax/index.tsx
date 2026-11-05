@@ -143,7 +143,7 @@ export default function AdminTaxPage() {
               {list.map(inv => (
                 <tr key={inv.id} className="border-t">
                   <td className="p-3 font-mono">
-                    {inv.series}-{inv.invoice_number}
+                    {inv.invoice_number}
                   </td>
                   <td className="p-3">{inv.seller?.name}</td>
                   <td className="p-3">{inv.buyer?.company_name || inv.buyer?.name}</td>

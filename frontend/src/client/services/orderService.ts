@@ -123,7 +123,7 @@ export type ShippingQuote = {
 }
 
 export const quoteShipping = async (payload: {
-  items: Array<{ product_id: number; quantity: number }>
+  items: Array<{ product_id: number; quantity: number; variant_id?: number }>
   shipping_address: CreateOrderPayload['shipping_address']
 }): Promise<ShippingQuote> => {
   const { data } = await axiosClient.post('/shipping/quote', payload)

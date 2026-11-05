@@ -59,7 +59,8 @@ export default function AdminCodPage() {
 
   const toggle = (id: number) =>
     setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]))
-  const canSubmit = picked.length > 0 && received !== '' && Number(received) >= 0 && oneCarrier
+  const canSubmit =
+    picked.length > 0 && received !== '' && Number.isInteger(Number(received)) && Number(received) >= 0 && oneCarrier
 
   return (
     <div className="space-y-4">

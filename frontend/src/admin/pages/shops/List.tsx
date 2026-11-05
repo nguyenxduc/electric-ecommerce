@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { BadgeCheck, Ban, CircleSlash, Store } from 'lucide-react'
+import { BadgeCheck, Ban, CircleSlash, Receipt, Store } from 'lucide-react'
 import adminShopService, { AdminShop } from '../../services/shopService'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
@@ -34,6 +34,9 @@ export default function AdminShopsList() {
   )
   const [reasonAction, setReasonAction] = useState<ReasonAction>(null)
   const [reason, setReason] = useState('')
+  const [taxShop, setTaxShop] = useState<AdminShop | null>(null)
+  const [taxCode, setTaxCode] = useState('')
+  const [taxType, setTaxType] = useState('household')
 
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -79,6 +82,21 @@ export default function AdminShopsList() {
     },
     onError: (err: any) =>
       toast.error(err?.response?.data?.error || 'Failed to suspend shop')
+  })
+
+  const taxMut = useMutation({
+    mutationFn: () =>
+      adminShopService.updateTax(taxShop!.id, {
+        tax_code: taxCode.trim(),
+        tax_entity_type: taxType
+      }),
+    onSuccess: () => {
+      toast.success('Tax info updated')
+      setTaxShop(null)
+      invalidate()
+    },
+    onError: (err: any) =>
+      toast.error(err?.response?.data?.error || 'Failed to update tax info')
   })
 
   const shops = data?.data?.data?.shops || []
@@ -230,6 +248,17 @@ export default function AdminShopsList() {
                             <CircleSlash className="w-4 h-4" /> Reject
                           </button>
                         )}
+                        <button
+                          title="Tax info"
+                          className="text-blue-600 flex items-center gap-1"
+                          onClick={() => {
+                            setTaxShop(shop)
+                            setTaxCode(shop.tax_code || '')
+                            setTaxType(shop.tax_entity_type || 'household')
+                          }}
+                        >
+                          <Receipt className="w-4 h-4" /> Tax
+                        </button>
                         {shop.status === 'active' && (
                           <button
                             title="Suspend"
@@ -270,6 +299,45 @@ export default function AdminShopsList() {
           setApproveShopTarget(null)
         }}
       />
+
+      {taxShop && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-semibold">
+              Tax info - "{taxShop.name}"
+            </h3>
+            <input
+              className="w-full border rounded px-3 py-2 text-sm"
+              placeholder="Tax code (10 digits, optionally -XXX; empty clears)"
+              value={taxCode}
+              onChange={e => setTaxCode(e.target.value)}
+            />
+            <select
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={taxType}
+              onChange={e => setTaxType(e.target.value)}
+            >
+              <option value="household">Household / individual</option>
+              <option value="company">Company</option>
+            </select>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-4 py-2 text-sm border rounded"
+                onClick={() => setTaxShop(null)}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={taxMut.isPending}
+                className="px-4 py-2 text-sm text-white rounded bg-blue-600 hover:bg-blue-700 disabled:opacity-60"
+                onClick={() => taxMut.mutate()}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {reasonAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

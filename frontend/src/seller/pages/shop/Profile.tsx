@@ -50,9 +50,7 @@ export default function SellerShopProfile() {
     pickup_province: '',
     pickup_district: '',
     pickup_ward: '',
-    pickup_address: '',
-    tax_code: '',
-    tax_entity_type: 'household'
+    pickup_address: ''
   })
 
   useEffect(() => {
@@ -62,9 +60,7 @@ export default function SellerShopProfile() {
         pickup_province: sx.pickup_province || '',
         pickup_district: sx.pickup_district || '',
         pickup_ward: sx.pickup_ward || '',
-        pickup_address: sx.pickup_address || '',
-        tax_code: sx.tax_code || '',
-        tax_entity_type: sx.tax_entity_type || 'household'
+        pickup_address: sx.pickup_address || ''
       })
       setName(shop.name || '')
       setDescription(shop.description || '')
@@ -291,28 +287,30 @@ export default function SellerShopProfile() {
             <div>
               <label className="block text-sm font-medium mb-1">Tax code</label>
               <input
-                className="w-full border rounded-lg px-3 py-2"
-                placeholder="10 digits, optionally -XXX"
-                value={ext.tax_code}
-                onChange={e => setExt({ ...ext, tax_code: e.target.value })}
+                className="w-full border rounded-lg px-3 py-2 bg-gray-50"
+                disabled
+                value={(shop as any).tax_code || ''}
+                placeholder="Not set"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
                 Entity type
               </label>
-              <select
-                className="w-full border rounded-lg px-3 py-2"
-                value={ext.tax_entity_type}
-                onChange={e =>
-                  setExt({ ...ext, tax_entity_type: e.target.value })
+              <input
+                className="w-full border rounded-lg px-3 py-2 bg-gray-50"
+                disabled
+                value={
+                  (shop as any).tax_entity_type === 'company'
+                    ? 'Company'
+                    : 'Household / individual'
                 }
-              >
-                <option value="household">Household / individual</option>
-                <option value="company">Company</option>
-              </select>
+              />
             </div>
           </div>
+          <p className="text-xs text-gray-500">
+            Tax information is read-only. Contact admin to change it.
+          </p>
           <p className="text-xs text-gray-500">
             Household sellers have 1% VAT + 0.5% PIT withheld by the platform
             per Decree 117/2025.

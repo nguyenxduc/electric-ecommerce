@@ -166,7 +166,7 @@ const Checkout = () => {
   }, [userData?.user, name, phone, address])
 
   // Debounced server-side shipping quote; failures fall back to the estimate
-  const quoteKey = items.map(i => `${i.product_id}:${i.quantity}`).join(',')
+  const quoteKey = items.map(i => `${i.product_id}:${i.variant?.id ?? ''}:${i.quantity}`).join(',')
   useEffect(() => {
     if (!quoteKey || !address.trim() || !localStorage.getItem('accessToken')) {
       setQuote(null)
@@ -177,7 +177,8 @@ const Checkout = () => {
       quoteShipping({
         items: items.map(i => ({
           product_id: i.product_id,
-          quantity: i.quantity
+          quantity: i.quantity,
+          variant_id: i.variant?.id
         })),
         shipping_address: {
           name,

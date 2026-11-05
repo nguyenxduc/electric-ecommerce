@@ -554,14 +554,14 @@ const OPS: OpDef[] = [
   { key: 'shipping_rate_mode', label: 'Shipping rate mode', type: 'select', options: ['flat', 'carrier'], fallback: 'flat', category: 'shipping' },
   { key: 'order_payment_timeout_minutes', label: 'Unpaid order timeout (minutes)', type: 'number', fallback: '30', category: 'general' },
   { key: 'cod_require_verified_phone', label: 'COD requires verified phone', type: 'boolean', fallback: 'false', category: 'general' },
-  { key: 'fraud_block_score', label: 'Fraud block score', type: 'number', fallback: '', category: 'general' },
-  { key: 'fraud_review_score', label: 'Fraud review score', type: 'number', fallback: '', category: 'general' },
-  { key: 'fraud_velocity_orders_per_hour', label: 'Fraud velocity (orders/hour)', type: 'number', fallback: '', category: 'general' },
-  { key: 'fraud_new_account_cod_amount', label: 'Fraud new-account COD amount', type: 'number', fallback: '', category: 'general' },
-  { key: 'invoice_vat_rate', label: 'Invoice VAT rate', type: 'number', fallback: '', category: 'general' },
+  { key: 'fraud_block_score', label: 'Fraud block score', type: 'number', fallback: '100', category: 'general' },
+  { key: 'fraud_review_score', label: 'Fraud review score', type: 'number', fallback: '40', category: 'general' },
+  { key: 'fraud_velocity_orders_per_hour', label: 'Fraud velocity (orders/hour)', type: 'number', fallback: '5', category: 'general' },
+  { key: 'fraud_new_account_cod_amount', label: 'Fraud new-account COD amount', type: 'number', fallback: '500', category: 'general' },
+  { key: 'invoice_vat_rate', label: 'Invoice VAT rate', type: 'number', fallback: '0.1', category: 'general' },
   { key: 'invoice_series', label: 'Invoice series', type: 'text', fallback: '', category: 'general' },
-  { key: 'tax_withhold_vat_rate', label: 'Tax withhold VAT rate', type: 'number', fallback: '', category: 'general' },
-  { key: 'tax_withhold_pit_rate', label: 'Tax withhold PIT rate', type: 'number', fallback: '', category: 'general' }
+  { key: 'tax_withhold_vat_rate', label: 'Tax withhold VAT rate', type: 'number', fallback: '0.01', category: 'general' },
+  { key: 'tax_withhold_pit_rate', label: 'Tax withhold PIT rate', type: 'number', fallback: '0.005', category: 'general' }
 ]
 
 function OperationsSection() {
