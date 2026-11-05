@@ -139,6 +139,25 @@ async function main() {
 
   const clusters = await resolveClusterProducts();
 
+  // computeProductSimilarity tinh tren TOAN BO don, nen don do test tao ra (mua
+  // ngau nhien) lam nhieu tin hieu dong mua: do 2026-11-05, ngay sau seed:full
+  // nDCG 0.660, sau npm test (them 20 don) con 0.568.
+  // shortcut: coi don tao sau khi seed 10 phut la don ngoai seed, sai neu seed
+  // chay qua 10 phut hoac du lieu that; doi sang danh dau don seed neu can.
+  const firstProduct = await prisma.product.aggregate({ _min: { created_at: true } });
+  const seededAt = firstProduct._min.created_at;
+  const foreignOrders = seededAt
+    ? await prisma.order.count({
+        where: { created_at: { gt: new Date(seededAt.getTime() + 10 * 60_000) } },
+      })
+    : 0;
+  if (foreignOrders > 0) {
+    console.warn(
+      `[!] Co ${foreignOrders} don tao sau khi seed (vd. do npm test). nDCG se bi nhieu;` +
+        " chay npm run seed:full truoc khi do."
+    );
+  }
+
   console.log("Dung du lieu gia lap: tao nguoi dung, hanh vi, gio hang booster...");
   const cases = []; // { personaId, clusterName, heldOutId, heldOutName }
 

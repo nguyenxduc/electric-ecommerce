@@ -16,7 +16,7 @@
 - Đo lại AI: `npm run eval:ai` → `backend/docs/ai-evaluation.md`.
 - Đo truy hồi và RAG Triad: `npm run eval:rag` → `backend/docs/rag-evaluation.md`. Thêm `-- --quick` để chạy nhanh. Bản miễn phí của Gemini giới hạn 15 lượt/phút nên script tự giãn nhịp, chạy đầy đủ mất khoảng 4 phút.
 - Đo tìm kiếm bằng ảnh: `npm run eval:image` — cần server đang chạy (`node server.js`), dùng thẳng ảnh có sẵn của sản phẩm seed, không cần chuẩn bị gì thêm.
-- Đo nDCG gợi ý cá nhân hoá: `npm run eval:reco` — tự tạo dữ liệu giả lập cô lập rồi dọn sạch, không cần chuẩn bị gì thêm. Nếu script bị ngắt giữa chừng, chạy lại một lần sẽ tự dọn phần dữ liệu giả lập còn sót trước khi đo tiếp.
+- Đo nDCG gợi ý cá nhân hoá: `npm run eval:reco` — tự tạo dữ liệu giả lập cô lập rồi dọn sạch. **Chạy ngay sau `npm run seed:full`**: độ tương đồng tính trên toàn bộ đơn, nên đơn do `npm test` để lại (mua ngẫu nhiên) kéo nDCG từ 0.660 xuống 0.568; script in cảnh báo `[!]` khi phát hiện. Nếu script bị ngắt giữa chừng, chạy lại một lần sẽ tự dọn phần dữ liệu giả lập còn sót trước khi đo tiếp.
 - Đo tải: khởi động backend với `RATE_LIMIT_ENABLED=0 node server.js` (chỉ khi đo, **không** ghi vào `.env`), rồi `npm run eval:load` → `backend/docs/load-test.md`. Thêm `LOAD_CONCURRENCY=300` để đo mức 300.
 - Đo kiểm duyệt khi Gemini chậm: `REVIEW_MODERATION_TIMEOUT_MS=60000 npm run eval:ai`. Script từ chối ghi kết quả nếu có mẫu bị skip.
 - Chuẩn hoá tiếng Việt: dùng `lib/vietnamese.js`, **đừng tự viết lại** `normalize("NFD")` vì chữ "đ" không tách được bằng cách đó.
@@ -83,8 +83,8 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
 | Chặn nhầm bình luận sạch | < 5% | chưa đo | **0%** (0/30, `npm run eval:ai`, 2026-11-05) | Đạt |
 | API danh sách sản phẩm, 200 người đồng thời | p95 < 500 ms | 594 ms | **424 ms** (0 lỗi; `/products/:id` 191 ms, `/categories` 101 ms; lần đo trước 431 ms) | Đạt |
 | Ổn định ở 300 người đồng thời | 0 lỗi | chưa đo | **0 lỗi / 4500 request**, p95 danh sách 650 ms | Ổn định, độ trễ vượt 500 ms |
-| Nhận diện đúng khi tìm bằng ảnh | > 70% | chưa đo | **100%** (20/20, `npm run eval:image`) | Đạt |
-| nDCG của gợi ý cá nhân hoá | > 0.60 | chưa đo | **0.610** (13 ca, `npm run eval:reco`) | Đạt, sát ngưỡng |
+| Nhận diện đúng khi tìm bằng ảnh | > 70% | chưa đo | **95%** (19/20, `npm run eval:image`, 2026-11-05; ca trượt là Gemini Vision không trả lời, lần trước 20/20) | Đạt |
+| nDCG của gợi ý cá nhân hoá | > 0.60 | chưa đo | **0.660-0.675** (13 ca, `npm run eval:reco` ngay sau `seed:full`, 2026-11-05; 0.568 nếu đo sau `npm test`) | Đạt trên DB sạch |
 
 **Ghi chú ba con số cần giải thích khi bảo vệ:**
 
@@ -142,7 +142,7 @@ tiếng Việt có chữ "đ" đều bị ảnh hưởng. Gom về `lib/vietname
 `gemini-3.1-flash-lite`. Cổng từ khoá bỏ embedding ở 13/30 câu. Muốn chắc
 dưới 1.5 s thì phải đổi model/nhà cung cấp hoặc đặt máy gần region của API.
 
-**nDCG 0.610 sát ngưỡng 0.60** — nên coi là "vừa đạt", không phải dư dả. Nếu
+**nDCG 0.660-0.675 trên DB vừa seed, nhưng nhạy với dữ liệu đơn hàng khác** (0.568 sau `npm test`). Nếu
 thay đổi thuật toán CF (`jobs/computeUserRecommendations.js`,
 `jobs/computeProductSimilarity.js`) thì chạy lại `npm run eval:reco` để biết
 có tụt dưới ngưỡng hay không.
@@ -262,3 +262,4 @@ có tụt dưới ngưỡng hay không.
 | 2026-11-05 | Dọn nợ: (1) màn hình `/admin/health`. (2) `tsc -b` frontend từ 27 lỗi về 0; xoá `PriceRangeFilter`/`ToggleFilter` không ai dùng; hook `useAdminFilterOption` trước trả `AxiosResponse` nên form sửa filter đọc nhầm lớp và để trống, nay unwrap `.data` trong hook. (3) `npm audit`: frontend 0 lỗ hổng (`audit fix` + `overrides` ép `minimatch ^11.0.4` cho `typescript-estree`/`glob`); backend nâng `@langchain/core` 1.3, `@langchain/google-genai` 2.3, `nodemailer` 10, còn 3 lỗ hổng high trong chuỗi CLI `prisma` 6 (`@prisma/config`, `effect`, `deepmerge-ts`), chỉ hết khi lên Prisma 7 (driver adapter + `prisma.config.ts`), để quyết riêng. Test 139/140 (ca đỏ vẫn là MoMo sandbox). `eval:rag` sau nâng cấp: Recall@5 100%, MRR 0.919, F 1, AR 0.875, CR 0.425, TTFT 1.42 s, tổng 1.81 s | Claude Code |
 | 2026-11-05 | T7: đo tách TTFT (truy hồi từ khoá ~2 ms, embedding ~0.5 s, LLM 0.9-2.8 s). Tắt thinking không giúp. Thêm cổng từ khoá trong `retrieveHybrid`: bỏ embedding khi full-text + trigram cùng chọn hạng 1 và tên khớp đủ token (13/30 câu, Recall@5 vẫn 100%, MRR 0.919). Bản đầu chỉ xét đồng thuận đã mở nhầm cho "sạc nhanh cho iPhone" và làm AR tụt 0.725; siết thêm điều kiện tên + chặn câu phụ kiện/so sánh. `eval:rag` đo TTFT trên đủ 30 câu. Cảnh báo hiệu năng gửi in-app cho admin, chỉ khi route vừa vượt ngưỡng (c5xx là bộ đếm trọn đời, báo theo trạng thái sẽ lặp mãi). Test 144/145 | Claude Code |
 | 2026-11-05 | T9: bảng điểm theo câu cho thấy câu hỏi theo thông số có CR 0. Nguyên nhân: nội dung embedding bỏ trống toàn bộ thông số (`buildContent` đọc sai dạng nhóm của `specs_detail`). Sửa + test + embed lại. Câu đã qua cổng tên chỉ giữ 1 ứng viên. CR 0.425 → 0.625, AR 0.925, TTFT 1.43 s trung vị 30 câu. Test 145/146 + 1 bỏ qua có chủ đích (bảng embedding rỗng ngay sau reseed) | Claude Code |
+| 2026-11-05 | Đo lại sau khi sửa embedding: tìm bằng ảnh 19/20 (ca trượt do Gemini Vision lỗi). nDCG ra 0.568 < 0.60; thuật toán không đổi, nguyên nhân là 20 đơn ngẫu nhiên do `npm test` để lại làm nhiễu `product_similarity`. Sau `seed:full`: 0.660 và 0.675. `eval:reco` nay cảnh báo khi có đơn ngoài seed | Claude Code |
