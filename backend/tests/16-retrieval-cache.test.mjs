@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { prisma } from '../lib/db.js'
-import { pickConfidentSubset, retrieveHybrid } from '../ai/retrieval.js'
+import { isLexicalDecisive, pickConfidentSubset, retrieveHybrid } from '../ai/retrieval.js'
 import { needsTools } from '../ai/agent.js'
 
 // T7: cache thu hang truy hoi de ha TTFT, nhung gia/ton kho KHONG duoc cache -
@@ -69,4 +69,58 @@ test('pickConfidentSubset: ca 3 nhanh dong y hang 1 thi cat con 2, khong thi giu
     { id: 3, _sources: ['fulltext'] }
   ]
   assert.equal(pickConfidentSubset(notUnanimous).length, 3)
+})
+
+// Cong tu khoa (T7): ten san pham thi bo luot goi API nhung, cau theo nhu cau
+// thi van phai goi. Moi cau them Date.now() de khong trung khoa cache thu hang
+// (cache hit thi khong chay nhanh nao, dem so lan goi se sai).
+test('retrieveHybrid: goi dung ten san pham thi khong goi API nhung', async () => {
+  const product = await prisma.product.findFirst({
+    where: { deleted_at: null, name: { contains: 'XPS' } }
+  })
+  assert.ok(product, 'can san pham Dell XPS trong seed')
+  let calls = 0
+  const rows = await retrieveHybrid(prisma, product.name + ' gia bao nhieu ' + Date.now(), {
+    topK: 5,
+    embedQuery: async () => { calls += 1; return [] }
+  })
+  assert.equal(calls, 0, 'full-text va trigram da dong thuan, khong duoc goi nhung')
+  assert.equal(String(rows[0]?.id), String(product.id))
+})
+
+test('retrieveHybrid: cau hoi theo nhu cau van goi API nhung', async () => {
+  let calls = 0
+  await retrieveHybrid(prisma, 'tu van dien thoai chup anh dep ' + Date.now(), {
+    topK: 5,
+    embedQuery: async () => { calls += 1; return [] }
+  })
+  assert.equal(calls, 1)
+})
+
+test('isLexicalDecisive: can ca hai nhanh tu khoa VA ten khop >= 2 token', () => {
+  const both = [{ sources: ['fulltext', 'trigram'] }]
+  assert.equal(isLexicalDecisive(both, ['dell', 'xps', '15', 'gia'], 'Dell XPS 15 9530'), true)
+  assert.equal(isLexicalDecisive(both, ['iphon', '15', 'pro'], 'iPhone 15 Pro'), true, 'loi go thieu chu van khop tien to')
+  // Mot chu thuong hieu thoi khong du: day la cau hoi phu kien, vector moi tim ra.
+  assert.equal(isLexicalDecisive(both, ['sac', 'nhanh', 'cho', 'iphone'], 'iPhone 15 Pro Max'), false)
+  assert.equal(isLexicalDecisive([{ sources: ['fulltext'] }], ['dell', 'xps'], 'Dell XPS 15'), false)
+  // Phu kien / so sanh: nhac ten may nhung dang tim thu khac.
+  assert.equal(isLexicalDecisive(both, ['op', 'lung', 'iphone', '15'], 'iPhone 15'), false)
+  assert.equal(isLexicalDecisive(both, ['sac', 'samsung', 'galaxy', 's24'], 'Samsung Galaxy S24'), false)
+  assert.equal(isLexicalDecisive(both, ['so', 'sanh', 'iphone', '15', 'galaxy', 's24'], 'iPhone 15'), false)
+  // Tu hoi gia khong lam giam ty le khop.
+  assert.equal(isLexicalDecisive(both, ['canon', 'eos', 'r5', 'chup', 'anh', 'the', 'nao'], 'Canon EOS R5'), true)
+  assert.equal(isLexicalDecisive([]), false)
+})
+
+test('pickConfidentSubset: bo qua vector thi 2/2 nhanh dong y la du de cat', () => {
+  const gated = [
+    { id: 1, _sources: ['fulltext', 'trigram'], _vectorSkipped: true },
+    { id: 2, _sources: ['fulltext'], _vectorSkipped: true },
+    { id: 3, _sources: ['fulltext'], _vectorSkipped: true }
+  ]
+  assert.equal(pickConfidentSubset(gated).length, 2)
+  // Co chay vector ma hang 1 chi duoc 2 nhanh chon thi KHONG cat (hanh vi cu).
+  const ranVector = gated.map(r => ({ ...r, _vectorSkipped: false }))
+  assert.equal(pickConfidentSubset(ranVector).length, 3)
 })

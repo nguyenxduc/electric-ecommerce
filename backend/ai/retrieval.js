@@ -40,6 +40,44 @@ const rankCacheSet = (key, fused) => {
   rankCache.set(key, { fused, expires: Date.now() + RANK_CACHE_TTL_MS });
 };
 
+// Cau hoi goi dung ten san pham ("Dell XPS 15 gia bao nhieu", "iphon 15 pro")
+// thi full-text va trigram cung chon mot san pham dung dau VA ten san pham do
+// chua it nhat 2 token cua cau hoi: luc do nhanh vector khong doi duoc ket qua
+// nen bo qua luot goi API nhung (~0.5s). Chi dong thuan thoi la chua du: "sac
+// nhanh cho iPhone" co ca hai nhanh cung chon mot chiec iPhone chi vi mot chu
+// thuong hieu, trong khi vector moi tim ra cu sac. Cau theo nhu cau van chay
+// vector. AI_RETRIEVAL_LEXICAL_GATE=0 de luon chay ca ba nhanh.
+const LEXICAL_GATE = process.env.AI_RETRIEVAL_LEXICAL_GATE !== "0";
+const MIN_NAME_TOKEN_HITS = 2;
+// Tu hoi gia/ton kho khong mang nghia san pham, bo ra truoc khi tinh ty le khop.
+const QUERY_FILLER = new Set(["gia", "bao", "nhieu", "con", "hang", "khong", "cho", "cua", "the", "nao", "mua", "co"]);
+// Cau hoi phu kien / so sanh nhac ten may nhung dang tim THU KHAC ("op lung
+// iphone 15", "so sanh X va Y"): luon chay vector, khong de cong cat ngu canh.
+const NOT_THE_PRODUCT = new Set(["op", "lung", "sac", "cap", "dan", "cuong", "phu", "kien", "sanh", "vs", "tuong", "thich", "case", "adapter"]);
+
+const nameTokenHits = (questionTokens, name) => {
+  const words = normalizeText(name || "").split(/[^a-z0-9]+/).filter(Boolean);
+  return questionTokens.filter((t) =>
+    words.some(
+      (w) =>
+        w === t ||
+        // tien to cho loi go thieu chu ("iphon" -> "iphone"), chi voi token du dai
+        (t.length >= 4 && w.startsWith(t)) ||
+        (w.length >= 4 && t.startsWith(w))
+    )
+  ).length;
+};
+
+export const isLexicalDecisive = (lexicalFused, questionTokens = [], topName = "") => {
+  const sources = lexicalFused[0]?.sources ?? [];
+  if (!sources.includes("fulltext") || !sources.includes("trigram")) return false;
+  if (questionTokens.some((t) => NOT_THE_PRODUCT.has(t))) return false;
+  const meaningful = questionTokens.filter((t) => !QUERY_FILLER.has(t));
+  const hits = nameTokenHits(meaningful, topName);
+  // Ten phai phu it nhat nua so token co nghia: "Canon EOS R5 chup anh" la 3/5.
+  return hits >= MIN_NAME_TOKEN_HITS && hits * 2 >= meaningful.length;
+};
+
 // Tai xuat de noi nao dang import tu day khong phai doi mot luot.
 export {
   RRF_K,
@@ -82,7 +120,9 @@ export const retrieveHybrid = async (
 
   if (!fused) {
     const tokens = [...new Set(tokenize(question))].slice(0, 12);
-    const tasks = [
+    // Hai nhanh tu khoa chay tren DB, mat vai ms. Nhanh vector phai goi API
+    // nhung (~0.5s, gan mot phan ba TTFT) nen chay SAU va chi khi can.
+    const [ftsRows, trgmRows] = await Promise.all([
       searchFullText(prisma, tokens, candidateLimit).catch((e) => {
         report("fulltext", e);
         return [];
@@ -91,26 +131,41 @@ export const retrieveHybrid = async (
         report("trigram", e);
         return [];
       }),
-      embedQuery
-        ? Promise.resolve()
-            .then(() => embedQuery(question))
-            .then((v) => searchVector(prisma, v, candidateLimit))
-            .catch((e) => {
-              report("vector", e);
-              return [];
-            })
-        : Promise.resolve([]),
-    ];
+    ]);
 
-    const [ftsRows, trgmRows, vecRows] = await Promise.all(tasks);
-
-    fused = fuseByRRF([
+    const lexicalBranches = [
       { key: "fulltext", rows: ftsRows, weight: 1 },
-      { key: "vector", rows: vecRows, weight: 1 },
       // Trigram chỉ là lưới an toàn cho lỗi gõ phím, nhiễu hơn hai nhánh kia nên
       // đóng góp ít hơn vào điểm hợp nhất.
       { key: "trigram", rows: trgmRows, weight: 0.5 },
-    ]);
+    ];
+    const lexical = fuseByRRF(lexicalBranches);
+
+    const topId = lexical[0]?.id;
+    const topName = [...ftsRows, ...trgmRows].find((r) => String(r?.id) === topId)?.name;
+    const vectorSkipped =
+      Boolean(embedQuery) && LEXICAL_GATE && isLexicalDecisive(lexical, tokens, topName);
+
+    let vecRows = [];
+    if (embedQuery && !vectorSkipped) {
+      vecRows = await Promise.resolve()
+        .then(() => embedQuery(question))
+        .then((v) => searchVector(prisma, v, candidateLimit))
+        .catch((e) => {
+          report("vector", e);
+          return [];
+        });
+    }
+
+    fused = vectorSkipped
+      ? lexical.map((e) => ({ ...e, vectorSkipped: true }))
+      : vecRows.length === 0
+        ? lexical
+        : fuseByRRF([
+            lexicalBranches[0],
+            { key: "vector", rows: vecRows, weight: 1 },
+            lexicalBranches[1],
+          ]);
     // Mot nhanh loi thi thu hang bi thieu: khong cache de lan sau duoc thu lai.
     if (!branchFailed) rankCacheSet(cacheKey, fused);
 
@@ -146,6 +201,7 @@ export const retrieveHybrid = async (
     _rrfScore: entry.score,
     _sources: entry.sources,
     _ranks: entry.ranks,
+    _vectorSkipped: entry.vectorSkipped === true,
   }));
 };
 
@@ -167,7 +223,10 @@ export const pickConfidentSubset = (retrieved, { maxWhenConfident = 2 } = {}) =>
   if (!retrieved || retrieved.length < 2) return retrieved;
   const topSources = retrieved[0]._sources?.length ?? 0;
   const secondSources = retrieved[1]._sources?.length ?? 0;
-  if (topSources >= 3 && secondSources < topSources) {
+  // Cong tu khoa bo qua vector thi chi co 2 nhanh: hang 1 duoc ca hai chon
+  // (cong da kiem them ten khop >= 2 token) la du tin cay nhu 3/3 khi co vector.
+  const required = retrieved[0]._vectorSkipped ? 2 : 3;
+  if (topSources >= required && secondSources < topSources) {
     return retrieved.slice(0, maxWhenConfident);
   }
   return retrieved;
