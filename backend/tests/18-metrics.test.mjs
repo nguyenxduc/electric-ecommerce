@@ -6,6 +6,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { percentile } from '../lib/stats.js'
 import { req, login, ACCOUNTS } from './helpers.mjs'
+import { prisma } from '../lib/db.js'
+import { notifyAdmins } from '../lib/notify.js'
 
 // Quy uoc duoc kiem o day la "nearest-rank-above": voi mang da sap xep tang do
 // dai n, p-percentile la phan tu o chi so 0-based floor(p/100 * n) - tuc la
@@ -74,4 +76,26 @@ test('metrics gom theo MAU route, khong giu id that trong khoa', async () => {
   // tranh.
   const leaked = keys.filter(k => /\/\d/.test(k))
   assert.deepEqual(leaked, [], 'khoa route khong duoc chua id that')
+})
+
+// Kenh canh bao ngoai log: chi admin nhan, khong co ban ghi broadcast
+// (user_id = null) ma nguoi mua cung thay.
+test('notifyAdmins: chi ghi cho tai khoan admin, khong broadcast', async () => {
+  const title = 'metrics-test-' + Date.now()
+  try {
+    const count = await notifyAdmins({ title, message: 'x' })
+    const admins = await prisma.user.count({ where: { role: 'admin' } })
+    assert.ok(admins > 0, 'seed phai co it nhat mot admin')
+    assert.equal(count, admins)
+    const rows = await prisma.notification.findMany({ where: { title } })
+    assert.equal(rows.length, admins)
+    assert.ok(rows.every(r => r.user_id !== null), 'khong duoc co ban ghi broadcast')
+    const roles = await prisma.user.findMany({
+      where: { id: { in: rows.map(r => r.user_id) } },
+      select: { role: true }
+    })
+    assert.ok(roles.every(u => u.role === 'admin'))
+  } finally {
+    await prisma.notification.deleteMany({ where: { title } })
+  }
 })

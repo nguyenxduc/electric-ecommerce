@@ -11,6 +11,7 @@
 // cho ra MAU route ("/api/products/:id"), khong bao gio la URL co id that.
 
 import { percentile } from "../lib/stats.js";
+import { notifyAdmins } from "../lib/notify.js";
 
 // Chan bo nho: toi da 200 khoa route. Het cho thi moi khoa moi gop vao mot
 // bucket "(other)" duy nhat (tong cong <= 201 entry), khong de Map lon theo
@@ -24,6 +25,11 @@ const RING = 500;
 const ALERT_THROTTLE_MS = 60_000;
 const P95_ALERT_MS = Number(process.env.METRICS_P95_ALERT_MS || 500);
 const C5XX_ALERT = Number(process.env.METRICS_5XX_ALERT || 5);
+
+const NOTIFY_THROTTLE_MS = Number(
+  process.env.METRICS_NOTIFY_THROTTLE_MS || 10 * 60_000
+);
+let lastNotifyAt = 0;
 
 const routes = new Map();
 
@@ -40,6 +46,7 @@ const bucketFor = (key) => {
       count: 0,
       c5xx: 0,
       lastAlertAt: 0,
+      notified: false,
     };
     routes.set(route, bucket);
   }
@@ -63,16 +70,32 @@ export const metricsMiddleware = (req, res, next) => {
     if (res.statusCode >= 500) bucket.c5xx += 1;
 
     const p95 = percentile(samplesOf(bucket), 95);
-    if (p95 <= P95_ALERT_MS && bucket.c5xx < C5XX_ALERT) return;
+    if (p95 <= P95_ALERT_MS && bucket.c5xx < C5XX_ALERT) {
+      bucket.notified = false; // ve duoi nguong: lan vuot sau se bao lai
+      return;
+    }
 
     // Bat buoc co throttle: khong co no thi mot route cham se log alert o MOI
     // request va canh bao that bi chim trong hang nghin dong giong nhau.
     const now = Date.now();
     if (now - bucket.lastAlertAt < ALERT_THROTTLE_MS) return;
     bucket.lastAlertAt = now;
-    console.error(
-      `[metrics] ${bucket.route} p95=${p95}ms count=${bucket.count} 5xx=${bucket.c5xx}`
-    );
+    const line = `${bucket.route} p95=${p95}ms count=${bucket.count} 5xx=${bucket.c5xx}`;
+    console.error(`[metrics] ${line}`);
+
+    // Kenh thu hai: thong bao in-app cho admin. Throttle chung 10 phut cho ca
+    // he thong (khong theo route): luc qua tai nhieu route cung vuot nguong,
+    // moi route mot thong bao se lam ngap hop thu dung luc can doc nhat.
+    // Chi bao khi route VUA vuot nguong: c5xx la bo dem tron doi process, neu
+    // bao theo trang thai thi da qua 5 loi la cu 10 phut mot thong bao mai mai.
+    if (bucket.notified || now - lastNotifyAt < NOTIFY_THROTTLE_MS) return;
+    bucket.notified = true;
+    lastNotifyAt = now;
+    notifyAdmins({
+      title: "Performance alert",
+      message: `${line}. See /admin/health.`,
+      type: "SYSTEM",
+    });
   });
 
   next();
