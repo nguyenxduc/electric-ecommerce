@@ -19,6 +19,7 @@ const ACTION_STYLE: Record<string, { bg: string; text: string }> = {
   PRODUCT_DELETE:        { bg: 'bg-red-100',     text: 'text-red-600' },
   COUPON_CREATE:         { bg: 'bg-cyan-100',    text: 'text-cyan-700' },
   COUPON_DELETE:         { bg: 'bg-red-100',     text: 'text-red-600' },
+  AI_GUARD_BLOCK:        { bg: 'bg-rose-100',    text: 'text-rose-700' },
 }
 
 const getActionStyle = (action: string) =>
@@ -29,7 +30,7 @@ const ACTION_OPTIONS = [
   'LOGIN', 'LOGOUT', 'REGISTER', 'CHANGE_PASSWORD',
   'ORDER_CREATE', 'ORDER_STATUS_UPDATE',
   'PRODUCT_CREATE', 'PRODUCT_UPDATE', 'PRODUCT_DELETE',
-  'COUPON_CREATE', 'COUPON_DELETE'
+  'COUPON_CREATE', 'COUPON_DELETE', 'AI_GUARD_BLOCK'
 ]
 
 // ─── Expandable metadata cell ─────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
 import { getSettingNumber } from "../lib/settings.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
 // Get dashboard statistics.
 // shopId (optional) scopes orders/products to one shop (seller dashboard).
@@ -307,6 +308,148 @@ export const getShopTopProducts = (req, res) => {
   }
   return buildTopProducts(req, res, req.shop.id);
 };
+
+// Retention + phieu chuyen doi (admin). GET /api/dashboard/behavior?days=30
+//
+// Cua so bao cao: [since, rollupUntil] = [N ngay truoc 00:00 UTC, het ngay hom
+// qua]. Bang user_behavior_daily chi co du lieu den HET NGAY HOM QUA (xem
+// jobs/rollupUserBehaviorDaily.js - no chi rollup "hom qua"), nen bang `orders`
+// cung bi cat ve dung moc do. Neu de orders doc den "now" trong khi rollup chi
+// den hom qua thi moi ty le deu bi lech am tham: tu so co don hom nay, mau so
+// khong co visitor hom nay.
+export const getBehaviorAnalytics = asyncHandler(async (req, res) => {
+  const rawDays = Number(req.query.days);
+  // days=0 phai duoc giu nguyen (cua so rong) chu khong roi ve mac dinh 30.
+  // Chan tren 730 ngay: so qua lon lam Date thanh Invalid Date va toISOString()
+  // nem loi -> 500.
+  const days =
+    Number.isFinite(rawDays) && rawDays >= 0 ? Math.min(Math.floor(rawDays), 730) : 30;
+
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - days);
+  since.setUTCHours(0, 0, 0, 0);
+
+  const rollupUntil = new Date();
+  rollupUntil.setUTCDate(rollupUntil.getUTCDate() - 1);
+  rollupUntil.setUTCHours(23, 59, 59, 999);
+
+  // Cot `day` la DATE: so sanh bang chuoi 'YYYY-MM-DD'::date de khong phu thuoc
+  // vao TimeZone cua session Postgres.
+  const sinceDay = since.toISOString().slice(0, 10);
+  const untilDay = rollupUntil.toISOString().slice(0, 10);
+
+  // Cung bo loc "don thuc su ban duoc" nhu buildDashboardStats: don da huy va
+  // don da tra hang khong phai nguoi mua.
+  const whereRevenueOrders = {
+    deleted_at: null,
+    status: { notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED] },
+    created_at: { gte: since, lte: rollupUntil },
+  };
+
+  const [retentionRows, funnelRows, buyerGroups] = await Promise.all([
+    prisma.$queryRaw`
+      WITH v AS (
+        SELECT visitor_key, COUNT(DISTINCT day) AS active_days
+        FROM user_behavior_daily
+        WHERE day BETWEEN ${sinceDay}::date AND ${untilDay}::date
+          AND visitor_key <> 'sess:unknown'
+        GROUP BY visitor_key
+      )
+      SELECT
+        CAST(COUNT(*) AS int) AS visitors,
+        CAST(COUNT(*) FILTER (WHERE active_days >= 2) AS int) AS returning_visitors
+      FROM v;
+    `,
+    prisma.$queryRaw`
+      WITH viewers AS (
+        SELECT DISTINCT visitor_key
+        FROM user_behavior_daily
+        WHERE day BETWEEN ${sinceDay}::date AND ${untilDay}::date
+          AND event_type = 'view'
+          AND visitor_key <> 'sess:unknown'
+      ),
+      carters AS (
+        SELECT DISTINCT visitor_key
+        FROM user_behavior_daily
+        WHERE day BETWEEN ${sinceDay}::date AND ${untilDay}::date
+          AND event_type = 'add_to_cart'
+          AND visitor_key <> 'sess:unknown'
+      )
+      SELECT
+        CAST((SELECT COUNT(*) FROM viewers) AS int) AS viewers,
+        CAST((
+          SELECT COUNT(*) FROM carters c
+          WHERE EXISTS (SELECT 1 FROM viewers v WHERE v.visitor_key = c.visitor_key)
+        ) AS int) AS carters,
+        CAST((
+          SELECT COUNT(*) FROM carters c
+          WHERE c.visitor_key LIKE 'user:%'
+            AND EXISTS (SELECT 1 FROM viewers v WHERE v.visitor_key = c.visitor_key)
+        ) AS int) AS logged_in_carters,
+        -- Tu so cua cartToOrderRate: chi nguoi mua NAM TRONG tap carter tren.
+        -- Dem tat ca nguoi mua (mua ngay, gio hang tu truoc cua so) se cho ty le > 100%.
+        CAST((
+          SELECT COUNT(DISTINCT o.user_id) FROM orders o
+          WHERE o.deleted_at IS NULL
+            AND COALESCE(o.status, '') NOT IN ('cancelled', 'returned')
+            AND o.created_at BETWEEN ${since} AND ${rollupUntil}
+            AND EXISTS (
+              SELECT 1 FROM carters c JOIN viewers v ON v.visitor_key = c.visitor_key
+              WHERE c.visitor_key = 'user:' || o.user_id::text
+            )
+        ) AS int) AS cart_buyers;
+    `,
+    // groupBy theo user_id = so NGUOI mua, khong phai so dong order: mot lan
+    // thanh toan bi tach thanh N don theo shop nen dem dong se thoi len N lan.
+    prisma.order.groupBy({
+      by: ["user_id"],
+      where: whereRevenueOrders,
+    }),
+  ]);
+
+  const visitors = Number(retentionRows[0]?.visitors || 0);
+  const returning = Number(retentionRows[0]?.returning_visitors || 0);
+  const viewers = Number(funnelRows[0]?.viewers || 0);
+  const carters = Number(funnelRows[0]?.carters || 0);
+  const loggedInCarters = Number(funnelRows[0]?.logged_in_carters || 0);
+  const cartBuyers = Number(funnelRows[0]?.cart_buyers || 0);
+  const buyers = buyerGroups.length;
+
+  // Mau so bang 0 thi tra ve 0, khong bao gio chia (khong NaN, khong Infinity).
+  const rate = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);
+
+  res.json({
+    success: true,
+    data: {
+      window: {
+        days,
+        since: since.toISOString(),
+        until: rollupUntil.toISOString(),
+      },
+      visitors,
+      returning,
+      returningRate: rate(returning, visitors),
+      funnel: {
+        viewers,
+        carters,
+        loggedInCarters,
+        buyers,
+        viewToCartRate: rate(carters, viewers),
+        cartBuyers,
+        cartToOrderRate: rate(cartBuyers, loggedInCarters),
+      },
+      caveats: {
+        timezone: "UTC",
+        rollupLag:
+          "user_behavior_daily chi co du lieu den het ngay hom qua; ca so lieu rollup va don hang trong bao cao nay deu bi cat ve cung moc do",
+        anonymousExcluded:
+          "buoc gio hang->don hang chi tinh tren khach da dang nhap (visitor_key dang 'user:*'); khach chua dang nhap ('sess:*') khong join duoc voi don hang",
+        identityNote:
+          "mot nguoi duyet web roi dang nhap se co hai visitor_key khac nhau (sess:* va user:*), co the lam visitors cao hon thuc te va returningRate thap hon thuc te",
+      },
+    },
+  });
+});
 
 // Helper functions
 function formatCurrency(amount) {

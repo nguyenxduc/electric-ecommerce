@@ -30,6 +30,9 @@ export default function AdminAiFeedbackPage() {
   })
 
   const summary = statsQuery.data?.summary
+  const total = Number(summary?.total ?? 0)
+  const positive = Number(summary?.positive ?? 0)
+  const positiveRate = total > 0 ? (positive / total) * 100 : null // null = chua chia, khong phai NaN
   const byRating = statsQuery.data?.byRating ?? []
   const recentBad = statsQuery.data?.recentBad ?? []
 
@@ -113,8 +116,32 @@ export default function AdminAiFeedbackPage() {
           </div>
           <div className="bg-white border rounded-lg p-4">
             <p className="text-xs text-gray-500 uppercase">Positive (4-5 stars)</p>
-            <p className="text-2xl font-bold text-green-600 mt-1">
-              {summary?.positive?.toLocaleString() ?? 0}
+            {total === 0 ? (
+              <p className="text-2xl font-bold text-gray-400 mt-1">
+                Chưa có dữ liệu
+              </p>
+            ) : total < 20 ? (
+              <p className="text-2xl font-bold text-gray-500 mt-1">
+                Chưa đủ mẫu (n = {total})
+              </p>
+            ) : (
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-2xl font-bold text-green-600">
+                  {positiveRate!.toFixed(1)}% tích cực (n = {total})
+                </p>
+                <span
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    positiveRate! >= 80
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {positiveRate! >= 80 ? 'đạt ≥ 80%' : 'chưa đạt 80%'}
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-gray-400 mt-1">
+              {positive.toLocaleString()} phản hồi tích cực
             </p>
           </div>
           <div className="bg-white border rounded-lg p-4">

@@ -4,6 +4,7 @@ import {
   getTopProducts,
   getShopDashboardStats,
   getShopTopProducts,
+  getBehaviorAnalytics,
 } from "../controllers/dashboard.controller.js";
 import {
   protectRoute,
@@ -16,6 +17,7 @@ const router = express.Router();
 // Platform admin
 router.get("/stats", protectRoute, adminRoute, getDashboardStats);
 router.get("/top-products", protectRoute, adminRoute, getTopProducts);
+router.get("/behavior", protectRoute, adminRoute, getBehaviorAnalytics);
 
 // Seller dashboard (scoped to own shop)
 router.get("/shop/stats", protectRoute, sellerRoute, getShopDashboardStats);
