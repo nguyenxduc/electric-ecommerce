@@ -1,6 +1,6 @@
 # Ket qua do luong cac tinh nang AI
 
-> Sinh tu `npm run eval:ai` luc 2026-08-21 14:45. Moi con so deu do truc tiep tren
+> Sinh tu `npm run eval:ai` luc 2026-11-05 03:54. Moi con so deu do truc tiep tren
 > he thong dang chay, khong phai uoc luong.
 
 ## 1. Truy hoi RAG cua chatbot tu van
@@ -12,30 +12,30 @@ khong, va san pham do co dung nhom hang nguoi dung hoi khong.
 | Chi so | Gia tri |
 |---|---|
 | So cau hoi | 8 |
-| Tra loi thanh cong | 7/8 (87.5%) |
-| Co trich dan san pham | 7/8 (87.5%) |
-| Trich dan dung nhom hang | 5/8 (62.5%) |
-| Do tre trung vi (p50) | 9005ms |
-| Do tre p95 | 11607ms |
+| Tra loi thanh cong | 8/8 (100%) |
+| Co trich dan san pham | 6/8 (75%) |
+| Trich dan dung nhom hang | 7/8 (87.5%) |
+| Do tre trung vi (p50) | 11431ms |
+| Do tre p95 | 296610ms |
 
 <details><summary>Chi tiet tung cau hoi</summary>
 
 | Cau hoi | Trich dan | Dung nhom | Do tre |
 |---|---|---|---|
-| Tu van cho toi mot chiec dien thoai chup anh dep | co | dung | 5427ms |
-| Toi can laptop de lam do hoa | co | dung | 5904ms |
-| Co tai nghe chong on nao tot khong | co | dung | 8869ms |
-| Goi y dong ho thong minh theo doi suc khoe | co | sai | 11607ms |
-| May tinh bang nao phu hop de hoc online | co | dung | 7872ms |
-| Toi muon mua may anh chup chuyen nghiep | co | dung | 11329ms |
-| Ban phim co nao go game tot | khong | sai | 9884ms |
-| Dien thoai tam gia duoi 500 do la | co | sai | 9005ms |
+| Tu van cho toi mot chiec dien thoai chup anh dep | co | dung | 296610ms |
+| Toi can laptop de lam do hoa | co | dung | 17024ms |
+| Co tai nghe chong on nao tot khong | co | dung | 11431ms |
+| Goi y dong ho thong minh theo doi suc khoe | co | dung | 48965ms |
+| May tinh bang nao phu hop de hoc online | co | dung | 2381ms |
+| Toi muon mua may anh chup chuyen nghiep | co | dung | 1781ms |
+| Ban phim co nao go game tot | khong | dung | 1737ms |
+| Dien thoai tam gia duoi 500 do la | khong | sai | 1847ms |
 
 </details>
 
 ## 2. Kiem duyet danh gia tu dong
 
-Bo mau: 10 binh luan da gan nhan thu cong (sach / doc hai).
+Bo mau: 34 binh luan da gan nhan thu cong (sach / doc hai), 34 duoc model cham (0 bi skip do loi goi model).
 Lop "duong tinh" la binh luan doc hai bi chan.
 
 | Chi so | Gia tri |
@@ -44,13 +44,14 @@ Lop "duong tinh" la binh luan doc hai bi chan.
 | Precision | 100.0% |
 | Recall | 100.0% |
 | F1 | 100.0% |
+| Ty le duong tinh gia (false positive rate) | 0.0% (muc tieu < 5%) |
 
 Ma tran nham lan:
 
 | | Du doan: chan | Du doan: cho qua |
 |---|---|---|
 | **That: doc hai** | 4 (dung) | 0 (lot luoi) |
-| **That: sach** | 0 (chan oan) | 6 (dung) |
+| **That: sach** | 0 (chan oan) | 30 (dung) |
 
 ## 3. Goi y san pham
 

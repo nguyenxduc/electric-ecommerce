@@ -18,6 +18,7 @@
 // Chay:  npm run eval:rag        (day du)
 //        npm run eval:rag -- --quick   (rut gon, do nhanh khi dang sua code)
 
+import "./_disable-rank-cache.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

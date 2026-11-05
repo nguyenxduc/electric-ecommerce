@@ -60,6 +60,18 @@ const percentile = (arr, p) => {
   return s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))];
 };
 
+// Ban mien phi cua Gemini gioi han 15 luot goi moi phut cho moi model. Bo
+// danh gia nay goi kha day: moi cau hoi ton 1 luot sinh cau tra loi cong 3
+// luot cham diem. Khong gian nhip thi chay duoc vai cau la dinh 429.
+const RPM = Number(process.env.EVAL_RPM || 12);
+const MIN_GAP_MS = Math.ceil(60000 / RPM);
+let lastCallAt = 0;
+const pace = async () => {
+  const wait = lastCallAt + MIN_GAP_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  lastCallAt = Date.now();
+};
+
 // ---------------------------------------------------------------------------
 // 1. Truy hoi RAG cua chatbot
 // ---------------------------------------------------------------------------
@@ -95,6 +107,7 @@ const evaluateRag = async () => {
       continue;
     }
 
+    await pace();
     const started = Date.now();
     const res = await req(`/ai-assistant/${chatId}/messages`, {
       method: "POST",
@@ -136,6 +149,9 @@ const evaluateRag = async () => {
 // ---------------------------------------------------------------------------
 
 // label=true nghia la binh luan SACH (dang le duoc dang).
+// Danh sach nay duoc chot MOT LAN va khong sua lai sau khi da xem ket qua,
+// de ty le duong tinh gia (false positive) do duoc la do thuc, khong phai
+// con so da bi chon loc nguoc.
 const MODERATION_SAMPLES = [
   { text: "San pham dung nhu mo ta, giao hang nhanh, dong goi can than.", clean: true },
   { text: "Pin trau, camera dep, dang tien.", clean: true },
@@ -143,6 +159,34 @@ const MODERATION_SAMPLES = [
   { text: "Minh dung mot tuan thay on, se ung ho shop lan sau.", clean: true },
   { text: "Gia hoi cao so voi mat bang chung, nhung chat luong tot.", clean: true },
   { text: "May nong khi choi game lau, hoi that vong.", clean: true },
+  // Nhom A: khen ngoi thong thuong.
+  { text: "Dong goi ky, giao nhanh, rat hai long voi don hang nay.", clean: true },
+  { text: "San pham dung y, se tiep tuc mua o shop.", clean: true },
+  { text: "Chat luong tot, dung nhu hinh anh quang cao.", clean: true },
+  { text: "Nhan vien tu van nhiet tinh, giao hang dung hen.", clean: true },
+  { text: "Mau sac dep, cam giac cao cap khi cam tren tay.", clean: true },
+  { text: "Mua lan thu hai van ung y nhu lan dau.", clean: true },
+  { text: "Shop dong goi cham kinh, khong bi mop mong khi van chuyen.", clean: true },
+  { text: "Gia hop ly, chat luong xung dang voi so tien bo ra.", clean: true },
+  // Nhom B: cau hoi ky thuat.
+  { text: "Sac nhanh toi da bao nhieu W vay shop?", clean: true },
+  { text: "May co ho tro NFC khong?", clean: true },
+  { text: "Pin dung duoc bao nhieu gio khi xem video lien tuc?", clean: true },
+  { text: "San pham nay co chong nuoc chuan IP68 khong?", clean: true },
+  { text: "Co ho tro xuat video 4K 60fps khong?", clean: true },
+  { text: "Bao hanh chinh hang bao nhieu thang?", clean: true },
+  { text: "May co ho tro sac khong day khong?", clean: true },
+  { text: "Dung luong RAM toi da nang cap duoc la bao nhieu?", clean: true },
+  // Nhom C: than phien trung lap tu nhung khong vi pham — day moi la nhom
+  // thuc su kiem tra duong tinh gia.
+  { text: "Pin te thuc su, that vong voi san pham nay.", clean: true },
+  { text: "Gia nay thi do, khong dang de mua.", clean: true },
+  { text: "Chay cham, khong dang tien.", clean: true },
+  { text: "Chat luong am thanh qua kem, minh khong hai long.", clean: true },
+  { text: "May nong bat thuong, trai nghiem rat khong tot.", clean: true },
+  { text: "Man hinh toi, mau sac nhin rat te.", clean: true },
+  { text: "Giao hang tre so voi du kien, trai nghiem mua sam khong tot.", clean: true },
+  { text: "San pham khong xung voi gia tien, that su that vong.", clean: true },
   { text: "Shop lua dao, do rac ruoi, thang chu shop ngu nhu bo.", clean: false },
   { text: "Do cho de, mua ve vut di cho nhanh, dm shop.", clean: false },
   { text: "LIEN HE 0900xxxx GIAM GIA 90% HANG CHUAN SIEU RE INBOX NGAY", clean: false },
@@ -161,10 +205,24 @@ const evaluateModeration = async () => {
   let tn = 0; // sach   -> cho qua dung
   let fp = 0; // sach   -> bi chan oan
   let fn = 0; // doc hai -> lot luoi
+  let skipped = 0; // loi goi model (429, timeout...) -> khong tinh vao ma tran
   const rows = [];
 
   for (const s of samples) {
-    const verdict = await moderateReviewComment(s.text);
+    // Goi lai toi da 2 lan khi model loi (503/timeout): cung mau, khong doi
+    // nhan, nen khong phai chon loc ket qua.
+    let verdict;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await pace();
+      verdict = await moderateReviewComment(s.text);
+      if (!verdict?.skipped) break;
+    }
+    if (verdict?.skipped) {
+      skipped++;
+      rows.push({ ...s, allowed: verdict?.allowed !== false, labels: verdict?.labels ?? [], skipped: true });
+      process.stdout.write("s");
+      continue;
+    }
     const allowed = verdict?.allowed !== false;
     if (s.clean && allowed) tn++;
     else if (s.clean && !allowed) fp++;
@@ -175,17 +233,22 @@ const evaluateModeration = async () => {
   }
   process.stdout.write("\n");
 
+  const scored = tp + tn + fp + fn; // mau duoc model cham thuc su (loai skipped)
   const precision = tp + fp === 0 ? 0 : tp / (tp + fp);
   const recall = tp + fn === 0 ? 0 : tp / (tp + fn);
   const f1 = precision + recall === 0 ? 0 : (2 * precision * recall) / (precision + recall);
+  const falsePositiveRate = fp + tn === 0 ? 0 : fp / (fp + tn);
 
   return {
     total: samples.length,
+    scored,
+    skipped,
     tp, tn, fp, fn,
-    accuracy: (tp + tn) / samples.length,
+    accuracy: scored === 0 ? 0 : (tp + tn) / scored,
     precision,
     recall,
     f1,
+    falsePositiveRate,
     rows,
   };
 };
@@ -248,6 +311,11 @@ const main = async () => {
 
   console.log("2/3  Kiem duyet danh gia...");
   const mod = await evaluateModeration();
+  if (!QUICK && mod.skipped > 0) {
+    throw new Error(
+      `${mod.skipped} mau bi skip (loi goi model) trong lan chay day du — ket qua bi pha loang, khong dang tin. Chay lai.`
+    );
+  }
 
   console.log("3/3  Goi y san pham...");
   const rec = await evaluateRecommendations();
@@ -287,7 +355,7 @@ const main = async () => {
     "",
     "## 2. Kiem duyet danh gia tu dong",
     "",
-    `Bo mau: ${mod.total} binh luan da gan nhan thu cong (sach / doc hai).`,
+    `Bo mau: ${mod.total} binh luan da gan nhan thu cong (sach / doc hai), ${mod.scored} duoc model cham (${mod.skipped} bi skip do loi goi model).`,
     'Lop "duong tinh" la binh luan doc hai bi chan.',
     "",
     "| Chi so | Gia tri |",
@@ -296,6 +364,7 @@ const main = async () => {
     `| Precision | ${(mod.precision * 100).toFixed(1)}% |`,
     `| Recall | ${(mod.recall * 100).toFixed(1)}% |`,
     `| F1 | ${(mod.f1 * 100).toFixed(1)}% |`,
+    `| Ty le duong tinh gia (false positive rate) | ${(mod.falsePositiveRate * 100).toFixed(1)}% (muc tieu < 5%) |`,
     "",
     "Ma tran nham lan:",
     "",
@@ -323,7 +392,7 @@ const main = async () => {
 
   console.log("\n" + "-".repeat(58));
   console.log(`RAG        : trich dan dung nhom ${rag.matched}/${rag.total} (${pct(rag.matched, rag.total)}%), p50 ${ms(rag.p50)}`);
-  console.log(`Kiem duyet : accuracy ${(mod.accuracy * 100).toFixed(1)}%, F1 ${(mod.f1 * 100).toFixed(1)}%`);
+  console.log(`Kiem duyet : accuracy ${(mod.accuracy * 100).toFixed(1)}%, F1 ${(mod.f1 * 100).toFixed(1)}%, FP rate ${(mod.falsePositiveRate * 100).toFixed(1)}% (skip ${mod.skipped})`);
   console.log(`Goi y      : ${rec.personalised.count} muc, lot shop khoa ${rec.personalised.leaked}`);
   console.log("-".repeat(58));
   console.log(`\nDa ghi bao cao: ${path.relative(process.cwd(), out)}`);

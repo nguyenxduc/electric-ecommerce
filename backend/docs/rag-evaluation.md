@@ -1,6 +1,6 @@
 # Do luong he truy hoi tang cuong sinh
 
-> Sinh tu dong bang `npm run eval:rag`. Cap nhat: 2026-09-09 08:47.
+> Sinh tu dong bang `npm run eval:rag`. Cap nhat: 2026-11-05 12:36.
 > Tap du lieu gan nhan: `eval/dataset.json` (30 cau hoi).
 
 ## 1. Truy hoi
@@ -29,16 +29,16 @@ Cham bang LLM-as-judge tren mau 8 cau, rai deu qua cac nhom.
 
 | Chi so | Y nghia | Diem |
 |---|---|---|
-| Faithfulness | Cau tra loi bam vao ngu canh, khong bia so lieu | **0.875** |
-| Answer Relevance | Tra loi dung trong tam cau hoi | **0.825** |
-| Context Relevance | Ngu canh lay ve co lien quan | **0.275** |
+| Faithfulness | Cau tra loi bam vao ngu canh, khong bia so lieu | **1** |
+| Answer Relevance | Tra loi dung trong tam cau hoi | **0.875** |
+| Context Relevance | Ngu canh lay ve co lien quan | **0.425** |
 
 ## 3. Do tre
 
 | Chi so | Muc tieu de cuong | Do duoc |
 |---|---|---|
-| Thoi gian toi ky tu dau tien | < 1.5s | **4020ms** |
-| Thoi gian hoan tat | < 8s | **4469ms** |
+| Thoi gian toi ky tu dau tien | < 1.5s | **1423ms** |
+| Thoi gian hoan tat | < 8s | **1811ms** |
 
 Tach lam hai moc vi streaming chi cai thien moc thu nhat. Bao cao mot con
 so tong nhu truoc day che mat dung phan ma nguoi dung cam nhan duoc.
