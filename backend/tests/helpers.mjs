@@ -54,9 +54,13 @@ export const ACCOUNTS = {
 
 export const round2 = n => Math.round(Number(n) * 100) / 100
 
+// San pham co bien the (SKU) bat buoc gui variant_id; cac test cu dat hang
+// khong kem bien the nen bo qua chung.
+export const noVariants = p => !(p?.variants?.length)
+
 export const firstProductOf = async (slug, sort = 'price-asc') => {
-  const res = await req(`/shops/${slug}/products?limit=1&sort=${sort}`)
-  return res.json?.products?.[0]
+  const res = await req(`/shops/${slug}/products?limit=20&sort=${sort}`)
+  return (res.json?.products ?? []).find(noVariants)
 }
 
 export const loyaltyPointsOf = async token =>

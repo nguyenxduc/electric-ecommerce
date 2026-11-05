@@ -15,6 +15,7 @@ const orderableProduct = async (slug = 'tech-world', minStock = 1) => {
   const list = await req(`/shops/${slug}/products?limit=20`)
   const all = list.json?.products ?? []
   const p = [...all]
+    .filter(x => !(x.variants?.length))
     .sort((x, y) => (y.quantity ?? 0) - (x.quantity ?? 0))
     .find(x => (x.quantity ?? 0) >= minStock)
   assert.ok(p, `shop ${slug} khong co san pham con >= ${minStock} hang`)

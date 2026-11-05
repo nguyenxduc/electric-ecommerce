@@ -125,7 +125,27 @@ export const updateMyShop = asyncHandler(async (req, res) => {
     address,
     shipping_fee_override,
     free_shipping_threshold_override,
+    pickup_province,
+    pickup_district,
+    pickup_ward,
+    pickup_address,
+    tax_code,
+    tax_entity_type,
   } = req.body || {};
+
+  if (tax_entity_type !== undefined && !["household", "company"].includes(tax_entity_type)) {
+    return res
+      .status(400)
+      .json({ success: false, error: "tax_entity_type must be 'household' or 'company'" });
+  }
+  if (tax_code !== undefined && tax_code !== null && tax_code !== "" && !/^\d{10}(-\d{3})?$/.test(String(tax_code).trim())) {
+    return res.status(400).json({
+      success: false,
+      error: "tax_code must be 10 digits (or 13 digits with -XXX branch suffix)",
+    });
+  }
+  // "" xoa gia tri; undefined = khong doi
+  const text = (v, max) => (v === undefined ? undefined : String(v ?? "").trim().slice(0, max) || null);
 
   let slug;
   if (name && String(name).trim() && String(name).trim() !== shop.name) {
@@ -157,6 +177,12 @@ export const updateMyShop = asyncHandler(async (req, res) => {
       free_shipping_threshold_override: parseOverride(
         free_shipping_threshold_override
       ),
+      pickup_province: text(pickup_province, 100),
+      pickup_district: text(pickup_district, 100),
+      pickup_ward: text(pickup_ward, 100),
+      pickup_address: text(pickup_address, 255),
+      tax_code: text(tax_code, 20),
+      tax_entity_type,
       ...imageUrls,
       ...(resubmitting && {
         status: SHOP_STATUS.PENDING,

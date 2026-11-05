@@ -15,10 +15,112 @@ import {
   fetchRankedProducts,
   resolveOrderBy,
   shopSelect,
+  variantsInclude,
 } from "../lib/productQuery.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
 import { resolveFilteredProductIds } from "../services/productFilter.service.js";
+
+// Chuan hoa + kiem tra mang bien the tu payload; tra { error } hoac { variants }.
+// Tra undefined neu client khong gui `variants` (giu nguyen bien the hien co).
+const parseVariantsInput = (raw) => {
+  if (raw === undefined) return { variants: undefined };
+  let list = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return { error: "variants must be a JSON array" };
+    }
+  }
+  if (!Array.isArray(list)) return { error: "variants must be an array" };
+  const seen = new Set();
+  const variants = [];
+  for (const v of list) {
+    const sku = String(v?.sku ?? "").trim();
+    const name = String(v?.name ?? "").trim();
+    const delta = v?.price_delta === undefined ? 0 : Number(v.price_delta);
+    const qty = v?.quantity === undefined ? 0 : Number(v.quantity);
+    if (!sku || sku.length > 64) return { error: "Variant sku is required (max 64 chars)" };
+    if (!name || name.length > 120) return { error: "Variant name is required (max 120 chars)" };
+    if (!Number.isFinite(delta)) return { error: "Variant price_delta must be a number" };
+    if (!Number.isInteger(qty) || qty < 0) {
+      return { error: "Variant quantity must be a non-negative integer" };
+    }
+    if (seen.has(sku)) return { error: `Duplicate variant sku ${sku}` };
+    seen.add(sku);
+    const attributes =
+      v.attributes && typeof v.attributes === "object" && !Array.isArray(v.attributes)
+        ? v.attributes
+        : {};
+    variants.push({
+      id: v.id != null && v.id !== "" ? BigInt(v.id) : null,
+      sku,
+      name,
+      attributes,
+      price_delta: delta,
+      quantity: qty,
+    });
+  }
+  return { variants };
+};
+
+// Dong bo bien the cua san pham: upsert theo id, xoa mem cai bi bo, tinh lai
+// product.quantity = tong ton kho bien the. Nem VARIANT_SKU_CONFLICT /
+// VARIANT_FOREIGN neu sku trung hoac id khong thuoc san pham.
+const syncVariants = async (tx, productId, variants) => {
+  const existing = await tx.productVariant.findMany({
+    where: { product_id: productId, deleted_at: null },
+    select: { id: true },
+  });
+  const ownIds = new Set(existing.map((e) => e.id.toString()));
+  const keep = new Set();
+  for (const v of variants) {
+    const data = {
+      sku: v.sku,
+      name: v.name,
+      attributes: v.attributes,
+      price_delta: v.price_delta,
+      quantity: v.quantity,
+    };
+    if (v.id) {
+      if (!ownIds.has(v.id.toString())) throw new Error("VARIANT_FOREIGN");
+      keep.add(v.id.toString());
+      await tx.productVariant.update({ where: { id: v.id }, data });
+    } else {
+      await tx.productVariant.create({ data: { ...data, product_id: productId } });
+    }
+  }
+  const removed = [...ownIds].filter((id) => !keep.has(id)).map(BigInt);
+  if (removed.length) {
+    // sku duoc doi sang gia tri duy nhat de giai phong sku cho lan dung lai
+    for (const id of removed) {
+      await tx.productVariant.update({
+        where: { id },
+        data: { deleted_at: new Date(), sku: `deleted-${id}-${Date.now()}` },
+      });
+    }
+  }
+  if (variants.length > 0) {
+    const sumQty = variants.reduce((s, v) => s + v.quantity, 0);
+    await tx.product.update({ where: { id: productId }, data: { quantity: sumQty } });
+    return sumQty;
+  }
+  return null;
+};
+
+// Map loi sync bien the sang HTTP; tra true neu da xu ly.
+const respondVariantError = (err, res) => {
+  if (err?.message === "VARIANT_FOREIGN") {
+    res.status(400).json({ message: "Variant does not belong to this product" });
+    return true;
+  }
+  if (err?.code === "P2002") {
+    res.status(409).json({ message: "Variant sku already exists" });
+    return true;
+  }
+  return false;
+};
 
 export const createProduct = asyncHandler(async (req, res) => {
   const {
@@ -118,7 +220,14 @@ export const createProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const { variants: variantsInput, error: variantError } = parseVariantsInput(
+    req.body.variants
+  );
+  if (variantError) return res.status(400).json({ message: variantError });
+
+  let result;
+  try {
+  result = await prisma.$transaction(async (tx) => {
     const savedProduct = await tx.product.create({
       data: {
         name,
@@ -159,8 +268,17 @@ export const createProduct = asyncHandler(async (req, res) => {
       savedProduct.quantity = sumQty;
     }
 
+    if (variantsInput?.length) {
+      const sumQty = await syncVariants(tx, savedProduct.id, variantsInput);
+      savedProduct.quantity = sumQty;
+    }
+
     return savedProduct;
   });
+  } catch (err) {
+    if (respondVariantError(err, res)) return;
+    throw err;
+  }
 
   res.status(201).json({
     message: "Product created successfully",
@@ -273,6 +391,7 @@ export const getProductById = asyncHandler(async (req, res) => {
     where: { id: BigInt(req.params.id), deleted_at: null },
     include: {
       product_colors: true,
+      variants: variantsInclude,
       shop: { select: { ...shopSelect, owner_id: true } },
     },
   });
@@ -409,7 +528,14 @@ export const updateProduct = asyncHandler(async (req, res) => {
     });
   }
 
-  const updatedProduct = await prisma.$transaction(async (tx) => {
+  const { variants: variantsInput, error: variantError } = parseVariantsInput(
+    data.variants
+  );
+  if (variantError) return res.status(400).json({ message: variantError });
+
+  let updatedProduct;
+  try {
+  updatedProduct = await prisma.$transaction(async (tx) => {
     const updated = await tx.product.update({
       where: { id: BigInt(req.params.id) },
       data: {
@@ -454,8 +580,17 @@ export const updateProduct = asyncHandler(async (req, res) => {
       updated.quantity = Number(data.quantity);
     }
 
+    if (variantsInput !== undefined) {
+      const sumQty = await syncVariants(tx, BigInt(req.params.id), variantsInput);
+      if (sumQty !== null) updated.quantity = sumQty;
+    }
+
     return updated;
   });
+  } catch (err) {
+    if (respondVariantError(err, res)) return;
+    throw err;
+  }
 
   res.json({
     message: "Product updated successfully",

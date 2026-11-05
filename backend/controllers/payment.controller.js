@@ -6,6 +6,7 @@ import {
   usdToGatewayVnd,
 } from "../lib/gatewayAmount.js";
 import crypto from "crypto";
+import { writeAuditLog } from "../services/audit.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
@@ -409,6 +410,9 @@ export const momoIpnHandler = async (req, res) => {
       }
     }
 
+    // true khi tien ve sau khi moi don cua checkout da bi huy (vd. het han giu cho)
+    let paidAfterCancel = false;
+
     await prisma.$transaction(async tx => {
       // Cong thanh toan phat lai callback la chuyen binh thuong: gateway tu
       // retry khi khong nhan duoc 200, va ke tan cong cung co the phat lai
@@ -437,6 +441,15 @@ export const momoIpnHandler = async (req, res) => {
       // When paid, move every shop-order of this checkout forward.
       // (Avoid overriding cancelled/shipped orders.)
       if (isPaid) {
+        // Khong hoi sinh don da huy (kho da tra); tien da thu nen ghi no hoan tien.
+        const liveCount = await tx.order.count({
+          where: {
+            order_group_id: payment.order_group_id,
+            status: { not: ORDER_STATUS.CANCELLED },
+            deleted_at: null,
+          },
+        });
+        paidAfterCancel = liveCount === 0;
         await tx.order.updateMany({
           where: {
             order_group_id: payment.order_group_id,
@@ -447,6 +460,25 @@ export const momoIpnHandler = async (req, res) => {
         });
       }
     });
+
+    if (paidAfterCancel) {
+      const group = await prisma.orderGroup.findUnique({
+        where: { id: payment.order_group_id },
+        select: { user_id: true },
+      });
+      writeAuditLog({
+        userId: group?.user_id,
+        action: "REFUND_OWED",
+        resource: "order_group",
+        resourceId: payment.order_group_id,
+        metadata: {
+          order_group_id: payment.order_group_id.toString(),
+          payment_id: payment.id.toString(),
+          amount: payment.amount?.toString?.() ?? payment.amount,
+          reason: "payment received after orders cancelled",
+        },
+      });
+    }
 
     return res.status(200).send("success");
   } catch (error) {

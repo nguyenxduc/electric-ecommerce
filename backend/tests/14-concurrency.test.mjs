@@ -60,7 +60,7 @@ const forceStock = async (productId, qty) => {
 test('hai nguoi mua cung luc mon hang con dung 1 cai: chi mot don di lot', async () => {
   const list = await req('/shops/tech-world/products?limit=20')
   const candidate = (list.json?.products ?? [])
-    .filter(p => (p.quantity ?? 0) > 3)
+    .filter(p => (p.quantity ?? 0) > 3 && !(p.variants?.length))
     .sort((a, b) => (b.quantity ?? 0) - (a.quantity ?? 0))[0]
   assert.ok(candidate, 'khong tim duoc san pham de thu nghiem')
 
@@ -125,7 +125,7 @@ test('IPN hop le phat lai lan hai khong ghi de ban ghi thanh toan', async () => 
   // Dung don that de co ban ghi payment that: cong thanh toan retry callback
   // la chuyen binh thuong, va ke tan cong cung co the phat lai payload hop le.
   const list = await req('/shops/tech-world/products?limit=20')
-  const p = (list.json?.products ?? []).find(x => (x.quantity ?? 0) > 2)
+  const p = (list.json?.products ?? []).find(x => (x.quantity ?? 0) > 2 && !(x.variants?.length))
   assert.ok(p, 'khong co san pham de dat don')
   const detail = await req(`/products/${p.id}`)
   const colors = (detail.json?.data ?? detail.json)?.available_colors ?? []

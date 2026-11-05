@@ -223,3 +223,7 @@ DEMO_CHECK_AI=1 npm run test:demo
 
 > Thứ tự khuyên dùng ngay trước buổi bảo vệ:
 > `npm run seed:full` → khởi động backend → `npm run test:demo` → tất cả xanh thì demo.
+
+## 7. Vận hành & hạ tầng
+
+Job nền (worker), backup DB, CI và checklist production: xem [docs/ops-infra.md](docs/ops-infra.md).

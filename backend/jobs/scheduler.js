@@ -48,6 +48,8 @@ const runJob = (job, reason) => {
   });
 };
 
+const timers = [];
+
 export const startScheduler = () => {
   for (const job of JOBS) {
     if (!asBoolean(process.env[`${job.envKey}_ENABLED`], true)) {
@@ -61,7 +63,18 @@ export const startScheduler = () => {
       job.everyMinutes * 60 * 1000
     );
     timer.unref();
+    timers.push(timer);
   }
+};
+
+// Dung len lich moi, doi job con dang chay xong toi da timeoutMs roi kill.
+export const stopScheduler = async (timeoutMs = 25_000) => {
+  timers.forEach(clearInterval);
+  const deadline = Date.now() + timeoutMs;
+  while (running.size && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  for (const child of running.values()) child.kill("SIGTERM");
 };
 
 // API process: JOBS_IN_API=0 khi da chay worker rieng (jobs/worker.js), de

@@ -21,3 +21,6 @@ build/
 
 # oh-my-claudecode: trang thai phien cuc bo
 .omc/
+
+# Backup DB (db-backup service)
+backups/

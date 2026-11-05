@@ -76,6 +76,7 @@ export const createOrder = async (req, res) => {
         where: { id: BigInt(it.product_id), deleted_at: null },
         include: {
           product_colors: true,
+          variants: { where: { deleted_at: null } },
           shop: {
             select: {
               id: true,
@@ -117,6 +118,24 @@ export const createOrder = async (req, res) => {
             })()
           : it.color || null;
 
+      // San pham co bien the thi bat buoc chon bien the, ton kho tinh theo bien the.
+      let variant = null;
+      if (product.variants.length > 0) {
+        variant = product.variants.find(
+          (v) => it.variant_id != null && v.id.toString() === String(it.variant_id)
+        );
+        if (!variant) {
+          return res.status(400).json({
+            message: `Valid variant required for product ${product.name}`,
+          });
+        }
+        if (variant.quantity < it.quantity) {
+          return res.status(400).json({
+            message: `Insufficient stock for ${product.name} (${variant.name})`,
+          });
+        }
+      }
+
       let productColor = null;
       if (colorVal && (colorVal.code || colorVal.name)) {
         productColor = product.product_colors.find(
@@ -136,11 +155,11 @@ export const createOrder = async (req, res) => {
             }`,
           });
         }
-      } else if (product.product_colors.length > 0) {
+      } else if (product.product_colors.length > 0 && !variant) {
         return res.status(400).json({
           message: `Color required for product ${product.name}`,
         });
-      } else {
+      } else if (!variant) {
         if (product.quantity < it.quantity) {
           return res.status(400).json({
             message: `Insufficient stock for ${product.name}`,
@@ -150,13 +169,16 @@ export const createOrder = async (req, res) => {
 
       // Charge the discounted price - matches what the cart displays
       const unitPrice = round2(
-        Number(product.price) - Number(product.discount || 0)
+        Number(product.price) -
+          Number(product.discount || 0) +
+          Number(variant?.price_delta || 0)
       );
       const totalPrice = Number(unitPrice) * Number(it.quantity);
       totalAmount += totalPrice;
       preparedItems.push({
         data: {
           product_id: BigInt(it.product_id),
+          variant_id: variant?.id ?? null,
           quantity: it.quantity,
           unit_price: unitPrice,
           total_price: totalPrice,
@@ -272,7 +294,7 @@ export const createOrder = async (req, res) => {
           (risk.couponBlocked
             ? "This voucher cannot be used with this account."
             : "This order cannot be placed. Please contact support."),
-        code: risk.couponBlocked ? "COUPON_ABUSE" : "ORDER_BLOCKED",
+        code: risk.code || (risk.couponBlocked ? "COUPON_ABUSE" : "ORDER_BLOCKED"),
       });
     }
 
@@ -341,6 +363,15 @@ export const createOrder = async (req, res) => {
         for (const item of group.items) {
           const it = item.data;
           const colorObj = item.color;
+          if (it.variant_id) {
+            const variantHit = await tx.productVariant.updateMany({
+              where: { id: it.variant_id, quantity: { gte: it.quantity } },
+              data: { quantity: { decrement: it.quantity } },
+            });
+            if (variantHit.count === 0) {
+              throw new Error(`OUT_OF_STOCK:${item.productName}`);
+            }
+          }
           if (colorObj && (colorObj.code || colorObj.name)) {
             const colorHit = await tx.productColor.updateMany({
               where: {

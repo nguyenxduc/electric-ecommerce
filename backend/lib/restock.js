@@ -24,6 +24,13 @@ export const restockOrderItems = async (db, items) => {
       });
     }
 
+    if (item.variant_id) {
+      await db.productVariant.update({
+        where: { id: item.variant_id },
+        data: { quantity: { increment: item.quantity } },
+      });
+    }
+
     await db.product.update({
       where: { id: item.product_id },
       data: {

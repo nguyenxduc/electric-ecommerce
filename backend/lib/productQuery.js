@@ -16,6 +16,13 @@ export const buyerVisibilityWhere = (req) =>
     ? {}
     : { shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null } };
 
+// Bien the con hieu luc (chua xoa mem); dung chung cho list va detail.
+export const variantsInclude = {
+  where: { deleted_at: null },
+  orderBy: { id: "asc" },
+  select: { id: true, sku: true, name: true, attributes: true, price_delta: true, quantity: true },
+};
+
 // Helper function to calculate final_price and discount_percentage
 export const calculateProductPrices = (product) => {
   const price = Number(product.price);
@@ -41,6 +48,9 @@ export const calculateProductPrices = (product) => {
     discount_percentage,
     rating: product.rating ? Number(product.rating) : 0,
     quantity,
+    ...(product.variants && {
+      variants: product.variants.map((v) => ({ ...v, price_delta: Number(v.price_delta) })),
+    }),
     available_colors: colors.map((c) => ({
       name: c.name || "",
       code: c.code || "",
@@ -73,7 +83,7 @@ export const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
       orderBy,
       skip,
       take,
-      include: { product_colors: true, shop: { select: shopSelect } },
+      include: { product_colors: true, variants: variantsInclude, shop: { select: shopSelect } },
       omit: LIST_OMIT,
     }),
   ]);
@@ -91,7 +101,7 @@ export const fetchPaginatedProducts = async (where, orderBy, skip, take) => {
 export const fetchRankedProducts = async (where, rankedIds, skip, take) => {
   const products = await prisma.product.findMany({
     where,
-    include: { product_colors: true, shop: { select: shopSelect } },
+    include: { product_colors: true, variants: variantsInclude, shop: { select: shopSelect } },
     omit: LIST_OMIT,
   });
 

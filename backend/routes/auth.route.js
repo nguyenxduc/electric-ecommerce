@@ -12,6 +12,8 @@ import {
   verifyEmail,
   forgotPassword,
   resetPassword,
+  sendPhoneOtp,
+  verifyPhoneOtp,
 } from "../controllers/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { uploadMemory } from "../middleware/upload.middleware.js";
@@ -27,6 +29,8 @@ router.post("/resend-verification", resendVerification);
 router.post("/verify-email", verifyEmail);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
+router.post("/phone/otp", protectRoute, sendPhoneOtp);
+router.post("/phone/verify", protectRoute, verifyPhoneOtp);
 router.get("/me", protectRoute, getProfile);
 router.patch("/update_profile", protectRoute, updateProfile);
 router.post("/change_password", protectRoute, changePassword);

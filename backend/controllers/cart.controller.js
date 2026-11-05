@@ -4,7 +4,7 @@ import { asyncHandler } from "../middleware/error.middleware.js";
 
 export const addToCart = asyncHandler(async (req, res) => {
   const { product_id } = req.params;
-  const { quantity = 1, color = null } = req.body;
+  const { quantity = 1, color = null, variant_id = null } = req.body;
   const userId = req.user?.id;
 
   if (!userId) {
@@ -22,7 +22,7 @@ export const addToCart = asyncHandler(async (req, res) => {
       // Only products from active shops are purchasable
       shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
     },
-    include: { product_colors: true },
+    include: { product_colors: true, variants: { where: { deleted_at: null } } },
   });
 
   if (!productDoc) {
@@ -43,6 +43,20 @@ export const addToCart = asyncHandler(async (req, res) => {
     cart = await prisma.cart.create({ 
       data: { user_id: BigInt(userId) } 
     });
+  }
+
+  // San pham co bien the thi bat buoc chon; ton kho kiem tra theo bien the
+  let variant = null;
+  if (productDoc.variants.length > 0) {
+    variant = productDoc.variants.find(
+      (v) => variant_id != null && v.id.toString() === String(variant_id)
+    );
+    if (!variant) {
+      return res.status(400).json({ message: "Variant is required for this product" });
+    }
+    if (variant.quantity < qty) {
+      return res.status(400).json({ message: "Insufficient stock for selected variant" });
+    }
   }
 
   // Process color - convert object to JSON string if needed
@@ -80,10 +94,10 @@ export const addToCart = asyncHandler(async (req, res) => {
     if (productColor.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock for selected color" });
     }
-  } else if (productDoc.product_colors.length > 0) {
+  } else if (productDoc.product_colors.length > 0 && !variant) {
     // If product has color variants, require color selection
     return res.status(400).json({ message: "Color is required for this product" });
-  } else {
+  } else if (!variant) {
     if (productDoc.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock" });
     }
@@ -100,6 +114,8 @@ export const addToCart = asyncHandler(async (req, res) => {
       cart_id: cart.id, 
       product_id: BigInt(product_id), 
       color: colorFilter,
+      variant_id: variant?.id ?? null,
+      variant_id: variant?.id ?? null,
       deleted_at: null 
     },
   });
@@ -121,6 +137,7 @@ export const addToCart = asyncHandler(async (req, res) => {
         product_id: BigInt(product_id),
         quantity: qty,
         color: colorValue,
+        variant_id: variant?.id ?? null,
       },
     });
   }
@@ -152,6 +169,7 @@ export const getCartProducts = asyncHandler(async (req, res) => {
   const items = await prisma.cartItem.findMany({
     where: { cart_id: cart.id, deleted_at: null, product: { deleted_at: null } },
     include: {
+      variant: true,
       product: {
         include: {
           shop: {
@@ -176,7 +194,8 @@ export const getCartProducts = asyncHandler(async (req, res) => {
     const product = item.product;
     const price = Number(product.price);
     const discount = Number(product.discount || 0);
-    const finalPrice = price - discount;
+    const variantDelta = Number(item.variant?.price_delta || 0);
+    const finalPrice = price - discount + variantDelta;
     const unitFinalPrice = finalPrice;
     const subtotal = finalPrice * item.quantity;
     
@@ -211,7 +230,16 @@ export const getCartProducts = asyncHandler(async (req, res) => {
       unit_final_price: unitFinalPrice,
       image_url: imageUrl,
       sold_quantity: item.quantity,
-      max_quantity: Number(product.quantity || 0),
+      max_quantity: Number(item.variant ? item.variant.quantity : product.quantity || 0),
+      variant: item.variant
+        ? {
+            id: Number(item.variant.id),
+            sku: item.variant.sku,
+            name: item.variant.name,
+            attributes: item.variant.attributes,
+            price_delta: variantDelta,
+          }
+        : null,
       quantity: item.quantity,
       color: {
         code: colorObj.code || '',
@@ -273,17 +301,26 @@ export const updateQuantity = asyncHandler(async (req, res) => {
   if (cart_item_id) {
     cartItem = await prisma.cartItem.findFirst({
       where: { id: BigInt(cart_item_id), cart_id: cart.id, deleted_at: null },
-      include: { product: true },
+      include: { product: true, variant: true },
     });
   } else {
     cartItem = await prisma.cartItem.findFirst({
-      where: { cart_id: cart.id, product_id: BigInt(product_id), deleted_at: null },
-      include: { product: true },
+      where: {
+        cart_id: cart.id,
+        product_id: BigInt(product_id),
+        ...(req.body.variant_id != null ? { variant_id: BigInt(req.body.variant_id) } : {}),
+        deleted_at: null,
+      },
+      include: { product: true, variant: true },
     });
   }
 
   if (!cartItem) return res.status(404).json({ message: "Item not found in cart" });
-  if (cartItem.product.quantity < quantity) return res.status(400).json({ message: "Insufficient stock" });
+  if (cartItem.variant) {
+    if (cartItem.variant.quantity < quantity) {
+      return res.status(400).json({ message: "Insufficient stock for selected variant" });
+    }
+  } else if (cartItem.product.quantity < quantity) return res.status(400).json({ message: "Insufficient stock" });
 
   // Check stock for color before update
   let productColor = null;
@@ -301,7 +338,7 @@ export const updateQuantity = asyncHandler(async (req, res) => {
     if (productColor && productColor.quantity < quantity) {
       return res.status(400).json({ message: "Insufficient stock for selected color" });
     }
-  } else {
+  } else if (!cartItem.variant) {
     if (cartItem.product.quantity < quantity) {
       return res.status(400).json({ message: "Insufficient stock" });
     }
@@ -342,7 +379,7 @@ export const deleteCartItem = asyncHandler(async (req, res) => {
 async function summarizeCart(cartId) {
   const items = await prisma.cartItem.findMany({
     where: { cart_id: cartId, deleted_at: null, product: { deleted_at: null } },
-    include: { product: true },
+    include: { product: true, variant: true },
   });
   let total_items = 0;
   let total_original_price = 0;
@@ -350,9 +387,9 @@ async function summarizeCart(cartId) {
   for (const it of items) {
     const price = Number(it.product.price);
     const discount = Number(it.product.discount || 0);
-    const unit_final = price - discount;
+    const unit_final = price - discount + Number(it.variant?.price_delta || 0);
     total_items += it.quantity;
-    total_original_price += price * it.quantity;
+    total_original_price += (price + Number(it.variant?.price_delta || 0)) * it.quantity;
     total_price += unit_final * it.quantity;
   }
   const total_discount = total_original_price - total_price;

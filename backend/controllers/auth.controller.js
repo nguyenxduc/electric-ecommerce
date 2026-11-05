@@ -7,6 +7,8 @@ import nodemailer from "nodemailer";
 import { promisify } from "util";
 import { writeAuditLog } from "../services/audit.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import crypto from "node:crypto";
+import { normalizeVnPhone, sendSms, exposeDevCode } from "../lib/sms.js";
 
 const generateAccessToken = (userId) => {
   const secret = ACCESS_TOKEN_SECRET;
@@ -181,6 +183,7 @@ export const login = asyncHandler(async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
+        phone_verified: !!user.phone_verified_at,
         email_verified: user.email_verified,
       },
     },
@@ -230,6 +233,7 @@ export const getProfile = asyncHandler(async (req, res) => {
       email: user.email,
       role: user.role,
       phone: user.phone,
+      phone_verified: !!user.phone_verified_at,
       address: user.address,
       avatar: user.avatar,
       loyalty_points: user.loyalty_points ?? 0,
@@ -260,6 +264,11 @@ export const updateProfile = asyncHandler(async (req, res) => {
     data: {
       name: name ?? undefined,
       phone: phone ?? undefined,
+      // Doi SDT thi mat xac thuc, phai OTP lai.
+      ...(phone !== undefined &&
+        (normalizeVnPhone(phone) ?? phone) !== (normalizeVnPhone(user.phone) ?? user.phone) && {
+          phone_verified_at: null,
+        }),
       address: address ?? undefined,
     },
   });
@@ -273,6 +282,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
       email: updatedUser.email,
       role: updatedUser.role,
       phone: updatedUser.phone,
+      phone_verified: !!updatedUser.phone_verified_at,
       address: updatedUser.address,
       avatar: updatedUser.avatar,
       createdAt: updatedUser.created_at,
@@ -643,4 +653,126 @@ export const deleteAvatar = asyncHandler(async (req, res) => {
       avatar: null,
     },
   });
+});
+
+// ---------------- Xac thuc SDT bang OTP ----------------
+const OTP_TTL_MS = 5 * 60 * 1000;
+const OTP_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_PER_HOUR = 5;
+const OTP_MAX_ATTEMPTS = 5;
+
+// Gan ma voi phone de ma cua SDT nay khong dung duoc cho SDT khac.
+const hashOtp = (code, phone) =>
+  crypto.createHash("sha256").update(`${code}:${phone}:${ACCESS_TOKEN_SECRET}`).digest("hex");
+
+const phoneTakenBy = (db, phone, userId) =>
+  db.user.findFirst({
+    where: { phone, phone_verified_at: { not: null }, id: { not: userId }, deleted_at: null },
+    select: { id: true },
+  });
+
+export const sendPhoneOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeVnPhone(req.body?.phone);
+  if (!phone) {
+    return res.status(400).json({ success: false, error: "Invalid Vietnamese phone number" });
+  }
+  const userId = BigInt(req.user.id);
+
+  if (await phoneTakenBy(prisma, phone, userId)) {
+    return res.status(409).json({ success: false, error: "Phone number already verified by another account" });
+  }
+
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const [last, byUser, byPhone] = await Promise.all([
+    prisma.otpCode.findFirst({ where: { user_id: userId }, orderBy: { created_at: "desc" } }),
+    prisma.otpCode.count({ where: { user_id: userId, created_at: { gte: hourAgo } } }),
+    prisma.otpCode.count({ where: { phone, created_at: { gte: hourAgo } } }),
+  ]);
+  if (last && Date.now() - last.created_at.getTime() < OTP_COOLDOWN_MS) {
+    const retry = Math.ceil((OTP_COOLDOWN_MS - (Date.now() - last.created_at.getTime())) / 1000);
+    return res.status(429).json({ success: false, error: `Please wait ${retry}s before requesting another code`, retry_after: retry });
+  }
+  if (byUser >= OTP_MAX_PER_HOUR || byPhone >= OTP_MAX_PER_HOUR) {
+    return res.status(429).json({ success: false, error: "Too many codes requested. Try again later." });
+  }
+
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+  await prisma.otpCode.create({
+    data: {
+      user_id: userId,
+      phone,
+      code_hash: hashOtp(code, phone),
+      expires_at: new Date(Date.now() + OTP_TTL_MS),
+    },
+  });
+  try {
+    await sendSms(phone, `Ma xac thuc cua ban la ${code}. Het han sau 5 phut.`);
+  } catch (err) {
+    console.error("sendSms error:", err?.message || err);
+    return res.status(502).json({ success: false, error: "Could not send SMS" });
+  }
+
+  res.json({
+    success: true,
+    message: "Verification code sent",
+    data: { phone, expires_in: OTP_TTL_MS / 1000, ...(exposeDevCode() && { dev_code: code }) },
+  });
+});
+
+export const verifyPhoneOtp = asyncHandler(async (req, res) => {
+  const phone = normalizeVnPhone(req.body?.phone);
+  const code = String(req.body?.code ?? "").trim();
+  if (!phone || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ success: false, error: "Phone and 6-digit code are required" });
+  }
+  const userId = BigInt(req.user.id);
+
+  const otp = await prisma.otpCode.findFirst({
+    where: { user_id: userId, phone, consumed_at: null },
+    orderBy: { created_at: "desc" },
+  });
+  if (!otp || otp.expires_at < new Date()) {
+    return res.status(400).json({ success: false, error: "No valid code. Please request a new one." });
+  }
+  // Tang attempts nguyen tu truoc khi so sanh: request song song khong vuot gioi han.
+  const bumped = await prisma.otpCode.updateMany({
+    where: { id: otp.id, consumed_at: null, attempts: { lt: OTP_MAX_ATTEMPTS } },
+    data: { attempts: { increment: 1 } },
+  });
+  if (bumped.count === 0) {
+    return res.status(429).json({ success: false, error: "Too many attempts. Please request a new code." });
+  }
+
+  const a = Buffer.from(hashOtp(code, phone));
+  const b = Buffer.from(otp.code_hash);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(400).json({ success: false, error: "Incorrect code" });
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const consumed = await tx.otpCode.updateMany({
+      where: { id: otp.id, consumed_at: null },
+      data: { consumed_at: new Date() },
+    });
+    if (consumed.count === 0) return "used";
+    if (await phoneTakenBy(tx, phone, userId)) return "taken";
+    await tx.user.update({ where: { id: userId }, data: { phone, phone_verified_at: new Date() } });
+    return "ok";
+  });
+  if (result === "taken") {
+    return res.status(409).json({ success: false, error: "Phone number already verified by another account" });
+  }
+  if (result === "used") {
+    return res.status(400).json({ success: false, error: "Code already used" });
+  }
+
+  writeAuditLog({
+    userId: req.user.id,
+    action: "VERIFY_PHONE",
+    resource: "user",
+    resourceId: req.user.id,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
+  });
+  res.json({ success: true, message: "Phone verified", data: { phone, phone_verified: true } });
 });

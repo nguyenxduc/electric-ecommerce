@@ -59,6 +59,7 @@ services:
       AI_HTTP_PROXY: ''
       HTTPS_PROXY: ''
       HTTP_PROXY: ''
+      JOBS_IN_API: '0'
     depends_on:
       db:
         condition: service_healthy
@@ -67,6 +68,58 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
+
+  # Chay job nen (jobs/worker.js), API khong chay job vi JOBS_IN_API=0.
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ngx-ecommerce-backend
+    working_dir: /app
+    environment:
+      DATABASE_URL: 'postgresql://postgres:postgres@db:5432/ecommerce?schema=public'
+      ACCESS_TOKEN_SECRET: change-me
+      FRONTEND_URL: 'http://localhost:5173'
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_CHAT_MODEL: 'gemini-3.1-flash-lite'
+      GEMINI_EMBED_MODEL: 'gemini-embedding-001'
+      IMAGE_SEARCH_MODEL: 'gemini-3.1-flash-lite'
+      SHIPPING_FEE: '9.99'
+      FREE_SHIPPING_THRESHOLD: '199'
+      USD_TO_VND_RATE: '25000'
+      AI_HTTP_PROXY: ''
+      HTTPS_PROXY: ''
+      HTTP_PROXY: ''
+    command: ['npm', 'run', 'worker']
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # pg_dump dinh ky vao ./backups (gitignored), giu 7 ban moi nhat.
+  db-backup:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: ecommerce
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+    entrypoint: ['sh', '/backup-db.sh']
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/scripts/backup-db.sh:/backup-db.sh:ro
+      - ./backups:/backups
 
   frontend:
     build:

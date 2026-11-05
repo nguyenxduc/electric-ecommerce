@@ -23,10 +23,18 @@ async function clearDatabase() {
   await prisma.productEmbedding.deleteMany();
   await prisma.productColor.deleteMany();
   await prisma.returnRequest.deleteMany();
+  await prisma.shipmentEvent.deleteMany();
+  await prisma.shipment.deleteMany();
+  await prisma.codSettlement.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.taxWithholding.deleteMany();
+  await prisma.fraudFlag.deleteMany();
+  await prisma.otpCode.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.orderGroup.deleteMany();
   await prisma.cartItem.deleteMany();
+  await prisma.productVariant.deleteMany();
   await prisma.cart.deleteMany();
   await prisma.review.deleteMany();
   await prisma.wishlist.deleteMany();
@@ -704,6 +712,22 @@ async function seedFilterOptions(filterKeys, categories) {
   return createdFilterOptions;
 }
 
+// Bien the SKU cho vai dien thoai (tong quantity = product.quantity).
+// Co y khong gan cho Galaxy S24 Ultra: test dung san pham ton kho cao nhat
+// cua Tech World va khong gui variant_id.
+const SEED_VARIANTS = {
+  "Google Pixel 8 Pro": [
+    { sku: "PIXEL8P-128", name: "128GB", attributes: { storage: "128GB" }, price_delta: 0, quantity: 12 },
+    { sku: "PIXEL8P-256", name: "256GB", attributes: { storage: "256GB" }, price_delta: 100, quantity: 12 },
+    { sku: "PIXEL8P-512", name: "512GB", attributes: { storage: "512GB" }, price_delta: 250, quantity: 8 },
+  ],
+  "Xiaomi 14": [
+    { sku: "XIAOMI14-256", name: "256GB", attributes: { storage: "256GB" }, price_delta: 0, quantity: 20 },
+    { sku: "XIAOMI14-512", name: "512GB", attributes: { storage: "512GB" }, price_delta: 80, quantity: 14 },
+    { sku: "XIAOMI14-1TB", name: "1TB", attributes: { storage: "1TB" }, price_delta: 180, quantity: 6 },
+  ],
+};
+
 async function seedProducts(categories, subCategories, shops) {
   const products = PRODUCTS_CATALOG.map((entry) =>
     resolveCatalogProduct(entry, categories, subCategories)
@@ -741,6 +765,9 @@ async function seedProducts(categories, subCategories, shops) {
         product_colors: {
           create: parseColorsWithQuantities(data.color, data.quantity),
         },
+        ...(SEED_VARIANTS[data.name] && {
+          variants: { create: SEED_VARIANTS[data.name] },
+        }),
       },
     });
     createdProducts.push(created);

@@ -337,6 +337,8 @@ model OrderGroup {
   payments Payment[]
 
   @@index([user_id, created_at])
+  // Chong lam dung voucher: tim cac checkout khac da dung cung coupon.
+  @@index([coupon_id])
   @@map("order_groups")
 }
 

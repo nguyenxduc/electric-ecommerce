@@ -80,6 +80,8 @@ export const createReview = asyncHandler(async (req, res) => {
       product_id: BigInt(productId),
       rating,
       comment,
+      client_ip: req.ip || null,
+      device_id: String(req.headers["x-device-id"] || "").slice(0, 100) || null,
     },
   });
 

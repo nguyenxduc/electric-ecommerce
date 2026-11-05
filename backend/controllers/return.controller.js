@@ -3,6 +3,7 @@ import { writeAuditLog } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { restockOrderItems } from "../lib/restock.js";
 import { revertPointsForOrder } from "../services/loyalty.service.js";
+import { onOrderReturned } from "../services/invoice.service.js";
 import { ROLES } from "../constants/roles.js";
 import { ORDER_STATUS, RETURN_STATUS } from "../constants/status.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
@@ -151,6 +152,7 @@ export const resolveReturnRequest = asyncHandler(async (req, res) => {
           where: { id: request.order_id },
           data: { status: ORDER_STATUS.RETURNED },
         });
+        await onOrderReturned(tx, request.order);
       }
       return tx.returnRequest.findUniqueOrThrow({ where: { id: request.id } });
     });

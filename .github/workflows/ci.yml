@@ -1,0 +1,69 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ecommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ecommerce"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecommerce?schema=public
+      ACCESS_TOKEN_SECRET: ci-dummy-secret-not-for-production
+      JOBS_IN_API: '0'
+      AUTO_EMBED_PRODUCTS: '0'
+      AUTO_SETUP_SIMILARITY: '0'
+      RATE_LIMIT_ENABLED: '0'
+      PORT: '3000'
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - name: Start server
+        run: |
+          npm run seed
+          node server.js > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            nc -z localhost 3000 && exit 0
+            sleep 1
+          done
+          cat server.log; exit 1
+      # Test MoMo sandbox goi mang ngoai, co the fail do dich vu ben thu ba.
+      - run: npm test
+      - if: failure()
+        run: cat server.log
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build

@@ -64,10 +64,13 @@ import recommendationRoutes from "./routes/recommendation.route.js";
 import loyaltyRoutes from "./routes/loyalty.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import auditRoutes from "./routes/audit.route.js";
+import fraudRoutes from "./routes/fraud.route.js";
 import behaviorRoutes from "./routes/behavior.route.js";
 import shopRoutes from "./routes/shop.route.js";
 import returnRoutes from "./routes/return.route.js";
+import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
+import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
 import { startDailyJobsScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
@@ -157,10 +160,15 @@ app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/loyalty", loyaltyRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/fraud", fraudRoutes);
 app.use("/api/behavior", behaviorRoutes);
 app.use("/api/shops", shopRoutes);
 app.use("/api/returns", returnRoutes);
+app.use("/api/shipping", shippingRouter);
+app.use("/api/shipments", shipmentRoutes);
 app.use("/api/health", healthRoutes);
+app.use("/api/invoices", invoiceRoutes);
+app.use("/api/tax", taxRouter);
 
 // Phai dung sau moi route: 404 cho endpoint la, roi mot cho duy nhat xu ly loi.
 // Express 4 khong tu bat promise reject, nen neu thieu luoi nay thi mot handler
