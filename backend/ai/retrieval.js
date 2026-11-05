@@ -227,7 +227,9 @@ export const pickConfidentSubset = (retrieved, { maxWhenConfident = 2 } = {}) =>
   // (cong da kiem them ten khop >= 2 token) la du tin cay nhu 3/3 khi co vector.
   const required = retrieved[0]._vectorSkipped ? 2 : 3;
   if (topSources >= required && secondSources < topSources) {
-    return retrieved.slice(0, maxWhenConfident);
+    // Qua cong tu khoa nghia la ten da khop cau hoi: chi 1 san pham lien quan.
+    // Do 2026-11-05: giu 2 thi CR cua nhom cau hoi theo ten dung o 0.5.
+    return retrieved.slice(0, retrieved[0]._vectorSkipped ? 1 : maxWhenConfident);
   }
   return retrieved;
 };

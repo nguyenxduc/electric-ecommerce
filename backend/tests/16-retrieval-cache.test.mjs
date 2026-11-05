@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { prisma } from '../lib/db.js'
 import { isLexicalDecisive, pickConfidentSubset, retrieveHybrid } from '../ai/retrieval.js'
 import { needsTools } from '../ai/agent.js'
+import { buildContent } from '../scripts/embed-products.js'
 
 // T7: cache thu hang truy hoi de ha TTFT, nhung gia/ton kho KHONG duoc cache -
 // phai doc lai tuoi moi lan. Bai duoi day chung minh dung bat bien do bang
@@ -113,14 +114,38 @@ test('isLexicalDecisive: can ca hai nhanh tu khoa VA ten khop >= 2 token', () =>
   assert.equal(isLexicalDecisive([]), false)
 })
 
-test('pickConfidentSubset: bo qua vector thi 2/2 nhanh dong y la du de cat', () => {
+test('pickConfidentSubset: qua cong tu khoa thi 2/2 nhanh dong y, cat con 1', () => {
   const gated = [
     { id: 1, _sources: ['fulltext', 'trigram'], _vectorSkipped: true },
     { id: 2, _sources: ['fulltext'], _vectorSkipped: true },
     { id: 3, _sources: ['fulltext'], _vectorSkipped: true }
   ]
-  assert.equal(pickConfidentSubset(gated).length, 2)
+  assert.equal(pickConfidentSubset(gated).length, 1)
   // Co chay vector ma hang 1 chi duoc 2 nhanh chon thi KHONG cat (hanh vi cu).
   const ranVector = gated.map(r => ({ ...r, _vectorSkipped: false }))
   assert.equal(pickConfidentSubset(ranVector).length, 3)
+})
+
+test('buildContent: lam phang specs_detail dang nhom, khong ra chuoi rong', () => {
+  const text = buildContent({
+    name: 'ASUS ROG Strix G16',
+    price: 1899.99,
+    specs_detail: [
+      { category: 'Performance', items: [{ label: 'GPU', value: 'NVIDIA RTX 4060' }, { label: 'RAM', value: '16GB' }] },
+      { category: 'Display', items: [{ label: 'Screen', value: '16"' }] }
+    ]
+  })
+  assert.match(text, /GPU: NVIDIA RTX 4060/)
+  assert.match(text, /Screen: 16"/)
+  assert.doesNotMatch(text, /: ""/)
+  // dang phang cu van doc duoc
+  assert.match(buildContent({ name: 'x', specs_detail: [{ label: 'CPU', value: 'M3' }] }), /CPU: M3/)
+})
+
+test('product_embeddings: noi dung co thong so that (da chay embed:products sau khi seed)', async (t) => {
+  const rows = await prisma.$queryRaw`SELECT content FROM product_embeddings LIMIT 50`
+  // npm test reseed xoa sach bang nay; bang rong da do demo-readiness bao.
+  if (rows.length === 0) return t.skip('chua chay embed:products sau seed')
+  const empty = rows.filter(r => /Specs: (: ""( \| )?)+$|Specs: $/.test(r.content))
+  assert.equal(empty.length, 0, 'co ban ghi embedding khong co thong so: chay npm run embed:products:force')
 })
