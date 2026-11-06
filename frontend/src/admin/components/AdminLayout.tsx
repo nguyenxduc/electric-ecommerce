@@ -6,13 +6,8 @@ import {
   Users,
   TicketPercent,
   Layers,
-  Wallet,
-  Badge,
   PlusCircle,
-  Images,
   List,
-  MessageSquare,
-  Shield,
   Settings2,
   ExternalLink,
   Store,
@@ -32,8 +27,6 @@ import { useValidateToken } from '../../client/hooks/useAuth'
 import { useAllChats } from '../../client/hooks/useChat'
 import { logout } from '../../client/services/authService'
 import { toast } from 'sonner'
-import { useEffect, useState } from 'react'
-import { io, Socket } from 'socket.io-client'
 
 type NavItem = {
   to: string
@@ -120,34 +113,6 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const { data: userData } = useValidateToken()
   const { data: chatsData } = useAllChats(1, 50)
-  const [socket, setSocket] = useState<Socket | null>(null)
-
-  useEffect(() => {
-    if (!userData?.user || userData.user.role !== 'admin') return
-
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-
-    const apiUrl =
-      (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000'
-    const socketUrl = apiUrl.replace('/api', '')
-    const newSocket = io(socketUrl, {
-      auth: { token },
-      transports: ['websocket', 'polling']
-    })
-
-    newSocket.on('connect', () => {
-      console.log('Admin socket connected for notifications')
-    })
-
-    newSocket.on('chat_notification', data => {})
-
-    setSocket(newSocket)
-
-    return () => {
-      newSocket.close()
-    }
-  }, [userData])
 
   const totalUnreadCount =
     chatsData?.data?.chats?.reduce(

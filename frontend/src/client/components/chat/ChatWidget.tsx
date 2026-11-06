@@ -95,11 +95,14 @@ function ChatWidgetInner({
     }
   }, [socket, chat?.id])
 
+  // .mutate on dinh; ca object mutation doi moi render -> effect goi lai mai
+  // (mark read -> invalidate -> render -> mark read ...)
+  const markRead = markAsReadMutation.mutate
   useEffect(() => {
     if (isOpen && chat?.id) {
-      markAsReadMutation.mutate(parseInt(chat.id, 10))
+      markRead(parseInt(chat.id, 10))
     }
-  }, [isOpen, chat?.id, markAsReadMutation])
+  }, [isOpen, chat?.id, markRead])
 
   const handleSend = async () => {
     if (!message.trim() || !chat) return

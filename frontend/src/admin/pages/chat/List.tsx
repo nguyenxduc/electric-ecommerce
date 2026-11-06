@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { MessageCircle, Send, Search, CheckCircle, XCircle, Clock } from 'lucide-react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
+import { MessageCircle, Send, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { useAllChats, useChatById, useSendMessage, useUpdateChatStatus, useMarkMessagesAsRead } from '../../../client/hooks/useChat'
 import { useValidateToken } from '../../../client/hooks/useAuth'
 import { toast } from 'sonner'
@@ -16,6 +16,10 @@ export default function AdminChatList({
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [socket, setSocket] = useState<Socket | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // Handler socket doc chat dang mo qua ref: dua selectedChatId vao deps se dong/mo
+  // lai socket moi lan doi chat va lo tin nhan den trong luc ket noi lai.
+  const selectedChatIdRef = useRef<number | null>(null)
+  selectedChatIdRef.current = selectedChatId
 
   const { data: userData } = useValidateToken()
   const { data: chatsData, refetch: refetchChats, isLoading: chatsLoading } = useAllChats(1, 50, statusFilter || undefined, scope)
@@ -26,7 +30,7 @@ export default function AdminChatList({
 
   const chats = chatsData?.data?.chats || []
   const selectedChat = chatData?.data
-  const messages = selectedChat?.messages || []
+  const messages = useMemo(() => selectedChat?.messages || [], [selectedChat?.messages])
 
   // Setup Socket.io connection
   useEffect(() => {
@@ -49,14 +53,14 @@ export default function AdminChatList({
 
     newSocket.on('new_chat_message', (data) => {
       refetchChats()
-      if (data.chatId === selectedChatId?.toString()) {
+      if (data.chatId === selectedChatIdRef.current?.toString()) {
         refetchChat()
       }
     })
 
     newSocket.on('chat_notification', (data) => {
       // Show notification toast when new message from customer
-      if (data.chatId !== selectedChatId?.toString()) {
+      if (data.chatId !== selectedChatIdRef.current?.toString()) {
         toast.info(`New message from ${data.message.sender.name}`, {
           description: data.message.content.substring(0, 50) + (data.message.content.length > 50 ? '...' : ''),
         })
@@ -73,7 +77,7 @@ export default function AdminChatList({
     return () => {
       newSocket.close()
     }
-  }, [userData, selectedChatId, refetchChats, refetchChat])
+  }, [userData, scope, refetchChats, refetchChat])
 
   // Join chat room when chat is selected
   useEffect(() => {
@@ -90,12 +94,13 @@ export default function AdminChatList({
   }, [messages])
 
   // Mark messages as read when chat is selected
+  const markRead = markAsReadMutation.mutate
   useEffect(() => {
     if (selectedChatId) {
       // Mark the buyer's messages as read when the operator opens the chat
-      markAsReadMutation.mutate(selectedChatId)
+      markRead(selectedChatId)
     }
-  }, [selectedChatId])
+  }, [selectedChatId, markRead])
 
   const handleSendMessage = async () => {
     if (!message.trim() || !selectedChatId) return
