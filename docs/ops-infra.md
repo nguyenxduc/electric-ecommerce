@@ -13,6 +13,26 @@ Moi job mot co "dang chay": chu ky toi ma lan truoc chua xong thi bo qua.
 | expire-unpaid-orders | `expireUnpaidOrders.js` | 5 phut, chay ngay khi khoi dong | `JOB_EXPIRE_UNPAID_ORDERS_ENABLED=0` |
 | sync-shipments | `syncShipments.js` | 30 phut | `JOB_SYNC_SHIPMENTS_ENABLED=0` |
 | fraud-review-scan | `scanSuspiciousReviews.js` | 24h | `JOB_FRAUD_REVIEW_SCAN_ENABLED=0` |
+| shipper-fraud-scan | `scanShipperFraud.js` | 6h | `JOB_SHIPPER_FRAUD_SCAN_ENABLED=0` |
+
+### Phat hien gian lan shipper (`SHIPPER_SUSPECT`)
+
+Job quet van don 30 ngay, cong diem theo tin hieu, dat `fraud_review_score` (40) thi gan co:
+
+| Tin hieu | Diem | Setting |
+|---|---|---|
+| `BUYER_NOT_RECEIVED`: nguoi mua bao chua nhan (`POST /api/shipments/orders/:orderId/not-received`, trong 15 ngay sau giao) | 70 | |
+| `COD_NOT_REMITTED`: da thu COD, chua doi soat qua han | 50 | `shipper_cod_remit_days` (14) |
+| `FAST_DELIVERY`: lay hang -> giao xong qua nhanh | 40 | `shipper_fast_delivery_minutes` (15) |
+| `ODD_HOUR_FAILED`: bao giao that bai 21h-7h (gio VN) | 30 | |
+| `AREA_FAIL_ANOMALY`: quan/huyen co ty le that bai/hoan cao bat thuong so voi carrier (z-test) | 30 | `shipper_area_min_shipments` (10), `shipper_area_z` (3) |
+| `ODD_HOUR_DELIVERY`: giao xong 22h-6h | 20 | |
+| `REPEATED_FAILED`: >= N lan giao that bai | 20 | `shipper_failed_repeat` (3) |
+
+Sau do Gemini viet nhan dinh (`details.ai`: risk, summary, next_step) cho toi da
+`SHIPPER_AI_PER_RUN` (20) flag moi lan; chi gui du lieu van don da an danh. Tat:
+`SHIPPER_AI_ENABLED=0` hoac khong co `GEMINI_API_KEY`. AI chi de tham khao, admin
+Confirm/Dismiss o trang Fraud.
 
 ### In-process hay worker
 
@@ -31,6 +51,7 @@ cd backend
 npm run job:expire-unpaid-orders
 npm run job:sync-shipments
 npm run job:fraud-review-scan
+npm run job:shipper-fraud-scan
 npm run job:daily-recommendation
 ```
 

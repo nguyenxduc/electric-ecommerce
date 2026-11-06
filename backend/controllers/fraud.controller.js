@@ -5,10 +5,10 @@ import { writeAuditLog } from "../services/audit.service.js";
 
 const STATUSES = ["open", "confirmed", "dismissed"];
 
-// Gan thong tin doi tuong (don/review) vao flag bang 2 query gop, tranh N+1.
+// Gan thong tin doi tuong (don/review/van don) vao flag bang query gop, tranh N+1.
 const attachSubjects = async (flags) => {
   const ids = (subject) => flags.filter((f) => f.subject === subject).map((f) => f.subject_id);
-  const [groups, reviews] = await Promise.all([
+  const [groups, reviews, shipments] = await Promise.all([
     prisma.orderGroup.findMany({
       where: { id: { in: ids("order_group") } },
       select: { id: true, group_number: true, total_amount: true, payment_method: true, user: { select: { email: true } } },
@@ -17,13 +17,24 @@ const attachSubjects = async (flags) => {
       where: { id: { in: ids("review") } },
       select: { id: true, comment: true, rating: true, product: { select: { id: true, name: true } }, user: { select: { email: true } } },
     }),
+    prisma.shipment.findMany({
+      where: { id: { in: ids("shipment") } },
+      select: {
+        id: true,
+        carrier: true,
+        tracking_code: true,
+        status: true,
+        cod_amount_vnd: true,
+        order: { select: { id: true, order_number: true, user: { select: { email: true } } } },
+      },
+    }),
   ]);
-  const gMap = new Map(groups.map((g) => [g.id, g]));
-  const rMap = new Map(reviews.map((r) => [r.id, r]));
-  return flags.map((f) => {
-    const s = f.subject === "order_group" ? gMap.get(f.subject_id) : f.subject === "review" ? rMap.get(f.subject_id) : null;
-    return { ...f, subject_info: s ?? null };
-  });
+  const maps = {
+    order_group: new Map(groups.map((g) => [g.id, g])),
+    review: new Map(reviews.map((r) => [r.id, r])),
+    shipment: new Map(shipments.map((s) => [s.id, s])),
+  };
+  return flags.map((f) => ({ ...f, subject_info: maps[f.subject]?.get(f.subject_id) ?? null }));
 };
 
 export const listFlags = asyncHandler(async (req, res) => {

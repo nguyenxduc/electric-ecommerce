@@ -869,12 +869,13 @@ model OtpCode {
 
 model FraudFlag {
   id          BigInt    @id @default(autoincrement())
-  type        String // COUPON_ABUSE | ORDER_RISK | SELF_DEALING | REVIEW_SUSPECT
-  subject     String // order_group | review | user
+  type        String // COUPON_ABUSE | ORDER_RISK | SELF_DEALING | REVIEW_SUSPECT | SHIPPER_SUSPECT
+  subject     String // order_group | review | user | shipment
   subject_id  BigInt
   user_id     BigInt?
   score       Int       @default(0)
   reasons     Json      @default("[]")
+  details     Json      @default("{}") // so lieu, ghi chu nguoi mua, nhan dinh AI
   status      String    @default("open") // open | confirmed | dismissed
   resolved_by BigInt?
   resolved_at DateTime?

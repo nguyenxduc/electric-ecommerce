@@ -148,6 +148,9 @@ export const fetchShipment = async (orderId: number): Promise<Shipment | null> =
   return data.data ?? null
 }
 
+export const reportNotReceived = async (orderId: number, note?: string) =>
+  (await axiosClient.post(`/shipments/orders/${orderId}/not-received`, { note })).data
+
 export const fetchInvoice = async (orderId: number): Promise<{ id: number; invoice_number: string } | null> => {
   try {
     const { data } = await axiosClient.get(`/invoices/orders/${orderId}`)

@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { formatUsd } from '../../utils/formatMoney'
 import {
   fetchInvoice,
   fetchShipment,
-  openInvoiceHtml
+  openInvoiceHtml,
+  reportNotReceived
 } from '../../services/orderService'
 
 interface Order {
@@ -46,6 +48,16 @@ const OrderDetails = ({ order }: OrderDetail) => {
     queryKey: ['invoice', order.id],
     queryFn: () => fetchInvoice(order.id),
     retry: false
+  })
+  const [note, setNote] = useState('')
+  const [reported, setReported] = useState(false)
+  const report = useMutation({
+    mutationFn: () => reportNotReceived(order.id, note.trim() || undefined),
+    onSuccess: () => {
+      setReported(true)
+      toast.success('Thanks, our team will review this delivery')
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to send report')
   })
 
   return (
@@ -135,6 +147,36 @@ const OrderDetails = ({ order }: OrderDetail) => {
                   </li>
                 ))}
             </ol>
+          )}
+          {shipment.status === 'delivered' && (
+            <div className="mt-4 border-t pt-3">
+              {reported ? (
+                <p className="text-sm text-green-700">Report sent. We will contact the carrier.</p>
+              ) : (
+                <div className="space-y-2">
+                  <label htmlFor="not-received-note" className="block text-sm text-gray-600">
+                    Marked as delivered but you did not receive it?
+                  </label>
+                  <textarea
+                    id="not-received-note"
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    maxLength={500}
+                    rows={2}
+                    placeholder="Optional note"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    disabled={report.isPending}
+                    onClick={() => report.mutate()}
+                    className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+                  >
+                    I did not receive this order
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}

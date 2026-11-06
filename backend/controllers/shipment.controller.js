@@ -6,6 +6,8 @@ import { writeAuditLog } from "../services/audit.service.js";
 import { actorFromReq } from "../services/orderLifecycle.service.js";
 import { groupItemsByShop, round2 } from "../services/pricing.service.js";
 import { getSettingNumber } from "../lib/settings.js";
+import { notifyAdmins } from "../lib/notify.js";
+import { upsertShipperFlag } from "../services/shipperFraud.service.js";
 import { quoteShippingForGroups } from "../services/shipping/index.js";
 import { getProvider } from "../services/shipping/providers/index.js";
 import { mockMapStatus } from "../services/shipping/providers/mock.js";
@@ -150,6 +152,39 @@ export const getShipmentByOrder = asyncHandler(async (req, res) => {
     include: { events: { orderBy: { occurred_at: "asc" } } },
   });
   res.json({ success: true, data: shipment });
+});
+
+const NOT_RECEIVED_DAYS = 15;
+
+// POST /api/shipments/orders/:orderId/not-received {note?} - nguoi mua bao van don
+// "da giao" nhung chua nhan hang: tin hieu manh nhat chong shipper giao gia.
+export const reportNotReceived = asyncHandler(async (req, res) => {
+  const order = await prisma.order.findFirst({
+    where: { id: BigInt(req.params.orderId), user_id: BigInt(req.user.id), deleted_at: null },
+    select: { id: true, order_number: true, shipment: { include: { events: { where: { status: "delivered" } } } } },
+  });
+  if (!order) throw bad("Order not found", 404);
+  const s = order.shipment;
+  if (!s || s.status !== "delivered") throw bad("Only delivered shipments can be reported", 409);
+  const deliveredAt = s.events[0]?.occurred_at ?? s.updated_at;
+  if (Date.now() - new Date(deliveredAt) > NOT_RECEIVED_DAYS * 86400000) {
+    throw bad(`Reports are accepted within ${NOT_RECEIVED_DAYS} days of delivery`, 409);
+  }
+  const note = typeof req.body?.note === "string" ? req.body.note.trim().slice(0, 500) : "";
+  const r = await upsertShipperFlag({
+    shipmentId: s.id,
+    userId: req.user.id,
+    reasons: ["BUYER_NOT_RECEIVED"],
+    extraDetails: { buyer_note: note || null, reported_at: new Date().toISOString() },
+  });
+  if (r.changed) {
+    await notifyAdmins({
+      title: "Nguoi mua bao chua nhan hang",
+      message: `Don ${order.order_number} (${s.carrier} ${s.tracking_code ?? ""}) bao da giao nhung nguoi mua chua nhan.`,
+      type: "SYSTEM",
+    });
+  }
+  res.status(r.changed ? 201 : 200).json({ success: true, data: { reported: true } });
 });
 
 // GET /api/shipments/:id/label - HTML in duoc cho moi nha van chuyen

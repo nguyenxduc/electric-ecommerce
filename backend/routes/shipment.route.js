@@ -4,6 +4,7 @@ import {
   createShipment,
   cancelShipment,
   getShipmentByOrder,
+  reportNotReceived,
   getLabel,
   webhook,
   simulate,
@@ -33,6 +34,7 @@ router.post("/cod/settlements", protectRoute, adminRoute, createSettlement);
 
 router.post("/orders/:orderId", protectRoute, sellerRoute, requireShopOwnership(shopIdOfOrder), createShipment);
 router.get("/orders/:orderId", protectRoute, getShipmentByOrder);
+router.post("/orders/:orderId/not-received", protectRoute, reportNotReceived);
 
 router.delete("/:id", protectRoute, sellerRoute, requireShopOwnership(shopIdOfShipment), cancelShipment);
 router.get("/:id/label", protectRoute, sellerRoute, requireShopOwnership(shopIdOfShipment), getLabel);

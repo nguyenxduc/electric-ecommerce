@@ -41,4 +41,12 @@ export const JOBS = [
     everyMinutes: hours(24),
     runOnStart: false,
   },
+  {
+    // Nghi van shipper: giao gia, bao that bai ngoai gio, giu COD, khu vuc bat thuong.
+    name: "shipper-fraud-scan",
+    file: "scanShipperFraud.js",
+    envKey: "JOB_SHIPPER_FRAUD_SCAN",
+    everyMinutes: hours(6),
+    runOnStart: false,
+  },
 ];

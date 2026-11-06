@@ -5,8 +5,30 @@ import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { errMsg, fetchFraudFlags, fetchFraudStats, resolveFraudFlag } from '../../services/opsService'
 
-const TYPES = ['COUPON_ABUSE', 'ORDER_RISK', 'SELF_DEALING', 'REVIEW_SUSPECT']
+const TYPES = ['COUPON_ABUSE', 'ORDER_RISK', 'SELF_DEALING', 'REVIEW_SUSPECT', 'SHIPPER_SUSPECT']
 const STATUSES = ['open', 'confirmed', 'dismissed']
+const RISK_CLS: Record<string, string> = {
+  high: 'text-red-600',
+  medium: 'text-yellow-700',
+  low: 'text-green-700'
+}
+
+// So lieu phat hien, ghi chu nguoi mua va nhan dinh AI (chi de tham khao, admin quyet dinh)
+function Details({ d }: { d: any }) {
+  if (!d?.ai && !d?.buyer_note) return null
+  return (
+    <div className="mt-2 max-w-sm space-y-1 text-xs">
+      {d.buyer_note && <div className="text-gray-600">Buyer: "{d.buyer_note}"</div>}
+      {d.ai && (
+        <div className="text-gray-700">
+          <span className={`font-semibold ${RISK_CLS[d.ai.risk] ?? ''}`}>AI {d.ai.risk}:</span> {d.ai.summary}
+          {d.ai.next_step && <div className="text-gray-500">→ {d.ai.next_step}</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const STATUS_CLS: Record<string, string> = {
   open: 'bg-yellow-100 text-yellow-700',
   confirmed: 'bg-red-100 text-red-700',
@@ -20,6 +42,17 @@ function Subject({ f }: { f: any }) {
       <span className="text-gray-400">
         {f.subject} #{f.subject_id}
       </span>
+    )
+  if (f.subject === 'shipment')
+    return (
+      <div>
+        <div className="font-medium">
+          {i.order?.order_number ?? `#${i.order?.id}`} / {i.carrier} <span className="font-mono">{i.tracking_code}</span>
+        </div>
+        <div className="text-xs text-gray-500">
+          {i.status} / COD {Number(i.cod_amount_vnd).toLocaleString('vi-VN')}₫ / {i.order?.user?.email}
+        </div>
+      </div>
     )
   if (f.subject === 'order_group')
     return (
@@ -67,7 +100,7 @@ export default function AdminFraudPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Fraud Flags</h1>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <div className="bg-white border rounded-lg p-3">
           <div className="text-xs text-gray-500">Total</div>
           <div className="text-2xl font-semibold">{stats.data?.total ?? 0}</div>
@@ -151,6 +184,7 @@ export default function AdminFraudPage() {
                         </span>
                       ))}
                     </div>
+                    <Details d={f.details} />
                   </td>
                   <td className="p-3">
                     <Subject f={f} />
