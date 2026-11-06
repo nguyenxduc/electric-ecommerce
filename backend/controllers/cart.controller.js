@@ -35,16 +35,12 @@ export const addToCart = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Quantity must be a whole number of at least 1" });
   }
 
-  // Find or create cart
-  let cart = await prisma.cart.findFirst({ 
-    where: { user_id: BigInt(userId), deleted_at: null } 
+  // upsert tren user_id unique: hai request dau tien cung luc khong tao hai gio.
+  const cart = await prisma.cart.upsert({
+    where: { user_id: BigInt(userId) },
+    update: {},
+    create: { user_id: BigInt(userId) },
   });
-  
-  if (!cart) {
-    cart = await prisma.cart.create({ 
-      data: { user_id: BigInt(userId) } 
-    });
-  }
 
   // San pham co bien the thi bat buoc chon; ton kho kiem tra theo bien the
   let variant = null;

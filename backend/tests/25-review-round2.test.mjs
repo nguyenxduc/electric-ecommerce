@@ -240,3 +240,21 @@ test('seller tax summary: nam khong hop le tra 400 thay vi 500', async () => {
   }
   assert.equal((await req('/tax/shop/mine/summary?year=2026', { token: seller })).status, 200)
 })
+
+test('hai lan them vao gio dau tien cung luc chi tao mot gio', async () => {
+  const email = ACCOUNTS.applicant
+  const user = await prisma.user.findUnique({ where: { email } })
+  const carts = await prisma.cart.findMany({ where: { user_id: user.id }, select: { id: true } })
+  await prisma.cartItem.deleteMany({ where: { cart_id: { in: carts.map(c => c.id) } } })
+  await prisma.cart.deleteMany({ where: { user_id: user.id } })
+
+  const token = await login(email)
+  const p = (await req('/shops/gadget-hub/products?limit=20')).json.products.find(x => !(x.variants?.length) && x.quantity > 5)
+  const detail = (await req(`/products/${p.id}`)).json
+  const colors = (detail?.data ?? detail)?.available_colors ?? []
+  const body = { quantity: 1, ...(colors.length && { color: { name: colors[0].name, code: colors[0].code } }) }
+  const rs = await Promise.all([1, 2, 3].map(() => req(`/cart/add_item/${p.id}`, { method: 'POST', token, body })))
+  assert.ok(rs.every(r => r.status < 500), JSON.stringify(rs.map(r => r.status)))
+  assert.equal(await prisma.cart.count({ where: { user_id: user.id } }), 1)
+  await req('/cart/clear', { method: 'DELETE', token }).catch(() => {})
+})
