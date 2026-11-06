@@ -81,7 +81,10 @@ export default {
       "POST",
       QUOTE_TIMEOUT_MS
     );
-    return { feeVnd: Number(r.data?.total) || 0 };
+    const feeVnd = Number(r.data?.total);
+    // Thieu/<=0 la loi bao gia: nem de checkout dung phi co dinh thay vi free ship
+    if (!(feeVnd > 0)) throw new AppError(`GHN: ${r.message || "bao phi that bai"}`, 502);
+    return { feeVnd };
   },
   async createShipment({ order, shop, from, to, weightGrams, codVnd, items, receiver }) {
     const r = await call("v2/shipping-order/create", {
@@ -116,8 +119,8 @@ export default {
     const r = await call("v2/a5/gen-token", { order_codes: [s.tracking_code] });
     return r.data?.token ? `${base()}/a5/public-api/printA5?token=${r.data.token}` : null;
   },
-  async getStatus(s) {
-    const r = await call("v2/shipping-order/detail", { order_code: s.tracking_code });
+  async getStatus(s, { timeoutMs } = {}) {
+    const r = await call("v2/shipping-order/detail", { order_code: s.tracking_code }, "POST", timeoutMs);
     return { status: ghnMapStatus(r.data?.status), description: r.data?.status, raw: r.data };
   },
   mapStatus: ghnMapStatus,

@@ -10,7 +10,7 @@ export const INVOICE_PROVIDERS = {
 };
 
 // Thang thue theo gio VN, tranh lech thang khi server chay UTC.
-const vnPeriod = (d) =>
+export const vnPeriod = (d) =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Ho_Chi_Minh",
     year: "numeric",

@@ -247,18 +247,23 @@ const pendingWhere = (carrier) => ({
 
 // GET /api/shipments/cod/pending?carrier=
 export const codPending = asyncHandler(async (req, res) => {
-  const shipments = await prisma.shipment.findMany({
-    where: pendingWhere(req.query.carrier),
-    orderBy: { cod_collected_at: "asc" },
-    take: 500,
-    include: { order: { select: { id: true, order_number: true, shop_id: true } } },
-  });
+  const where = pendingWhere(req.query.carrier);
+  // Tong/dem tinh tren toan bo where, khong phai chi 500 dong dau.
+  const [shipments, agg] = await Promise.all([
+    prisma.shipment.findMany({
+      where,
+      orderBy: { cod_collected_at: "asc" },
+      take: 500,
+      include: { order: { select: { id: true, order_number: true, shop_id: true } } },
+    }),
+    prisma.shipment.aggregate({ where, _count: true, _sum: { cod_amount_vnd: true } }),
+  ]);
   res.json({
     success: true,
     data: {
       shipments,
-      count: shipments.length,
-      total_cod_vnd: shipments.reduce((s, x) => s + x.cod_amount_vnd, 0),
+      count: agg._count,
+      total_cod_vnd: agg._sum.cod_amount_vnd ?? 0,
     },
   });
 });

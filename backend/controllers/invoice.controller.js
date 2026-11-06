@@ -3,6 +3,7 @@ import { asyncHandler } from "../middleware/error.middleware.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { ROLES } from "../constants/roles.js";
 import { shopYearSummary, periodReport, isPeriod } from "../services/tax.service.js";
+import { vnPeriod } from "../services/invoice.service.js";
 
 const ID_RE = /^[1-9][0-9]{0,18}$/;
 const notFound = (res) =>
@@ -35,6 +36,12 @@ export const getInvoiceByOrder = asyncHandler(async (req, res) => {
   res.json({ success: true, data: invoice });
 });
 
+// Ngay theo gio VN (YYYY-MM-DD), tranh lech ngay khi server chay UTC.
+const vnDate = (d) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(d);
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
 const money = (n) => Number(n).toFixed(2);
@@ -66,7 +73,7 @@ h1{text-align:center;font-size:20px}table{width:100%;border-collapse:collapse;ma
 td,th{border:1px solid #999;padding:6px}.r{text-align:right}.x{color:#c00;font-weight:bold;text-align:center}
 .t td{border:0}</style></head><body>
 <h1>HOA DON GIA TRI GIA TANG</h1>${cancelled}
-<p>Ky hieu: <b>${esc(inv.series)}</b> &nbsp; So: <b>${esc(inv.invoice_number)}</b> &nbsp; Ngay: ${esc(inv.issued_at.toISOString().slice(0, 10))}</p>
+<p>Ky hieu: <b>${esc(inv.series)}</b> &nbsp; So: <b>${esc(inv.invoice_number)}</b> &nbsp; Ngay: ${esc(vnDate(inv.issued_at))}</p>
 <p><b>Nguoi ban:</b> ${esc(s.name)}<br>MST: ${esc(s.tax_code)}<br>Dia chi: ${esc(s.address)}</p>
 <p><b>Nguoi mua:</b> ${esc(b.company_name || b.name)}<br>${b.tax_code ? `MST: ${esc(b.tax_code)}<br>` : ""}Dia chi: ${esc(b.company_address || b.address)}${b.email ? `<br>Email: ${esc(b.email)}` : ""}</p>
 <table><thead><tr><th>STT</th><th>Bang hang</th><th>SL</th><th>Don gia</th><th>Thanh tien</th></tr></thead><tbody>${rows}</tbody></table>
@@ -106,15 +113,21 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
   }
   if (status) where.status = String(status);
   const issued = {};
-  if (from && !isNaN(new Date(from))) issued.gte = new Date(from);
-  if (to && !isNaN(new Date(to))) issued.lte = new Date(to);
+  // Ngay thuan (YYYY-MM-DD) hieu theo gio VN; `to` bao gom ca ngay do (lt dau ngay ke tiep).
+  const f = from && new Date(DATE_ONLY.test(from) ? `${from}T00:00:00+07:00` : from);
+  if (f && !isNaN(f)) issued.gte = f;
+  const t = to && new Date(DATE_ONLY.test(to) ? `${to}T00:00:00+07:00` : to);
+  if (t && !isNaN(t)) {
+    if (DATE_ONLY.test(to)) issued.lt = new Date(t.getTime() + 86_400_000);
+    else issued.lte = t;
+  }
   if (Object.keys(issued).length) where.issued_at = issued;
   return listInvoices(req, res, where);
 });
 
 export const getShopTaxSummary = asyncHandler(async (req, res) => {
   if (!req.shop) return badRequest(res, "Seller shop required");
-  const year = Number(req.query.year) || new Date().getFullYear();
+  const year = Number(req.query.year) || Number(vnPeriod(new Date()).slice(0, 4));
   const months = await shopYearSummary(req.shop.id, year);
   res.json({ success: true, data: { year, months } });
 });
@@ -128,7 +141,8 @@ export const getTaxReport = asyncHandler(async (req, res) => {
 // Chong CSV injection: o bat dau bang = + - @ (hoac tab/CR) bi Excel coi la cong thuc.
 const csvCell = (v) => {
   let s = String(v ?? "");
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  // So am hop le (thue dao) khong phai cong thuc; chi chan chuoi
+  if (typeof v !== "number" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

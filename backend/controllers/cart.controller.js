@@ -29,9 +29,10 @@ export const addToCart = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: "Product not found" });
   }
   
-  const qty = Number(quantity) || 1;
-  if (qty < 1) {
-    return res.status(400).json({ message: "Quantity must be at least 1" });
+  // Number("abc")/1.5 truoc day lot qua va gay 500 o DB; chi nhan so nguyen >= 1
+  const qty = Number(quantity);
+  if (!Number.isInteger(qty) || qty < 1) {
+    return res.status(400).json({ message: "Quantity must be a whole number of at least 1" });
   }
 
   // Find or create cart
@@ -91,7 +92,8 @@ export const addToCart = asyncHandler(async (req, res) => {
     if (!productColor) {
       return res.status(400).json({ message: "Selected color not available" });
     }
-    if (productColor.quantity < qty) {
+    // Co bien the thi ton kho bien the quyet dinh, bo qua ton kho mau
+    if (!variant && productColor.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock for selected color" });
     }
   } else if (productDoc.product_colors.length > 0 && !variant) {
@@ -115,17 +117,22 @@ export const addToCart = asyncHandler(async (req, res) => {
       product_id: BigInt(product_id), 
       color: colorFilter,
       variant_id: variant?.id ?? null,
-      variant_id: variant?.id ?? null,
       deleted_at: null 
     },
   });
 
   if (existing) {
+    // Kiem tra ton kho theo so luong sau khi gop, khong chi so vua them
+    const merged = existing.quantity + qty;
+    const stock = variant ? variant.quantity : productColor ? productColor.quantity : productDoc.quantity;
+    if (stock < merged) {
+      return res.status(400).json({ message: "Insufficient stock for requested quantity" });
+    }
     // Update existing item (same product & color)
     await prisma.cartItem.update({
       where: { id: existing.id },
       data: {
-        quantity: existing.quantity + qty,
+        quantity: merged,
         // keep existing color (already matched), do not overwrite other colors
       },
     });
@@ -198,6 +205,8 @@ export const getCartProducts = asyncHandler(async (req, res) => {
     const finalPrice = price - discount + variantDelta;
     const unitFinalPrice = finalPrice;
     const subtotal = finalPrice * item.quantity;
+    // Bien the da xoa mem: giu dong de nguoi mua go bo, khong tinh vao tong
+    const unavailable = !!item.variant?.deleted_at;
     
     // Get first image from product.img array
     const imageUrl = Array.isArray(product.img) && product.img.length > 0 
@@ -229,6 +238,7 @@ export const getCartProducts = asyncHandler(async (req, res) => {
       subtotal: subtotal,
       unit_final_price: unitFinalPrice,
       image_url: imageUrl,
+      unavailable,
       sold_quantity: item.quantity,
       max_quantity: Number(item.variant ? item.variant.quantity : product.quantity || 0),
       variant: item.variant
@@ -292,7 +302,10 @@ export const updateQuantity = asyncHandler(async (req, res) => {
   const { product_id } = req.params;
   const { quantity, cart_item_id } = req.body;
   const userId = req.user.id;
-  if (quantity < 1) return res.status(400).json({ message: "Quantity must be at least 1" });
+  const qty = Number(quantity);
+  if (!Number.isInteger(qty) || qty < 1) {
+    return res.status(400).json({ message: "Quantity must be a whole number of at least 1" });
+  }
 
   const cart = await prisma.cart.findFirst({ where: { user_id: BigInt(userId) } });
   if (!cart) return res.status(404).json({ message: "Cart not found" });
@@ -316,15 +329,19 @@ export const updateQuantity = asyncHandler(async (req, res) => {
   }
 
   if (!cartItem) return res.status(404).json({ message: "Item not found in cart" });
+  if (cartItem.variant?.deleted_at) {
+    return res.status(400).json({ message: "Variant is no longer available" });
+  }
   if (cartItem.variant) {
-    if (cartItem.variant.quantity < quantity) {
+    if (cartItem.variant.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock for selected variant" });
     }
-  } else if (cartItem.product.quantity < quantity) return res.status(400).json({ message: "Insufficient stock" });
+  } else if (cartItem.product.quantity < qty) return res.status(400).json({ message: "Insufficient stock" });
 
   // Check stock for color before update
   let productColor = null;
-  if (cartItem.color) {
+  // Co bien the thi bo qua ton kho mau (bien the quyet dinh)
+  if (cartItem.color && !cartItem.variant) {
     const colorVal = typeof cartItem.color === "string" ? (() => { try { return JSON.parse(cartItem.color); } catch { return { name: cartItem.color, code: "" }; }})() : cartItem.color;
     productColor = await prisma.productColor.findFirst({
       where: {
@@ -335,16 +352,16 @@ export const updateQuantity = asyncHandler(async (req, res) => {
         ],
       },
     });
-    if (productColor && productColor.quantity < quantity) {
+    if (productColor && productColor.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock for selected color" });
     }
   } else if (!cartItem.variant) {
-    if (cartItem.product.quantity < quantity) {
+    if (cartItem.product.quantity < qty) {
       return res.status(400).json({ message: "Insufficient stock" });
     }
   }
 
-  const updatedItem = await prisma.cartItem.update({ where: { id: cartItem.id }, data: { quantity: Number(quantity) } });
+  const updatedItem = await prisma.cartItem.update({ where: { id: cartItem.id }, data: { quantity: qty } });
   const summary = await summarizeCart(cart.id);
   res.json({ message: "Quantity updated", cart_item: updatedItem, cart_summary: summary });
 });
@@ -385,6 +402,7 @@ async function summarizeCart(cartId) {
   let total_original_price = 0;
   let total_price = 0;
   for (const it of items) {
+    if (it.variant?.deleted_at) continue; // bien the da xoa mem khong tinh gia
     const price = Number(it.product.price);
     const discount = Number(it.product.discount || 0);
     const unit_final = price - discount + Number(it.variant?.price_delta || 0);

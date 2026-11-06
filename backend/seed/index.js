@@ -186,7 +186,11 @@ async function seedUsers() {
 
   const createdUsers = [];
   for (let i = 0; i < users.length; i++) {
-    const created = await prisma.user.create({ data: users[i] });
+    // Tai khoan demo coi nhu da dang ky 90 ngay: tai khoan moi < 24h bi cong diem
+    // gian lan khi dat COD gia tri cao, du lieu vua seed se bi chan nhu tai khoan ao.
+    const created = await prisma.user.create({
+      data: { ...users[i], created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+    });
     createdUsers.push(created);
   }
 

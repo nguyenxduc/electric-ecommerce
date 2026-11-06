@@ -8,8 +8,8 @@ const headers = () => {
   if (!process.env.GHTK_TOKEN) throw new AppError("GHTK chua cau hinh GHTK_TOKEN", 502);
   return { Token: process.env.GHTK_TOKEN };
 };
-const call = (path, body, method = "POST") =>
-  callCarrier("GHTK", `${base()}${path}`, { method, headers: headers(), body });
+const call = (path, body, method = "POST", timeoutMs) =>
+  callCarrier("GHTK", `${base()}${path}`, { method, headers: headers(), body, timeoutMs });
 
 // status_id cua GHTK
 const STATUS = {
@@ -52,7 +52,10 @@ export default {
     });
     const r = await call(`/services/shipment/fee?${q}`, undefined, "GET");
     if (!r.success) throw new AppError(`GHTK: ${r.message || "bao phi that bai"}`, 502);
-    return { feeVnd: Number(r.fee?.fee) || 0 };
+    const feeVnd = Number(r.fee?.fee);
+    // Thieu/<=0 la loi bao gia: nem de checkout dung phi co dinh thay vi free ship
+    if (!(feeVnd > 0)) throw new AppError(`GHTK: ${r.message || "bao phi that bai"}`, 502);
+    return { feeVnd };
   },
   async createShipment({ order, shop, from, to, weightGrams, codVnd, items, receiver }) {
     const r = await call("/services/shipment/order/?ver=1.5", {
@@ -90,8 +93,8 @@ export default {
   async getLabelUrl() {
     return null;
   },
-  async getStatus(s) {
-    const r = await call(`/services/shipment/v2/${s.tracking_code}`, undefined, "GET");
+  async getStatus(s, { timeoutMs } = {}) {
+    const r = await call(`/services/shipment/v2/${s.tracking_code}`, undefined, "GET", timeoutMs);
     return { status: ghtkMapStatus(r.order?.status), description: r.order?.status_text, raw: r.order };
   },
   mapStatus: ghtkMapStatus,
