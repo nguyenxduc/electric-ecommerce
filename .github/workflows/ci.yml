@@ -26,6 +26,14 @@ jobs:
       AUTO_SETUP_SIMILARITY: '0'
       RATE_LIMIT_ENABLED: '0'
       PORT: '3000'
+      # Chi cho test: lo ma OTP trong response va cho seller gia lap van don.
+      OTP_EXPOSE_DEV_CODE: '1'
+      SHIPMENT_SIMULATE_ENABLED: '1'
+      SHIPPING_WEBHOOK_SECRET_MOCK: ci-webhook-secret
+      # Khoa sandbox cong khai cua MoMo (tai lieu MoMo), khong phai bi mat.
+      MOMO_PARTNER_CODE: MOMO
+      MOMO_ACCESS_KEY: F8BBA842ECF85
+      MOMO_SECRET_KEY: K951B6PE1waDMi640xX08PD3vg6EkVlz
     defaults:
       run:
         working-directory: backend

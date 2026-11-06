@@ -80,7 +80,11 @@ test('hai nguoi mua cung luc mon hang con dung 1 cai: chi mot don di lot', async
     ])
     const ok = results.filter(r => [200, 201].includes(r.status)).length
 
-    assert.equal(ok, 1, `${ok}/2 don duoc tao tu mon hang chi con 1 cai`)
+    assert.equal(
+      ok,
+      1,
+      `${ok}/2 don duoc tao tu mon hang chi con 1 cai: ${JSON.stringify(results.map(r => [r.status, r.json?.message || r.json?.error]))}`
+    )
 
     const after = await prisma.product.findUnique({
       where: { id: BigInt(candidate.id) },
