@@ -31,6 +31,7 @@ export default function AdminProductEdit({
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState<number>(0)
+  const [weightGrams, setWeightGrams] = useState<number>(500)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [quantity, setQuantity] = useState<number>(0)
   const [categoryId, setCategoryId] = useState<number | ''>('')
@@ -61,6 +62,7 @@ export default function AdminProductEdit({
       const p = data.data
       setName(p.name)
       setPrice(Number(p.price))
+      setWeightGrams(Number((p as any).weight_grams) || 500)
       setDiscountPercent(
         p.price
           ? Math.round((Number(p.discount || 0) / Number(p.price)) * 100)
@@ -145,6 +147,7 @@ export default function AdminProductEdit({
           name,
           price: Number(price),
           quantity: totalQty,
+          weight_grams: weightGrams || undefined,
           category_id: Number(categoryId || 0),
           sub_category_id:
             subCategoryId === '' ? undefined : Number(subCategoryId),
@@ -163,6 +166,7 @@ export default function AdminProductEdit({
           price: Number(price),
           discount: Number(discountAmount.toFixed(2)),
           quantity: totalQty,
+          weight_grams: weightGrams || undefined,
           category_id: categoryId === '' ? undefined : Number(categoryId),
           sub_category_id: subCategoryId === '' ? null : Number(subCategoryId),
           color: colorsPayload,
@@ -254,6 +258,16 @@ export default function AdminProductEdit({
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm mb-1">Weight (grams, for shipping)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border rounded px-3 py-2"
+                  value={weightGrams}
+                  onChange={e => setWeightGrams(Number(e.target.value))}
+                />
+              </div>
               <div>
                 <label className="block text-sm mb-1">Product Price</label>
                 <input

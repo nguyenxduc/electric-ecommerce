@@ -47,6 +47,10 @@ const parseVariantsInput = (raw) => {
     if (!Number.isInteger(qty) || qty < 0) {
       return { error: "Variant quantity must be a non-negative integer" };
     }
+    // id rac (abc, 1.5) nem loi BigInt -> 500; chan o day de tra 400
+    if (v?.id != null && v.id !== "" && !/^\d{1,18}$/.test(String(v.id))) {
+      return { error: "Variant id is invalid" };
+    }
     if (seen.has(sku)) return { error: `Duplicate variant sku ${sku}` };
     seen.add(sku);
     const attributes =
@@ -63,6 +67,17 @@ const parseVariantsInput = (raw) => {
     });
   }
   return { variants };
+};
+
+// Khoi luong (gram) dung bao gia van chuyen; undefined = giu nguyen / mac dinh cua DB.
+// Truoc day API bo qua weight_grams nen seller khong chinh duoc can nang.
+const parseWeight = (raw) => {
+  if (raw === undefined || raw === null || raw === "") return { weight: undefined };
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 1_000_000) {
+    return { error: "weight_grams must be an integer between 1 and 1000000" };
+  }
+  return { weight: n };
 };
 
 // Dong bo bien the cua san pham: upsert theo id, xoa mem cai bi bo. Nem VARIANT_SKU_CONFLICT /
@@ -238,6 +253,8 @@ export const createProduct = asyncHandler(async (req, res) => {
     req.body.variants
   );
   if (variantError) return res.status(400).json({ message: variantError });
+  const { weight, error: weightError } = parseWeight(req.body.weight_grams);
+  if (weightError) return res.status(400).json({ message: weightError });
 
   let result;
   try {
@@ -256,6 +273,7 @@ export const createProduct = asyncHandler(async (req, res) => {
         category_id: parseBigIntOrUndefined(category_id),
         sub_category_id: parseSubCategory(sub_category_id),
         description: String(description),
+        weight_grams: weight,
       },
     });
 
@@ -545,6 +563,8 @@ export const updateProduct = asyncHandler(async (req, res) => {
     data.variants
   );
   if (variantError) return res.status(400).json({ message: variantError });
+  const { weight, error: weightError } = parseWeight(data.weight_grams);
+  if (weightError) return res.status(400).json({ message: weightError });
 
   let updatedProduct;
   try {
@@ -561,6 +581,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
         category_id: parseBigIntOrUndefined(data.category_id),
         sub_category_id: parseSubCategory(data.sub_category_id),
         description: data.description ?? undefined,
+        weight_grams: weight,
       },
     });
 

@@ -77,6 +77,10 @@ export const createOrder = async (req, res) => {
         return res.status(400).json({ message: "Item quantity must be a positive integer" });
       }
       it.quantity = Number(it.quantity);
+      // product_id rac nem loi BigInt -> 500; chan o day de tra 400
+      if (!/^\d{1,18}$/.test(String(it.product_id))) {
+        return res.status(400).json({ message: `Product ${it.product_id} not found` });
+      }
       const product = await prisma.product.findFirst({
         where: { id: BigInt(it.product_id), deleted_at: null },
         include: {

@@ -33,6 +33,7 @@ export default function AdminProductCreate({
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState<number>(0)
+  const [weightGrams, setWeightGrams] = useState<number>(500)
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [subCategoryId, setSubCategoryId] = useState<number | ''>('')
   const [colors, setColors] = useState<
@@ -76,6 +77,7 @@ export default function AdminProductCreate({
       name,
       price: Number(price),
       quantity: totalQty,
+      weight_grams: weightGrams || undefined,
       shop_id: isAdmin && shopId !== '' ? Number(shopId) : undefined,
       category_id: Number(categoryId || 0),
       sub_category_id: subCategoryId === '' ? undefined : Number(subCategoryId),
@@ -149,6 +151,16 @@ export default function AdminProductCreate({
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Weight (grams, for shipping)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border rounded px-3 py-2"
+                  value={weightGrams}
+                  onChange={e => setWeightGrams(Number(e.target.value))}
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">Product Price</label>
