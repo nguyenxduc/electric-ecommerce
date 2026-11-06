@@ -89,7 +89,7 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
             >
               Print label
             </button>
-            {(sh.status === 'created' || sh.status === 'picking') && (
+            {['created', 'picking', 'failed'].includes(sh.status) && (
               <button
                 className="px-3 py-1 border rounded text-red-600"
                 disabled={run.isPending}

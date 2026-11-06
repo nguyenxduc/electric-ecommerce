@@ -1241,7 +1241,9 @@ async function seedReviews(users, products) {
           user_id: user.id,
           product_id: product.id,
           rating,
-          comment: REVIEW_COMMENTS[commentIndex],
+          // Kem ten san pham: cung mot cau tren nhieu san pham cua mot shop la dau
+          // hieu review gia, job fraud-review-scan se gan co ca bo du lieu demo.
+          comment: `${REVIEW_COMMENTS[commentIndex]} (${product.name})`,
         },
       });
       reviews.push(review);

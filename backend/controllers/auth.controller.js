@@ -692,14 +692,10 @@ export const sendPhoneOtp = asyncHandler(async (req, res) => {
     return res.status(429).json({ success: false, error: "Too many codes requested. Try again later." });
   }
 
-  // SDT da thuoc tai khoan khac: tra 200 chung, khong gui SMS/khong tao row de khong lo SDT nao da dang ky.
-  if (await phoneTakenBy(prisma, phone, userId)) {
-    return res.json({
-      success: true,
-      message: "Verification code sent",
-      data: { phone, expires_in: OTP_TTL_MS / 1000 },
-    });
-  }
+  // SDT da thuoc tai khoan khac: van tao row (de han muc/cooldown va buoc verify
+  // phan ung y het SDT trong) nhung khong gui SMS - ma khong ai biet nen khong
+  // verify duoc, va khong lo SDT nao da dang ky.
+  const taken = await phoneTakenBy(prisma, phone, userId);
 
   const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
   await prisma.otpCode.create({
@@ -710,6 +706,13 @@ export const sendPhoneOtp = asyncHandler(async (req, res) => {
       expires_at: new Date(Date.now() + OTP_TTL_MS),
     },
   });
+  if (taken) {
+    return res.json({
+      success: true,
+      message: "Verification code sent",
+      data: { phone, expires_in: OTP_TTL_MS / 1000 },
+    });
+  }
   try {
     await sendSms(phone, `Ma xac thuc cua ban la ${code}. Het han sau 5 phut.`);
   } catch (err) {

@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test'
-import { loginAs } from './helpers'
+import { API, loginAs } from './helpers'
 
 test('seller: product edit shows variants editor and weight', async ({ page }) => {
   await loginAs(page, 'seller1@example.com')
-  await page.goto('/seller/products/1763')
+  // id doi sau moi lan seed: tra id qua API.
+  const found = await page.request.get(`${API}/products?search=Xiaomi%2014&limit=5`)
+  const xiaomi = (await found.json()).products.find((p: { name: string }) => p.name === 'Xiaomi 14')
+  await page.goto(`/seller/products/${xiaomi.id}`)
   await expect(page.getByRole('heading', { name: 'Edit Product' })).toBeVisible()
   await expect(page.getByText('Variants (SKU)')).toBeVisible()
   await expect(page.locator('input[value="XIAOMI14-512"]')).toBeVisible()

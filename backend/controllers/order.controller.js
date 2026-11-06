@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { prisma } from "../lib/db.js";
 import { earnPointsForOrder } from "../services/loyalty.service.js";
 import { writeAuditLog } from "../services/audit.service.js";
@@ -327,7 +328,8 @@ export const createOrder = async (req, res) => {
       const orderGroup = await tx.orderGroup.create({
         data: {
           user_id: BigInt(userId),
-          group_number: `GRP-${Date.now()}`,
+          // Hau to ngau nhien: hai checkout cung mili giay trung so -> P2002 -> 500.
+          group_number: `GRP-${Date.now()}-${randomInt(1e6)}`,
           subtotal_amount: round2(totalAmount),
           tier_discount: round2(tierDiscount),
           coupon_discount: round2(couponDiscount),
@@ -352,7 +354,7 @@ export const createOrder = async (req, res) => {
             user_id: BigInt(userId),
             shop_id: group.shopId,
             order_group_id: orderGroup.id,
-            order_number: `ORD-${Date.now()}-${group.shopId}`,
+            order_number: `ORD-${Date.now()}-${group.shopId}-${randomInt(1e6)}`,
             total_amount: group.finalTotal,
             shipping_fee: group.shipping,
             status: ORDER_STATUS.PENDING,

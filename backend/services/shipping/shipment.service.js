@@ -119,7 +119,9 @@ export const createShipmentForOrder = async (order, shop, actor = {}) => {
 };
 
 export const cancelShipmentById = async (shipment) => {
-  if (!["created", "picking"].includes(shipment.status)) {
+  // "failed" (giao that bai) cung cho huy: khong thi don ket vi chan SHIPMENT_ACTIVE
+  // cho toi khi nha van chuyen bao "returned"; carrier tu choi thi loi 502 cua ho hien ra.
+  if (!["created", "picking", "failed"].includes(shipment.status)) {
     throw new AppError("Shipment can no longer be cancelled", 409);
   }
   // Dung provider luu tren van don, khong phai provider dang bat

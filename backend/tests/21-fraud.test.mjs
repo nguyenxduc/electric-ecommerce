@@ -101,12 +101,17 @@ test('OTP: happy path verifies phone (+84 format accepted) and exposes phone_ver
   assert.equal(me.json.data.phone_verified, true)
 })
 
-test('OTP: a phone verified by another account gets generic 200 without SMS/row', async () => {
+test('OTP: a phone verified by another account gets generic 200, no SMS, same limits', async () => {
   await clearOtps()
   const r = await sendOtp(john)
   assert.equal(r.status, 200)
   assert.equal(r.json.data.dev_code, undefined)
-  assert.equal(await prisma.otpCode.count({ where: { user_id: users.john.id } }), 0)
+  // Van tao row de cooldown/han muc giong het SDT trong (khong do duoc SDT da dang ky).
+  assert.equal(await prisma.otpCode.count({ where: { user_id: users.john.id } }), 1)
+  assert.equal((await sendOtp(john)).status, 429)
+  // Ma khong duoc gui: doan ma chi nhan loi sai ma nhu moi SDT khac.
+  const v = await req('/auth/phone/verify', { method: 'POST', token: john, body: { phone: PHONE, code: '000000' } })
+  assert.equal(v.status, 400)
 })
 
 test('changing phone in profile clears phone_verified', async () => {

@@ -17,7 +17,10 @@ test('buyer: variant, cart, checkout COD with shipping quote', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Login / Sign Up' })).toBeHidden()
 
   // Chi tiet san pham co variant
-  await page.goto('/product/xiaomi-14-p1763')
+  // id doi sau moi lan seed: tra id qua API thay vi viet cung slug.
+  const found = await page.request.get(`${API}/products?search=Xiaomi%2014&limit=5`)
+  const xiaomi = (await found.json()).products.find((p: { name: string }) => p.name === 'Xiaomi 14')
+  await page.goto(`/product/xiaomi-14-p${xiaomi.id}`)
   await expect(page.getByRole('heading', { name: 'Xiaomi 14', level: 1 })).toBeVisible()
   const addBtn = page.getByRole('button', { name: 'Add to Cart' })
   await expect(addBtn).toBeDisabled()
