@@ -348,6 +348,38 @@ Nguoi mua chi tu huy duoc khi don con o `pending` hoac `processing`.
 > khien nhung don do ket vinh vien — khong chuyen tiep duoc ma cung khong huy
 > duoc. Suite `11-business-rules` kiem tra khong con trang thai la nao.
 
+Moi lan doi trang thai (seller, buyer huy, webhook van chuyen, job het han)
+deu di qua `services/orderLifecycle.service.js` (`transitionOrderStatus`): cap
+nhat co dieu kien theo trang thai cu nen hai yeu cau dong thoi chi mot cai
+thang; huy thi hoan kho + thu hoi diem trong cung giao dich; giao thi phat
+hanh hoa don + ghi khau tru thue. Don con van don dang chay bi chan huy
+(`SHIPMENT_ACTIVE`) cho toi khi seller huy van don.
+
+### Van don dieu khien don hang
+
+```mermaid
+stateDiagram-v2
+  [*] --> created: seller tao van don (don -> processing)
+  created --> picking
+  picking --> in_transit
+  created --> in_transit
+  in_transit --> failed: giao that bai
+  failed --> in_transit: giao lai
+  in_transit --> delivered: don -> delivered, ghi nhan da thu COD
+  in_transit --> returned: don -> cancelled, hoan kho
+  failed --> returned
+  created --> cancelled: seller huy / carrier huy
+  delivered --> [*]
+  returned --> [*]
+  cancelled --> [*]
+```
+
+Trang thai den tu webhook (`/api/shipments/webhook/:carrier`, token rieng moi
+hang) hoac job `sync-shipments`. Su kien den tre/trung bi bo qua theo thu hang
+trang thai. `in_transit` dua don sang `shipped`. Van don da thu COD cho doi
+soat (`CodSettlement`); job `shipper-fraud-scan` dung chinh lich su su kien nay
+de phat hien giao gia va giu COD.
+
 ---
 
 ## 6. Vong doi gian hang

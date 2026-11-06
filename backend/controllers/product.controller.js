@@ -979,17 +979,7 @@ export const getSimilarProducts = asyncHandler(async (req, res) => {
     });
   }
 
-  // Use pg_trgm for description similarity
-  // First, ensure pg_trgm extension is enabled (this should be done in migration)
-  try {
-    await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pg_trgm;`;
-  } catch (error) {
-    console.log(
-      "pg_trgm extension might already exist or permission denied:",
-      error.message
-    );
-  }
-
+  // pg_trgm do migration 20260909_product_search_vector tao, khong chay DDL moi request
   // Find similar products using trigram similarity
   // similarity() function returns a value between 0 and 1, where 1 is identical
   const similarProducts = await prisma.$queryRaw`
