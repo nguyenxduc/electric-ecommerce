@@ -24,6 +24,10 @@ test('status mapping GHN/GHTK/mock', () => {
   assert.equal(ghnMapStatus('???'), null)
   assert.equal(ghtkMapStatus(5), 'delivered')
   assert.equal(ghtkMapStatus(-1), 'cancelled')
+  // Ma shipper tu bao khong phai trang thai chinh thuc cua GHTK
+  for (const informal of [45, 49, 123, 127, 128, 410]) assert.equal(ghtkMapStatus(informal), null)
+  assert.equal(ghtkMapStatus(11), 'returned')
+  assert.equal(ghtkMapStatus(30), 'in_transit')
   assert.equal(mockMapStatus('picked'), 'in_transit')
 })
 

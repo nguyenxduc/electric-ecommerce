@@ -11,29 +11,33 @@ const headers = () => {
 const call = (path, body, method = "POST", timeoutMs) =>
   callCarrier("GHTK", `${base()}${path}`, { method, headers: headers(), body, timeoutMs });
 
-// status_id cua GHTK
+// status_id cua GHTK theo bang chinh thuc (api.ghtk.vn/en/docs/submit-order/webhook).
+// Ma shipper tu bao (123, 127, 128, 45, 49, 410) GHTK ghi ro "khong phai trang
+// thai chinh thuc": khong map, neu khong 45 se danh dau da giao + da thu COD
+// truoc khi GHTK xac nhan.
 const STATUS = {
   "-1": "cancelled",
-  1: "created",
-  2: "created",
-  12: "picking",
-  7: "picking",
-  8: "picking",
-  127: "picking",
-  128: "picking",
-  3: "in_transit",
-  123: "in_transit",
-  4: "in_transit",
-  10: "in_transit",
-  410: "in_transit",
-  5: "delivered",
-  6: "delivered",
-  45: "delivered",
-  9: "failed",
+  1: "created", // chua tiep nhan
+  2: "created", // da tiep nhan
+  12: "picking", // dang lay hang
+  7: "picking", // lay hang that bai (se lay lai)
+  8: "picking", // hoan lay hang
+  3: "in_transit", // da lay hang / nhap kho
+  4: "in_transit", // dang giao
+  10: "in_transit", // hoan giao hang
+  26: "in_transit",
+  30: "in_transit",
+  31: "in_transit",
+  91: "in_transit", // cac moc trung chuyen
+  5: "delivered", // da giao, chua doi soat
+  6: "delivered", // da doi soat
+  9: "failed", // giao that bai
+  20: "failed", // dang hoan hang: hang chua ve shop
+  // shortcut: 13 (don den bu, mat hang) de "failed" cho xu ly tay vi hang khong
+  // ve kho - map "returned" se cong lai ton kho sai; can luong boi thuong rieng.
   13: "failed",
-  49: "failed",
-  20: "failed",
-  21: "returned",
+  21: "returned", // da hoan hang
+  11: "returned", // da doi soat hoan hang
 };
 export const ghtkMapStatus = (s) => STATUS[String(s)] || null;
 
