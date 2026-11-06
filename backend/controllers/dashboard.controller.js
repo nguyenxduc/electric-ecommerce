@@ -142,7 +142,8 @@ const buildDashboardStats = async (res, shopId = null) => {
 
     // Calculate percentages
     const calculateDelta = (current, previous) => {
-      if (previous === 0) return current > 0 ? "+100%" : "0%";
+      // Ky truoc bang 0 thi ty le vo nghia ("+100%" gay hieu nham), bao "new"
+      if (previous === 0) return current > 0 ? "new" : "0%";
       const delta = ((current - previous) / previous) * 100;
       return `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`;
     };

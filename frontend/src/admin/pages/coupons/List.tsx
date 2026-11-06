@@ -14,6 +14,7 @@ import AdminPagination from '../../components/common/AdminPagination'
 import { DiscountType, UpdateCouponRequest } from '../../types'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
+import { fmtDate } from '../../utils/date'
 
 export default function AdminCouponsList() {
   const navigate = useNavigate()
@@ -109,7 +110,7 @@ export default function AdminCouponsList() {
                     </td>
                     <td className="p-2">
                       {c.expires_at
-                        ? new Date(c.expires_at).toLocaleDateString()
+                        ? fmtDate(c.expires_at)
                         : '—'}
                     </td>
                     <td className="p-2">

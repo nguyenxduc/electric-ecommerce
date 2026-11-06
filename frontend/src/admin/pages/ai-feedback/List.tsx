@@ -14,6 +14,7 @@ import {
 } from '../../services/aiFeedbackAdminService'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
+import { fmtDateTime } from '../../utils/date'
 
 export default function AdminAiFeedbackPage() {
   const [days, setDays] = useState(14)
@@ -118,16 +119,16 @@ export default function AdminAiFeedbackPage() {
             <p className="text-xs text-gray-500 uppercase">Positive (4-5 stars)</p>
             {total === 0 ? (
               <p className="text-2xl font-bold text-gray-400 mt-1">
-                Chưa có dữ liệu
+                No data yet
               </p>
             ) : total < 20 ? (
               <p className="text-2xl font-bold text-gray-500 mt-1">
-                Chưa đủ mẫu (n = {total})
+                Not enough samples (n = {total})
               </p>
             ) : (
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-2xl font-bold text-green-600">
-                  {positiveRate!.toFixed(1)}% tích cực (n = {total})
+                  {positiveRate!.toFixed(1)}% (n = {total})
                 </p>
                 <span
                   className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -136,12 +137,12 @@ export default function AdminAiFeedbackPage() {
                       : 'bg-amber-100 text-amber-700'
                   }`}
                 >
-                  {positiveRate! >= 80 ? 'đạt ≥ 80%' : 'chưa đạt 80%'}
+                  {positiveRate! >= 80 ? 'meets ≥ 80% target' : 'below 80% target'}
                 </span>
               </div>
             )}
             <p className="text-xs text-gray-400 mt-1">
-              {positive.toLocaleString()} phản hồi tích cực
+              {positive.toLocaleString()} positive responses
             </p>
           </div>
           <div className="bg-white border rounded-lg p-4">
@@ -172,7 +173,7 @@ export default function AdminAiFeedbackPage() {
                     {r.rating} stars
                   </span>
                   <span className="text-gray-400 text-xs ml-2">
-                    {new Date(r.created_at).toLocaleString()}
+                    {fmtDateTime(r.created_at)}
                   </span>
                   {r.comment && (
                     <p className="text-gray-600 mt-1">{r.comment}</p>
@@ -246,7 +247,7 @@ export default function AdminAiFeedbackPage() {
                   {items.map((row: AiFeedbackRow) => (
                     <tr key={String(row.id)} className="border-t hover:bg-gray-50">
                       <td className="p-3 text-gray-500 whitespace-nowrap text-xs">
-                        {new Date(row.created_at).toLocaleString()}
+                        {fmtDateTime(row.created_at)}
                       </td>
                       <td className="p-3 font-semibold text-amber-600">
                         {row.rating}

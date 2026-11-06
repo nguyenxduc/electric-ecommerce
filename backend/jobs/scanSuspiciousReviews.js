@@ -111,8 +111,8 @@ const main = async () => {
   console.log(`[fraud-review-scan] scanned ${reviews.length} reviews, ${created} new flag(s).`);
   if (created > 0) {
     await notifyAdmins({
-      title: "Review nghi van moi",
-      message: `${created} review moi bi gan co REVIEW_SUSPECT.`,
+      title: "Suspicious reviews flagged",
+      message: `${created} new review(s) flagged REVIEW_SUSPECT. See /admin/fraud.`,
     });
   }
 };

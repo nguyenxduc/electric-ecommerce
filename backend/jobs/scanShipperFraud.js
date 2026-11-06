@@ -94,8 +94,8 @@ const main = async () => {
   );
   if (created > 0) {
     await notifyAdmins({
-      title: "Nghi van gian lan van chuyen",
-      message: `${created} van don moi bi gan co ${SHIPPER_FLAG}.`,
+      title: "Suspicious deliveries flagged",
+      message: `${created} new shipment(s) flagged ${SHIPPER_FLAG}. See /admin/fraud.`,
     });
   }
 };

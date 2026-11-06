@@ -179,8 +179,8 @@ export const reportNotReceived = asyncHandler(async (req, res) => {
   });
   if (r.changed) {
     await notifyAdmins({
-      title: "Nguoi mua bao chua nhan hang",
-      message: `Don ${order.order_number} (${s.carrier} ${s.tracking_code ?? ""}) bao da giao nhung nguoi mua chua nhan.`,
+      title: "Buyer reports order not received",
+      message: `Order ${order.order_number} (${s.carrier} ${s.tracking_code ?? ""}) is marked delivered but the buyer did not receive it. See /admin/fraud.`,
       type: "SYSTEM",
     });
   }

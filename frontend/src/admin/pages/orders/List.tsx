@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAdminOrders, useAdminOrderStats } from '../../hooks'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
+import { fmtDate } from '../../utils/date'
 
 export default function AdminOrdersList() {
   const [page, setPage] = useState(1)
@@ -138,7 +139,7 @@ export default function AdminOrdersList() {
                   <td className="p-2">{o.order_items?.length || 0}</td>
                   <td className="p-2">
                     {o.created_at
-                      ? new Date(o.created_at).toLocaleDateString()
+                      ? fmtDate(o.created_at)
                       : '-'}
                   </td>
                   <td className="p-2 font-semibold">

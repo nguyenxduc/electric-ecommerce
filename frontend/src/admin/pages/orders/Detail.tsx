@@ -12,6 +12,7 @@ import {
   simulateShipment
 } from '../../../seller/services/sellerService'
 import { useAdminOrder, useUpdateAdminOrderStatus } from '../../hooks'
+import { fmtDateTime } from '../../utils/date'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -126,7 +127,7 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
               {sh.events.map(ev => (
                 <li key={ev.id} className="flex gap-2">
                   <span className="text-gray-500 whitespace-nowrap">
-                    {new Date(ev.occurred_at).toLocaleString()}
+                    {fmtDateTime(ev.occurred_at)}
                   </span>
                   <span className="capitalize font-medium">
                     {ev.status.replace('_', ' ')}
@@ -215,7 +216,7 @@ export default function AdminOrderDetail() {
           <p className="text-sm text-gray-500">
             Created:{' '}
             {order.created_at
-              ? new Date(order.created_at).toLocaleString()
+              ? fmtDateTime(order.created_at)
               : '—'}
           </p>
         </div>

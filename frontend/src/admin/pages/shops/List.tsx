@@ -7,6 +7,7 @@ import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
+import { fmtDate } from '../../utils/date'
 
 const STATUS_TABS = [
   { key: '', label: 'All' },
@@ -224,7 +225,7 @@ export default function AdminShopsList() {
                     <td className="p-2">{shop._count?.products ?? 0}</td>
                     <td className="p-2">{shop._count?.orders ?? 0}</td>
                     <td className="p-2">
-                      {new Date(shop.created_at).toLocaleDateString()}
+                      {fmtDate(shop.created_at)}
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">

@@ -10,6 +10,7 @@ import Modal from '../../components/common/Modal'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
+import { fmtDate } from '../../utils/date'
 
 const TIER_STYLE: Record<string, { bg: string; text: string; label: string; icon: string }> = {
   BRONZE:   { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Bronze',   icon: '🥉' },
@@ -116,7 +117,7 @@ export default function AdminCustomersList() {
                       </td>
                       <td className="p-2">
                         {u.created_at
-                          ? new Date(u.created_at).toLocaleDateString()
+                          ? fmtDate(u.created_at)
                           : '-'}
                       </td>
                       <td className="p-2">

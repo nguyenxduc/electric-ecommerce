@@ -230,8 +230,8 @@ export const recordCheckoutRisk = async (orderGroup, assessment, ctx) => {
     throw err;
   }
   await notifyAdmins({
-    title: "Don hang co rui ro gian lan",
-    message: `Don ${orderGroup.group_number} (${type}, diem ${assessment.score}): ${assessment.reasons.join(", ")}`,
+    title: "Risky order flagged",
+    message: `Order ${orderGroup.group_number} (${type}, score ${assessment.score}): ${assessment.reasons.join(", ")}. See /admin/fraud.`,
     type: "SYSTEM",
   });
 };

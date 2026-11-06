@@ -9,9 +9,10 @@ import {
   fetchCodSettlements,
   fmtVnd
 } from '../../services/opsService'
+import { fmtDateTime } from '../../utils/date'
 
 const CARRIERS = ['', 'ghn', 'ghtk', 'mock']
-const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleString() : '-')
+const fmtDate = (d?: string | null) => (d ? fmtDateTime(d) : '-')
 const diffCls = (d: number) => (d !== 0 ? 'text-red-600 font-semibold' : 'text-green-600')
 
 export default function AdminCodPage() {
@@ -114,7 +115,7 @@ export default function AdminCodPage() {
                   <td className="p-3 uppercase">{r.carrier}</td>
                   <td className="p-3">{r.order?.order_number ?? r.order_number ?? r.order_id}</td>
                   <td className="p-3 text-right">{fmtVnd(r.cod_amount_vnd)}</td>
-                  <td className="p-3">{fmtDate(r.cod_collected_at)}</td>
+                  <td className="p-3">{fmtDateTime(r.cod_collected_at)}</td>
                 </tr>
               ))}
               {rows.length === 0 && (
@@ -204,7 +205,7 @@ export default function AdminCodPage() {
                 <td className="p-3 text-right">{fmtVnd(s.received_amount_vnd)}</td>
                 <td className={`p-3 text-right ${diffCls(Number(s.difference_vnd))}`}>{fmtVnd(s.difference_vnd)}</td>
                 <td className="p-3">{s.note || '-'}</td>
-                <td className="p-3">{fmtDate(s.created_at)}</td>
+                <td className="p-3">{fmtDateTime(s.created_at)}</td>
               </tr>
             ))}
             {!history.isLoading && (history.data ?? []).length === 0 && (

@@ -30,14 +30,14 @@ export default function AdminDashboard() {
           subtitle="Last 7 days"
           value={stats?.sales.formatted || '$0'}
           delta={stats?.sales.delta || '0%'}
-          prev={`Previous 7days (${stats?.sales.formattedPrev || '$0'})`}
+          prev={`Previous 7 days (${stats?.sales.formattedPrev || '$0'})`}
         />
         <KpiCard
           title="Total Orders"
           subtitle="Last 7 days"
           value={stats?.orders.formatted || '0'}
           delta={stats?.orders.delta || '0%'}
-          prev={`Previous 7days (${stats?.orders.formattedPrev || '0'})`}
+          prev={`Previous 7 days (${stats?.orders.formattedPrev || '0'})`}
         />
         <KpiSplitCard
           title="Pending & Canceled"
@@ -57,8 +57,8 @@ export default function AdminDashboard() {
 
       <div className="bg-white rounded border">
         <div className="p-4 border-b">
-          <div className="font-semibold">Retention &amp; phễu chuyển đổi</div>
-          <div className="text-xs text-gray-400">30 ngày gần nhất (UTC)</div>
+          <div className="font-semibold">Retention &amp; conversion funnel</div>
+          <div className="text-xs text-gray-400">Last 30 days (UTC)</div>
         </div>
         {behaviorLoading ? (
           <div className="p-4 text-center text-gray-500 text-sm">Loading...</div>
@@ -67,53 +67,48 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 text-center text-sm">
               <div>
                 <div className="text-2xl font-semibold">{behavior?.visitors ?? 0}</div>
-                <div className="text-gray-500">Khách truy cập</div>
+                <div className="text-gray-500">Visitors</div>
               </div>
               <div>
                 <div className="text-2xl font-semibold">{behavior?.returningRate ?? 0}%</div>
-                <div className="text-gray-500">Khách quay lại</div>
+                <div className="text-gray-500">Returning visitors</div>
               </div>
               <div>
                 <div className="text-2xl font-semibold">
                   {behavior?.funnel.viewToCartRate ?? 0}%
                 </div>
-                <div className="text-gray-500">Xem → giỏ hàng</div>
+                <div className="text-gray-500">View → cart</div>
               </div>
               <div>
                 <div className="text-2xl font-semibold">
                   {behavior?.funnel.cartToOrderRate ?? 0}%
                 </div>
                 <div className="text-gray-500">
-                  Giỏ hàng → đơn hàng
-                  <div className="text-xs text-gray-400">chỉ khách đã đăng nhập</div>
+                  Cart → order
+                  <div className="text-xs text-gray-400">signed-in users only</div>
                 </div>
               </div>
             </div>
             {/* Doc thang tu response de UI khong bao gio lech so voi cach query thuc su chay. */}
-            <div className="px-4 pb-4 space-y-1 text-xs text-gray-400">
-              {behavior && (
-                <>
+            {behavior && (
+              <details className="px-4 pb-4 text-xs text-gray-500">
+                <summary className="cursor-pointer select-none">How these numbers are calculated</summary>
+                <div className="mt-2 space-y-1 text-gray-400">
                   <div>{behavior.caveats.rollupLag}</div>
                   <div>{behavior.caveats.anonymousExcluded}</div>
                   <div>{behavior.caveats.identityNote}</div>
-                </>
-              )}
-            </div>
+                </div>
+              </details>
+            )}
           </>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <div className="lg:col-span-2 bg-white rounded border">
           <div className="p-4 flex items-center justify-between border-b">
-            <div className="font-semibold">Report for this week</div>
-            <div className="flex items-center gap-2 text-sm">
-              <button className="px-2 py-1 rounded border bg-green-50 text-green-700">
-                This week
-              </button>
-              <button className="px-2 py-1 rounded border">Last week</button>
-              <button className="p-2 rounded border">⋮</button>
-            </div>
+            <div className="font-semibold">Store overview</div>
+            <div className="text-xs text-gray-400">All time</div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 p-4 text-center text-sm">
             <div>
@@ -137,13 +132,12 @@ export default function AdminDashboard() {
               <div className="text-gray-500">Revenue</div>
             </div>
           </div>
-          <ChartPlaceholder />
         </div>
         <div className="bg-white rounded border">
           <div className="p-4 flex items-center justify-between border-b">
             <div className="font-semibold">Top Products</div>
             <Link to="/admin/products" className="text-sm text-blue-600">
-              All product
+              All products
             </Link>
           </div>
           <div className="p-4">
@@ -207,7 +201,9 @@ function KpiCard({
       </div>
       <div className="mt-1 text-xs text-blue-600">{prev}</div>
       <div className="mt-3 text-right">
-        <button className="px-3 py-1.5 text-xs border rounded">Details</button>
+        <Link to="/admin/orders" className="inline-block px-3 py-1.5 text-xs border rounded hover:bg-gray-50">
+          View orders
+        </Link>
       </div>
     </div>
   )
@@ -246,36 +242,10 @@ function KpiSplitCard({
         ))}
       </div>
       <div className="mt-3 text-right">
-        <button className="px-3 py-1.5 text-xs border rounded">Details</button>
+        <Link to="/admin/orders" className="inline-block px-3 py-1.5 text-xs border rounded hover:bg-gray-50">
+          View orders
+        </Link>
       </div>
     </div>
   )
 }
-
-function ChartPlaceholder() {
-  return (
-    <div className="p-4">
-      <div className="h-48 rounded bg-gradient-to-b from-green-100 to-white border flex items-end">
-        <div className="w-full h-full">
-          <svg
-            viewBox="0 0 400 150"
-            className="w-full h-full"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M0 120 C40 80, 80 100, 120 70 C160 40, 200 90, 240 70 C280 50, 320 90, 360 80 L400 150 L0 150 Z"
-              fill="#bbf7d0"
-            />
-            <path
-              d="M0 120 C40 80, 80 100, 120 70 C160 40, 200 90, 240 70 C280 50, 320 90, 360 80"
-              fill="none"
-              stroke="#16a34a"
-              strokeWidth="2"
-            />
-          </svg>
-        </div>
-      </div>
-    </div>
-  )
-}
-

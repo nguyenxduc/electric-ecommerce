@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { downloadTaxCsv, errMsg, fetchInvoices, fetchTaxReport, openInvoiceHtml } from '../../services/opsService'
+import { fmtDate } from '../../utils/date'
 
 const num = (n: any) => Number(n ?? 0).toLocaleString('en-US')
 const inp = 'border rounded px-3 py-2 text-sm'
@@ -153,7 +154,7 @@ export default function AdminTaxPage() {
                   <td className="p-3">{inv.buyer?.company_name || inv.buyer?.name}</td>
                   <td className="p-3 text-right">{num(inv.total)}</td>
                   <td className="p-3">{inv.status}</td>
-                  <td className="p-3">{new Date(inv.issued_at).toLocaleDateString()}</td>
+                  <td className="p-3">{fmtDate(inv.issued_at)}</td>
                   <td className="p-3">
                     <button
                       onClick={() => run(() => openInvoiceHtml(inv.id), 'Failed to open invoice')}

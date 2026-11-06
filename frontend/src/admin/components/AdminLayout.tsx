@@ -40,76 +40,59 @@ type NavSection = { title?: string; items: NavItem[] }
 
 const sections: NavSection[] = [
   {
-    title: 'Main menu',
+    items: [{ to: '/admin', label: 'Dashboard', icon: Home, end: true }]
+  },
+  {
+    title: 'Sales',
     items: [
-      { to: '/admin', label: 'Dashboard', icon: Home, end: true },
+      { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
       { to: '/admin/shops', label: 'Shops', icon: Store, end: true },
-      { to: '/admin/orders', label: 'Order Management', icon: ShoppingCart },
       { to: '/admin/customers', label: 'Customers', icon: Users },
-      { to: '/admin/coupons', label: 'Coupon Code', icon: TicketPercent },
-      { to: '/admin/categories', label: 'Categories', icon: Layers },
-      {
-        to: '/admin/filters',
-        label: 'Filter Options',
-        icon: Filter,
-        end: true
-      },
-      {
-        to: '/admin/filter-keys',
-        label: 'Filter Keys',
-        icon: Filter,
-        end: true
-      },
-      {
-        to: '/admin/chat',
-        label: 'Customer Chat',
-        icon: MessageCircle,
-        end: true
-      },
-      {
-        to: '/admin/notifications',
-        label: 'Notifications',
-        icon: Bell,
-        end: true
-      },
-      {
-        to: '/admin/audit-logs',
-        label: 'Audit Log',
-        icon: ScrollText,
-        end: true
-      },
-      {
-        to: '/admin/ai-feedback',
-        label: 'AI Feedback',
-        icon: Bot,
-        end: true
-      },
-      {
-        to: '/admin/health',
-        label: 'System Health',
-        icon: Activity,
-        end: true
-      },
-      { to: '/admin/cod', label: 'COD Reconciliation', icon: Banknote, end: true },
-      { to: '/admin/fraud', label: 'Fraud Flags', icon: ShieldAlert, end: true },
-      { to: '/admin/tax', label: 'Tax & Invoices', icon: Receipt, end: true },
-      { to: '/admin/settings', label: 'Settings', icon: Settings2, end: true }
+      { to: '/admin/coupons', label: 'Coupons', icon: TicketPercent }
     ]
   },
   {
-    title: 'Product',
+    title: 'Catalog',
     items: [
-      { to: '/admin/products/new', label: 'Add Products', icon: PlusCircle },
-
-      { to: '/admin/products', label: 'Product List', icon: List, end: true }
-      // {
-      //   to: '/admin/product-reviews',
-      //   label: 'Product Reviews',
-      //   icon: MessageSquare
-      // }
+      { to: '/admin/products', label: 'Products', icon: List },
+      { to: '/admin/products/new', label: 'Add Product', icon: PlusCircle },
+      { to: '/admin/categories', label: 'Categories', icon: Layers },
+      { to: '/admin/filters', label: 'Filter Options', icon: Filter },
+      { to: '/admin/filter-keys', label: 'Filter Keys', icon: Filter }
+    ]
+  },
+  {
+    title: 'Operations',
+    items: [
+      { to: '/admin/cod', label: 'COD Reconciliation', icon: Banknote, end: true },
+      { to: '/admin/fraud', label: 'Fraud Flags', icon: ShieldAlert, end: true },
+      { to: '/admin/tax', label: 'Tax & Invoices', icon: Receipt, end: true }
+    ]
+  },
+  {
+    title: 'Support',
+    items: [
+      { to: '/admin/chat', label: 'Customer Chat', icon: MessageCircle, end: true },
+      { to: '/admin/notifications', label: 'Notifications', icon: Bell, end: true },
+      { to: '/admin/ai-feedback', label: 'AI Feedback', icon: Bot, end: true }
+    ]
+  },
+  {
+    title: 'System',
+    items: [
+      { to: '/admin/audit-logs', label: 'Audit Log', icon: ScrollText, end: true },
+      { to: '/admin/health', label: 'System Health', icon: Activity, end: true },
+      { to: '/admin/settings', label: 'Settings', icon: Settings2, end: true }
     ]
   }
 ]
+
+const NAV_ITEMS = sections.flatMap(s => s.items)
+// Tieu de header = muc menu khop dai nhat voi URL (vd. /admin/products/12 -> Products)
+const pageTitle = (pathname: string) =>
+  NAV_ITEMS.filter(i => pathname === i.to || pathname.startsWith(i.to + '/')).sort(
+    (a, b) => b.to.length - a.to.length
+  )[0]?.label ?? 'Admin'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
@@ -166,7 +149,10 @@ export default function AdminLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <h1 className="truncate text-base md:text-lg font-semibold text-gray-800">Admin Panel</h1>
+          <div className="truncate text-base md:text-lg font-semibold text-gray-800">
+            <span className="hidden sm:inline text-gray-400 font-normal">Admin / </span>
+            {pageTitle(pathname)}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -196,7 +182,7 @@ export default function AdminLayout() {
       )}
       <aside
         id="side-nav"
-        className={`${navOpen ? 'fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto shadow-xl' : 'hidden'} md:static md:block md:row-span-2 md:row-start-1 border-r bg-white`}
+        className={`${navOpen ? 'fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto shadow-xl' : 'hidden'} md:sticky md:top-0 md:block md:h-screen md:self-start md:overflow-y-auto md:row-span-2 md:row-start-1 border-r bg-white`}
       >
         <div className="h-14 flex items-center px-4 font-semibold border-b">
           <Store className="w-5 h-5 mr-2" />

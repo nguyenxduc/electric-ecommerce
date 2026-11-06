@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { errMsg, fetchFraudFlags, fetchFraudStats, resolveFraudFlag } from '../../services/opsService'
+import { fmtDateTime } from '../../utils/date'
 
 const TYPES = ['COUPON_ABUSE', 'ORDER_RISK', 'SELF_DEALING', 'REVIEW_SUSPECT', 'SHIPPER_SUSPECT']
 const STATUSES = ['open', 'confirmed', 'dismissed']
@@ -189,7 +190,7 @@ export default function AdminFraudPage() {
                   <td className="p-3">
                     <Subject f={f} />
                   </td>
-                  <td className="p-3">{new Date(f.created_at).toLocaleString()}</td>
+                  <td className="p-3">{fmtDateTime(f.created_at)}</td>
                   <td className="p-3">
                     <span className={`px-2 py-0.5 text-xs rounded ${STATUS_CLS[f.status] ?? ''}`}>{f.status}</span>
                   </td>
