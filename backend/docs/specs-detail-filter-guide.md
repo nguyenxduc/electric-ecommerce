@@ -80,13 +80,13 @@ specs_detail.forEach((category) => {
 
 ```bash
 cd backend
-node test-specs-sync.js --create-samples
+node scripts/test-specs-sync.js --create-samples
 ```
 
 ### 2. Test Sync Function
 
 ```bash
-node test-specs-sync.js --test
+node scripts/test-specs-sync.js --test
 ```
 
 ### 3. Manual API Test

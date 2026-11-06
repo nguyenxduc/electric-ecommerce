@@ -8,7 +8,10 @@ import {
 } from "../controllers/cart.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Specified routes
 router.get("/", protectRoute, getCartProducts);

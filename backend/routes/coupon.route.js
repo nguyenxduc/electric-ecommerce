@@ -1,5 +1,9 @@
 import express from "express";
-import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
+import {
+  protectRoute,
+  adminRoute,
+  sellerRoute,
+} from "../middleware/auth.middleware.js";
 import {
   validateCoupon,
   validateMyCoupon,
@@ -9,14 +13,29 @@ import {
   getCouponById,
   updateCoupon,
   deleteCoupon,
+  getShopCoupons,
+  getMyShopCoupons,
+  createShopCoupon,
+  deleteShopCoupon,
 } from "../controllers/coupon.controller.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Public routes
 router.post("/validate", validateCoupon);
 router.post("/validate-my", protectRoute, validateMyCoupon);
 router.get("/my", protectRoute, getMyCoupons);
+
+// Seller shop vouchers (fixed paths before /shop/:slug)
+router.get("/shop/mine/list", protectRoute, sellerRoute, getMyShopCoupons);
+router.post("/shop", protectRoute, sellerRoute, createShopCoupon);
+router.delete("/shop/:id", protectRoute, sellerRoute, deleteShopCoupon);
+
+// Public: a shop's collectible vouchers
+router.get("/shop/:slug", getShopCoupons);
 
 // Admin routes
 router.get("/", protectRoute, adminRoute, getAllCoupons);

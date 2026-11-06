@@ -15,7 +15,10 @@ import {
 } from "../controllers/filter.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 // Public routes
 router.get("/", getFilterMetadata);

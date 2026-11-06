@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Skill(fewer-permission-prompts)",
+      "Skill(fewer-permission-prompts:*)",
+      "Bash(ls -la \"C:/Users/Lecoo/.claude/projects/\" 2>/dev/null | head -30)",
+      "Read(//c/Users/Lecoo/.claude/projects/**)",
+      "Bash(awk '{print $2}')",
+      "Bash(node -e ' *)"
+    ]
+  }
+}

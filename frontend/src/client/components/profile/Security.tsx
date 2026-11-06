@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react'
 import { useChangePassword } from '../../hooks/useAuth'
 import { toast } from 'sonner'
+import PhoneVerification from './PhoneVerification'
 
 const Security = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
@@ -49,6 +50,9 @@ const Security = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
+      <div className="mb-8">
+        <PhoneVerification />
+      </div>
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
           Security & Access

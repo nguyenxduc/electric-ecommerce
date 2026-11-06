@@ -52,7 +52,7 @@ const getMetricWinners = (products: Product[], pick: MetricPick): number[] => {
       case 'highestSold':
         return { id: product.id, value: Number(product.sold) || 0 }
       case 'highestDiscount':
-        return { id: product.id, value: Number(product.discount) || 0 }
+        return { id: product.id, value: Number(product.discount_percentage) || 0 }
       default:
         return { id: product.id, value: 0 }
     }
@@ -317,8 +317,8 @@ const CompareContent = ({ products, comparison, onBack }: CompareContentProps) =
                             : 'text-gray-900'
                         }`}
                       >
-                        {Number(product.discount) > 0
-                          ? `${product.discount}%`
+                        {Number(product.discount_percentage) > 0
+                          ? `${product.discount_percentage}%`
                           : '—'}
                       </dd>
                     </div>

@@ -77,6 +77,7 @@ export default function AdminProductsList() {
                 <th className="text-left p-2">Image</th>
                 <th className="text-left p-2">ID</th>
                 <th className="text-left p-2">Name</th>
+                <th className="text-left p-2">Shop</th>
                 <th className="text-left p-2">Price</th>
                 <th className="text-left p-2">Stock</th>
                 <th className="text-left p-2">Actions</th>
@@ -97,6 +98,7 @@ export default function AdminProductsList() {
                   </td>
                   <td className="p-2">{p.id}</td>
                   <td className="p-2">{p.name}</td>
+                  <td className="p-2">{(p as any).shop?.name || '—'}</td>
                   <td className="p-2">${p.price}</td>
                   <td className="p-2">
                     {Array.isArray(p.available_colors) &&

@@ -2,12 +2,20 @@ import { useState, useEffect } from 'react';
 
 import { ChevronDown } from 'lucide-react'
 
-const SortDropdown = ({ options, selected, onSelect }) => {
+type SortOption = { value: string; label: string }
+
+type SortDropdownProps = {
+  options: SortOption[]
+  selected: string
+  onSelect: (value: string) => void
+}
+
+const SortDropdown = ({ options, selected, onSelect }: SortDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      const dropdown = event.target.closest('.sort-dropdown');
+    const handleClickOutside = (event: MouseEvent) => {
+      const dropdown = (event.target as Element | null)?.closest('.sort-dropdown');
       if (!dropdown) {
         setIsOpen(false);
       }

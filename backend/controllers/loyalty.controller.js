@@ -1,374 +1,208 @@
+// Bo chuyen doi HTTP cho chuong trinh khach hang than thiet.
+// Moi quy tac nghiep vu nam o services/loyalty.service.js.
+
 import { prisma } from "../lib/db.js";
+import {
+  TIERS,
+  getTierByPoints,
+  POINTS_PER_UNIT,
+  UNIT_AMOUNT,
+  MIN_REDEEM_POINTS,
+  REDEEM_POINTS_PER_DOLLAR,
+} from "../services/loyalty.service.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
 
-// Earn rule: POINTS_PER_UNIT per UNIT_AMOUNT spent (USD, same as order totals)
-const POINTS_PER_UNIT = Number(process.env.LOYALTY_POINTS_PER_UNIT || 1);
-const UNIT_AMOUNT = Number(process.env.LOYALTY_UNIT_AMOUNT || 100); // đơn vị tiền (cùng currency với order.total_amount)
-const MIN_REDEEM_POINTS = Number(process.env.LOYALTY_MIN_REDEEM_POINTS || 100);
+export const getLoyaltySummary = asyncHandler(async (req, res) => {
+  const userId = BigInt(req.user.id);
 
-export const TIERS = [
-  {
-    key: "BRONZE",
-    label: "Bronze",
-    min: 0,
-    max: 499,
-    multiplier: 1,
-    benefits: ["Tich diem co ban", "Uu dai sinh nhat nhe"],
-  },
-  {
-    key: "SILVER",
-    label: "Silver",
-    min: 500,
-    max: 1999,
-    multiplier: 1.1,
-    benefits: ["Nhanh diem +10%", "Uu tien CSKH", "Voucher theo mua"],
-  },
-  {
-    key: "GOLD",
-    label: "Gold",
-    min: 2000,
-    max: 4999,
-    multiplier: 1.25,
-    benefits: ["Nhanh diem +25%", "Voucher gia tri cao", "Uu tien giao hang"],
-  },
-  {
-    key: "PLATINUM",
-    label: "Platinum",
-    min: 5000,
-    max: Infinity,
-    multiplier: 1.5,
-    benefits: ["Nhanh diem +50%", "CSKH uu tien cao nhat", "Qua tang doc quyen"],
-  },
-];
-
-export const getTierByPoints = (points) =>
-  TIERS.find((tier) => points >= tier.min && points <= tier.max) || TIERS[0];
-
-const getTierIndex = (tierKey) => TIERS.findIndex((tier) => tier.key === tierKey);
-
-/** Min order uses same currency as catalog/checkout (USD in seed). */
-export const UPGRADE_VOUCHERS = {
-  SILVER: { discount_type: "percent", discount_value: 5, min_order: 300, expires_in_days: 30 },
-  GOLD: { discount_type: "percent", discount_value: 10, min_order: 500, expires_in_days: 45 },
-  PLATINUM: { discount_type: "percent", discount_value: 15, min_order: 700, expires_in_days: 60 },
-};
-
-export const grantUpgradeVouchers = async (tx, userIdBigInt, fromTierKey, toTierKey) => {
-  const fromIdx = Math.max(0, getTierIndex(fromTierKey));
-  const toIdx = getTierIndex(toTierKey);
-  if (toIdx <= fromIdx) return [];
-
-  const granted = [];
-  const userIdText = userIdBigInt.toString();
-
-  for (let idx = fromIdx + 1; idx <= toIdx; idx += 1) {
-    const tier = TIERS[idx];
-    const rewardCfg = UPGRADE_VOUCHERS[tier.key];
-    if (!rewardCfg) continue;
-
-    const code = `UP-${tier.key}-U${userIdText}`;
-    const existingCoupon = await tx.coupon.findFirst({
-      where: { code, deleted_at: null },
-      select: { id: true },
-    });
-
-    let couponId = existingCoupon?.id;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + rewardCfg.expires_in_days);
-
-    if (!couponId) {
-      const created = await tx.coupon.create({
-        data: {
-          code,
-          description: `Tier upgrade reward - ${tier.label}`,
-          discount_type: rewardCfg.discount_type,
-          discount_value: rewardCfg.discount_value,
-          min_order: rewardCfg.min_order,
-          usage_limit: 1,
-          expires_at: expiresAt,
-        },
-      });
-      couponId = created.id;
-    } else {
-      await tx.coupon.update({
-        where: { id: couponId },
-        data: {
-          discount_type: rewardCfg.discount_type,
-          discount_value: rewardCfg.discount_value,
-          min_order: rewardCfg.min_order,
-          expires_at: expiresAt,
-        },
-      });
-    }
-
-    await tx.user.update({
-      where: { id: userIdBigInt },
-      data: {
+  const [user, transactions] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        loyalty_points: true,
+        segment: true,
         coupons: {
-          connect: { id: couponId },
-        },
-      },
-    });
-
-    granted.push({
-      tier: tier.key,
-      code,
-      discount_type: rewardCfg.discount_type,
-      discount_value: rewardCfg.discount_value,
-    });
-  }
-
-  return granted;
-};
-
-export const getLoyaltySummary = async (req, res) => {
-  try {
-    const userId = BigInt(req.user.id);
-
-    const [user, transactions] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          name: true,
-          loyalty_points: true,
-          segment: true,
-          coupons: {
-            where: {
-              description: { contains: "Tier upgrade reward", mode: "insensitive" },
-              deleted_at: null,
-            },
-            orderBy: { created_at: "desc" },
-            select: {
-              id: true,
-              code: true,
-              description: true,
-              discount_type: true,
-              discount_value: true,
-              min_order: true,
-              expires_at: true,
-              created_at: true,
-            },
-            take: 10,
+          where: {
+            description: { contains: "Tier upgrade reward", mode: "insensitive" },
+            deleted_at: null,
           },
+          orderBy: { created_at: "desc" },
+          select: {
+            id: true,
+            code: true,
+            description: true,
+            discount_type: true,
+            discount_value: true,
+            min_order: true,
+            expires_at: true,
+            created_at: true,
+          },
+          take: 10,
         },
-      }),
-      prisma.loyaltyPointTransaction.findMany({
-        where: { user_id: userId },
-        orderBy: { created_at: "desc" },
-        take: 50,
-      }),
-    ]);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: "User not found",
-      });
-    }
-
-    const points = user.loyalty_points || 0;
-    // Tier is determined by stored segment (set only when earning points, never decremented on redeem)
-    // Fall back to points-based calculation only if segment hasn't been set yet
-    const tierFromSegment = user.segment ? TIERS.find(t => t.key === user.segment) : null;
-    const tier = tierFromSegment || getTierByPoints(points);
-
-    return res.json({
-      success: true,
-      data: {
-        user: {
-          id: user.id.toString(),
-          name: user.name,
-          loyalty_points: points,
-          segment: tier.key,
-        },
-        tier: {
-          key: tier.key,
-          label: tier.label,
-          min: tier.min,
-          max: tier.max,
-          multiplier: tier.multiplier,
-          benefits: tier.benefits,
-        },
-        point_policy: {
-          unit_amount: UNIT_AMOUNT,
-          points_per_unit: POINTS_PER_UNIT,
-          min_redeem_points: MIN_REDEEM_POINTS,
-        },
-        reward_vouchers: user.coupons.map((c) => ({
-          ...c,
-          id: c.id?.toString?.() ?? c.id,
-        })),
-        transactions: transactions.map((t) => ({
-          ...t,
-          id: t.id?.toString?.() ?? t.id,
-          user_id: t.user_id?.toString?.() ?? t.user_id,
-          order_id: t.order_id?.toString?.() ?? t.order_id,
-        })),
       },
-    });
-  } catch (error) {
-    console.error("getLoyaltySummary error:", error);
-    return res.status(500).json({
+    }),
+    prisma.loyaltyPointTransaction.findMany({
+      where: { user_id: userId },
+      orderBy: { created_at: "desc" },
+      take: 50,
+    }),
+  ]);
+
+  if (!user) {
+    return res.status(404).json({
       success: false,
-      error: "Không thể tải thông tin tích điểm",
+      error: "User not found",
     });
   }
-};
+
+  const points = user.loyalty_points || 0;
+  // Tier is determined by stored segment (set only when earning points, never decremented on redeem)
+  // Fall back to points-based calculation only if segment hasn't been set yet
+  const tierFromSegment = user.segment ? TIERS.find(t => t.key === user.segment) : null;
+  const tier = tierFromSegment || getTierByPoints(points);
+
+  return res.json({
+    success: true,
+    data: {
+      user: {
+        id: user.id.toString(),
+        name: user.name,
+        loyalty_points: points,
+        segment: tier.key,
+      },
+      tier: {
+        key: tier.key,
+        label: tier.label,
+        min: tier.min,
+        max: tier.max,
+        multiplier: tier.multiplier,
+        benefits: tier.benefits,
+      },
+      point_policy: {
+        unit_amount: UNIT_AMOUNT,
+        points_per_unit: POINTS_PER_UNIT,
+        min_redeem_points: MIN_REDEEM_POINTS,
+      },
+      reward_vouchers: user.coupons.map((c) => ({
+        ...c,
+        id: c.id?.toString?.() ?? c.id,
+      })),
+      transactions: transactions.map((t) => ({
+        ...t,
+        id: t.id?.toString?.() ?? t.id,
+        user_id: t.user_id?.toString?.() ?? t.user_id,
+        order_id: t.order_id?.toString?.() ?? t.order_id,
+      })),
+    },
+  });
+});
 
 // Tỉ lệ quy đổi: REDEEM_POINTS_PER_DOLLAR điểm = $1 giảm giá
-const REDEEM_POINTS_PER_DOLLAR = Number(process.env.LOYALTY_REDEEM_POINTS_PER_DOLLAR || 100);
+export const redeemPoints = asyncHandler(async (req, res) => {
+  const userId = BigInt(req.user.id);
+  const { points: rawPoints } = req.body || {};
+  const points = Number.parseInt(rawPoints, 10);
 
-// Đổi điểm lấy voucher giảm giá
-export const redeemPoints = async (req, res) => {
-  try {
-    const userId = BigInt(req.user.id);
-    const { points: rawPoints } = req.body || {};
-    const points = Number.parseInt(rawPoints, 10);
-
-    if (!Number.isInteger(points) || points <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: "Số điểm phải lớn hơn 0",
-      });
-    }
-    if (points < MIN_REDEEM_POINTS) {
-      return res.status(400).json({
-        success: false,
-        error: `Minimum redeem is ${MIN_REDEEM_POINTS} points`,
-      });
-    }
-    if (points % REDEEM_POINTS_PER_DOLLAR !== 0) {
-      return res.status(400).json({
-        success: false,
-        error: `Points must be a multiple of ${REDEEM_POINTS_PER_DOLLAR}`,
-      });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, loyalty_points: true },
-    });
-
-    if (!user) {
-      return res.status(404).json({ success: false, error: "User not found" });
-    }
-
-    if (user.loyalty_points < points) {
-      return res.status(400).json({
-        success: false,
-        error: "Điểm không đủ để đổi quà",
-      });
-    }
-
-    const discountValue = Math.floor(points / REDEEM_POINTS_PER_DOLLAR);
-    if (discountValue <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: `Cần ít nhất ${REDEEM_POINTS_PER_DOLLAR} điểm để đổi $1 giảm giá`,
-      });
-    }
-
-    const userIdText = userId.toString();
-    const timestamp = Date.now();
-    const couponCode = `RD-${userIdText}-${timestamp}`;
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
-
-    const result = await prisma.$transaction(async (tx) => {
-      const coupon = await tx.coupon.create({
-        data: {
-          code: couponCode,
-          description: `Redeemed ${points} pts — $${discountValue} off`,
-          discount_type: "fixed",
-          discount_value: discountValue,
-          min_order: 0,
-          usage_limit: 1,
-          expires_at: expiresAt,
-        },
-      });
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { coupons: { connect: { id: coupon.id } } },
-      });
-
-      await tx.loyaltyPointTransaction.create({
-        data: {
-          user_id: userId,
-          points: -points,
-          type: "REDEEM",
-          description: `Redeemed ${points} pts for voucher ${couponCode} ($${discountValue} off)`,
-        },
-      });
-
-      // Tier is based on lifetime earned points, not current balance — do NOT downgrade on redeem
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: { loyalty_points: { decrement: points } },
-      });
-
-      return { updatedUser, coupon };
-    });
-
-    return res.json({
-      success: true,
-      message: `Points redeemed! A $${discountValue} off voucher has been added to your warehouse.`,
-      data: {
-        loyalty_points: result.updatedUser.loyalty_points,
-        voucher: {
-          code: couponCode,
-          discount_value: discountValue,
-          discount_type: "fixed",
-          expires_at: expiresAt,
-        },
-      },
-    });
-  } catch (error) {
-    console.error("redeemPoints error:", error);
-    return res.status(500).json({
+  if (!Number.isInteger(points) || points <= 0) {
+    return res.status(400).json({
       success: false,
-      error: "Không thể đổi điểm",
+      error: "Số điểm phải lớn hơn 0",
     });
   }
-};
+  if (points < MIN_REDEEM_POINTS) {
+    return res.status(400).json({
+      success: false,
+      error: `Minimum redeem is ${MIN_REDEEM_POINTS} points`,
+    });
+  }
+  if (points % REDEEM_POINTS_PER_DOLLAR !== 0) {
+    return res.status(400).json({
+      success: false,
+      error: `Points must be a multiple of ${REDEEM_POINTS_PER_DOLLAR}`,
+    });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, loyalty_points: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ success: false, error: "User not found" });
+  }
+
+  if (user.loyalty_points < points) {
+    return res.status(400).json({
+      success: false,
+      error: "Điểm không đủ để đổi quà",
+    });
+  }
+
+  const discountValue = Math.floor(points / REDEEM_POINTS_PER_DOLLAR);
+  if (discountValue <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: `Cần ít nhất ${REDEEM_POINTS_PER_DOLLAR} điểm để đổi $1 giảm giá`,
+    });
+  }
+
+  const userIdText = userId.toString();
+  const timestamp = Date.now();
+  const couponCode = `RD-${userIdText}-${timestamp}`;
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const coupon = await tx.coupon.create({
+      data: {
+        code: couponCode,
+        description: `Redeemed ${points} pts — $${discountValue} off`,
+        discount_type: "fixed",
+        discount_value: discountValue,
+        min_order: 0,
+        usage_limit: 1,
+        expires_at: expiresAt,
+      },
+    });
+
+    await tx.user.update({
+      where: { id: userId },
+      data: { coupons: { connect: { id: coupon.id } } },
+    });
+
+    await tx.loyaltyPointTransaction.create({
+      data: {
+        user_id: userId,
+        points: -points,
+        type: "REDEEM",
+        description: `Redeemed ${points} pts for voucher ${couponCode} ($${discountValue} off)`,
+      },
+    });
+
+    // Tier is based on lifetime earned points, not current balance — do NOT downgrade on redeem
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: { loyalty_points: { decrement: points } },
+    });
+
+    return { updatedUser, coupon };
+  });
+
+  return res.json({
+    success: true,
+    message: `Points redeemed! A $${discountValue} off voucher has been added to your warehouse.`,
+    data: {
+      loyalty_points: result.updatedUser.loyalty_points,
+      voucher: {
+        code: couponCode,
+        discount_value: discountValue,
+        discount_type: "fixed",
+        expires_at: expiresAt,
+      },
+    },
+  });
+});
 
 // Hàm dùng nội bộ: cộng điểm khi đơn hàng hoàn tất
-export const earnPointsForOrder = async (tx, userIdBigInt, orderIdBigInt, amountDecimal) => {
-  const amount = Number(amountDecimal || 0);
-  if (amount <= 0 || !UNIT_AMOUNT || !POINTS_PER_UNIT) return;
-
-  const user = await tx.user.findUnique({
-    where: { id: userIdBigInt },
-    select: { loyalty_points: true },
-  });
-  if (!user) return;
-
-  const currentPoints = user.loyalty_points || 0;
-  const currentTier = getTierByPoints(currentPoints);
-  const basePoints = Math.floor((amount / UNIT_AMOUNT) * POINTS_PER_UNIT);
-  const points = Math.floor(basePoints * currentTier.multiplier);
-  if (points <= 0) return;
-
-  const nextPoints = currentPoints + points;
-  const nextTier = getTierByPoints(nextPoints);
-  await grantUpgradeVouchers(tx, userIdBigInt, currentTier.key, nextTier.key);
-
-  await tx.loyaltyPointTransaction.create({
-    data: {
-      user_id: userIdBigInt,
-      order_id: orderIdBigInt,
-      points,
-      type: "EARN",
-      description: `Earn points from order (${currentTier.label} x${currentTier.multiplier})`,
-    },
-  });
-
-  await tx.user.update({
-    where: { id: userIdBigInt },
-    data: {
-      loyalty_points: { increment: points },
-      segment: nextTier.key,
-    },
-  });
-};
-

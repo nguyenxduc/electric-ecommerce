@@ -45,6 +45,17 @@ export type DashboardStats = {
     total: number
     formatted: string
   }
+  // Present on the seller (shop-scoped) stats only
+  commission?: {
+    rate: number
+    ratePercent: string
+    fee: number
+    netRevenue: number
+    formatted: {
+      fee: string
+      netRevenue: string
+    }
+  }
 }
 
 export type TopProduct = {
@@ -57,6 +68,31 @@ export type TopProduct = {
   image: string | null
 }
 
+export type BehaviorAnalytics = {
+  window: {
+    days: number
+    since: string
+    until: string
+  }
+  visitors: number
+  returning: number
+  returningRate: number
+  funnel: {
+    viewers: number
+    carters: number
+    loggedInCarters: number
+    buyers: number
+    viewToCartRate: number
+    cartToOrderRate: number
+  }
+  caveats: {
+    timezone: string
+    rollupLag: string
+    anonymousExcluded: string
+    identityNote: string
+  }
+}
+
 export type DashboardStatsResponse = {
   success: boolean
   data: DashboardStats
@@ -67,6 +103,11 @@ export type TopProductsResponse = {
   data: TopProduct[]
 }
 
+export type BehaviorAnalyticsResponse = {
+  success: boolean
+  data: BehaviorAnalytics
+}
+
 export const getDashboardStats = async (): Promise<DashboardStatsResponse> => {
   const { data } = await axiosClient.get<DashboardStatsResponse>('/dashboard/stats')
   return data
@@ -74,6 +115,26 @@ export const getDashboardStats = async (): Promise<DashboardStatsResponse> => {
 
 export const getTopProducts = async (limit?: number): Promise<TopProductsResponse> => {
   const { data } = await axiosClient.get<TopProductsResponse>('/dashboard/top-products', {
+    params: { limit }
+  })
+  return data
+}
+
+export const getBehaviorAnalytics = async (days?: number): Promise<BehaviorAnalyticsResponse> => {
+  const { data } = await axiosClient.get<BehaviorAnalyticsResponse>('/dashboard/behavior', {
+    params: { days }
+  })
+  return data
+}
+
+// Seller dashboard variants (scoped to the caller's own shop)
+export const getShopDashboardStats = async (): Promise<DashboardStatsResponse> => {
+  const { data } = await axiosClient.get<DashboardStatsResponse>('/dashboard/shop/stats')
+  return data
+}
+
+export const getShopTopProducts = async (limit?: number): Promise<TopProductsResponse> => {
+  const { data } = await axiosClient.get<TopProductsResponse>('/dashboard/shop/top-products', {
     params: { limit }
   })
   return data

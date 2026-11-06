@@ -25,12 +25,18 @@ if (AI_PROXY_URL) {
   setGlobalDispatcher(new ProxyAgent(AI_PROXY_URL));
 }
 
-const buildContent = (product) => {
-  const specs = Array.isArray(product.specs_detail)
+// specs_detail la danh sach NHOM [{ category, items: [{ label, value }] }].
+// Truoc day doc no nhu mang phang {label, value} nen moi san pham chi ra
+// "Specs: : "" | : """: vector khong biet RTX 4060 hay chip M3 nam o may nao,
+// va chatbot cung khong thay thong so trong ngu canh. Van nhan dang phang cu.
+export const buildContent = (product) => {
+  const groups = Array.isArray(product.specs_detail)
     ? product.specs_detail
     : [];
-  const specsText = specs
-    .map((spec) => `${spec.label ?? ""}: ${JSON.stringify(spec.value ?? "")}`)
+  const specsText = groups
+    .flatMap((g) => (Array.isArray(g?.items) ? g.items : [g]))
+    .filter((s) => s?.label && s?.value != null && s.value !== "")
+    .map((s) => `${s.label}: ${s.value}`)
     .join(" | ");
   const price = product.price ? product.price.toString() : "";
   return `Name: ${product.name} | Price: ${price} | Specs: ${specsText}`;

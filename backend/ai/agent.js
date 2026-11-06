@@ -10,29 +10,43 @@ import {
   GEMINI_API_KEY,
   GEMINI_CHAT_MODEL,
   hasGeminiApiKey,
+  incrementAiCallCounter,
 } from "./geminiConfig.js";
+import { pickConfidentSubset, retrieveHybrid } from "./retrieval.js";
+import {
+  normalizeText,
+  slugifyText,
+  tokenizeText,
+} from "../lib/vietnamese.js";
+import { calculateProductPrices } from "../lib/productQuery.js";
+import { createShoppingTools, MAX_TOOL_ROUNDS } from "./tools.js";
+import {
+  INPUT_REFUSAL,
+  buildGuardInstruction,
+  createContextNonce,
+  inspectModelOutput,
+  inspectUserInput,
+  neutralizeUntrustedText,
+  wrapUntrustedBlock,
+} from "./guard.js";
 
-const EMBED_MODEL =
-  process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
+const EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || "gemini-embedding-001";
 const EMBED_API_KEY = GEMINI_API_KEY;
-const SYSTEM_PROMPT = [
-  "Bạn là trợ lý mua sắm cho cửa hàng đồ điện tử. Trả lời ngắn gọn, rõ ràng, ưu tiên tiếng Việt.",
-  "Khi đề cập đến sản phẩm trong ngữ cảnh được cung cấp, hãy đưa đúng URL sản phẩm (dạng http://.../product/<slug>) ở một dòng riêng để hệ thống tự render thành card.",
-  "Không cần liệt kê URL ảnh hay lặp lại nhiều link ảnh — frontend sẽ tự lấy ảnh từ link sản phẩm.",
-  "Không bịa link, chỉ dùng đúng các URL trong ngữ cảnh. Nếu chưa đủ thông tin, hãy hỏi lại.",
-].join(" ");
+
 const PRODUCT_BASE_URL =
   process.env.FRONTEND_BASE_URL || "http://localhost:5173";
 
-const slugify = (str) =>
-  (str || "")
-    .toString()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-+/g, "-");
+const SYSTEM_PROMPT = [
+  "Bạn là trợ lý mua sắm cho sàn thương mại điện tử đa gian hàng (nhiều shop cùng bán đồ điện tử). Trả lời ngắn gọn, rõ ràng, ưu tiên tiếng Việt.",
+  "Khối dữ liệu sản phẩm bên dưới đã kèm giá và tồn kho đọc trực tiếp từ cơ sở dữ liệu ngay trước câu hỏi này. Hãy dùng đúng các con số đó, không làm tròn và không suy diễn.",
+  "Chỉ gọi công cụ khi khối dữ liệu không có thứ cần: tồn kho theo từng màu (check_stock), phí vận chuyển của gian hàng (get_shop_policy), hoặc sản phẩm không nằm trong danh sách (lookup_product).",
+  "Tuyệt đối không nói giá, tồn kho hay phí vận chuyển từ trí nhớ.",
+  "Khi ngữ cảnh có tên gian hàng bán sản phẩm, hãy nhắc đến gian hàng đó (ví dụ: 'bán bởi Tech World').",
+  "Khi đề cập đến sản phẩm, hãy đưa đúng URL sản phẩm ở một dòng riêng để hệ thống tự render thành card.",
+  "Không bịa link, chỉ dùng đúng các URL do công cụ hoặc ngữ cảnh cung cấp. Nếu chưa đủ thông tin, hãy hỏi lại.",
+].join(" ");
+
+const slugify = (str) => slugifyText(str);
 
 const embeddings = EMBED_API_KEY
   ? new GoogleGenerativeAIEmbeddings({
@@ -42,82 +56,53 @@ const embeddings = EMBED_API_KEY
   : null;
 
 const topK = Number(process.env.AI_RETRIEVE_K || 5);
-// Số lượng message gần nhất dùng làm ngữ cảnh hội thoại để tránh gửi quá dài
-// giúp giảm latency nhưng vẫn đảm bảo AI hiểu câu như "Cái này giá bao nhiêu?".
 const MAX_HISTORY = Number(process.env.AI_MAX_HISTORY || 6);
 
 const logDebugError = (label, err, extra = {}) => {
   const cause = err?.cause;
-  const payload = {
+  console.error(label, {
     name: err?.name,
     message: err?.message,
     stack: err?.stack?.split("\n").slice(0, 6).join("\n"),
     cause:
       cause && typeof cause === "object"
-        ? {
-            name: cause.name,
-            message: cause.message,
-            code: cause.code,
-            type: cause.type,
-            errno: cause.errno,
-            syscall: cause.syscall,
-            hostname: cause.hostname,
-          }
+        ? { name: cause.name, message: cause.message, code: cause.code }
         : cause || null,
     ...extra,
-  };
-  console.error(label, payload);
+  });
 };
 
-const escapeSqlLiteral = (value) => (value || "").replace(/'/g, "''");
+const normalizeTokens = (text) => tokenizeText(text, 3);
 
-const normalizeTokens = (text) =>
-  (text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((t) => t.length >= 3);
+// Gemini dung lai "can nhac" co goi cong cu hay khong moi khi tools duoc bind,
+// day la phan lon do tre toi ky tu dau tien (do thuc te: 1.4s khong bind vs
+// 4.0s co bind). Khoi ngu canh da co san gia/ton kho cho tung san pham, nen
+// chi thuc su can cong cu khi: chua tim duoc san pham nao (can lookup_product),
+// hoi theo mau/bien the (can check_stock) hoac hoi phi/thoi gian ship (can
+// get_shop_policy).
+const TOOL_CUES = [
+  "mau", "mau sac", "phien ban mau", "size",
+  "ship", "van chuyen", "phi ship", "phi van chuyen", "giao hang", "freeship",
+];
+export const needsTools = (question, retrieved) => {
+  if (!retrieved || retrieved.length === 0) return true;
+  const normalized = normalizeText(question);
+  return TOOL_CUES.some((cue) => normalized.includes(cue));
+};
 
 const hasFollowUpCue = (text) => {
-  const normalized = (text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const normalized = normalizeText(text);
 
   const staticCues = [
-    "cai nay",
-    "san pham nay",
-    "san pham do",
-    "san pham kia",
-    "mau nay",
-    "mau do",
-    "con nay",
-    "con do",
-    "no",
-    "them",
-    "loai do",
-    "cai do",
-    "cai kia",
-    "vay",
-    "nua",
+    "cai nay", "san pham nay", "san pham do", "san pham kia", "mau nay",
+    "mau do", "con nay", "con do", "no", "them", "loai do", "cai do",
+    "cai kia", "vay", "nua",
   ];
   if (staticCues.some((cue) => normalized.includes(cue))) return true;
 
-  // Catch generic references like "<noun> do/nay/kia" (e.g. "may anh do", "laptop nay").
-  if (
-    /\b(?:san pham|mau|con|may anh|laptop|dien thoai|tai nghe|dong ho)\s+(?:do|nay|kia)\b/.test(
-      normalized
-    )
-  ) {
-    return true;
-  }
-
-  return false;
+  return /\b(?:san pham|mau|con|may anh|laptop|dien thoai|tai nghe|dong ho)\s+(?:do|nay|kia)\b/.test(
+    normalized
+  );
 };
 
 const detectTopicShiftHeuristic = (currentText, previousUserText) => {
@@ -129,36 +114,15 @@ const detectTopicShiftHeuristic = (currentText, previousUserText) => {
   if (currentTokens.length < 2 || previousTokens.length < 2) return false;
 
   const overlap = currentTokens.filter((t) => previousTokens.includes(t)).length;
-  const ratio = overlap / Math.max(1, Math.min(currentTokens.length, previousTokens.length));
+  const ratio =
+    overlap / Math.max(1, Math.min(currentTokens.length, previousTokens.length));
 
-  // Very low overlap and no follow-up cue => likely a new topic.
   return ratio < 0.2;
-};
-
-const parseJsonArrayFromText = (text) => {
-  if (!text) return [];
-  const raw = Array.isArray(text)
-    ? text.join("\n")
-    : typeof text === "string"
-    ? text
-    : String(text);
-  const match = raw.match(/\[[\s\S]*\]/);
-  if (!match) return [];
-  try {
-    const parsed = JSON.parse(match[0]);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 };
 
 const parseJsonObjectFromText = (text) => {
   if (!text) return null;
-  const raw = Array.isArray(text)
-    ? text.join("\n")
-    : typeof text === "string"
-    ? text
-    : String(text);
+  const raw = Array.isArray(text) ? text.join("\n") : String(text);
   const match = raw.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
@@ -169,28 +133,18 @@ const parseJsonObjectFromText = (text) => {
   }
 };
 
-const sanitizeToken = (token) =>
-  String(token || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9-]/g, "")
-    .trim();
-
-const normalizePhrase = (value) =>
-  String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
 const createResearchModel = () =>
   createGeminiChatModel({
     model: GEMINI_CHAT_MODEL,
     temperature: 0,
     maxRetries: 1,
+  });
+
+const createChatModel = () =>
+  createGeminiChatModel({
+    model: GEMINI_CHAT_MODEL,
+    temperature: 0.2,
+    maxRetries: 2,
   });
 
 const classifyConversationMode = async ({ latestUserText, recentMessages }) => {
@@ -224,253 +178,117 @@ const classifyConversationMode = async ({ latestUserText, recentMessages }) => {
   } catch (err) {
     logDebugError("classifyConversationMode error:", err, {
       latestUserLength: latestUserText?.length ?? 0,
-      recentMessageCount: recentMessages?.length ?? 0,
     });
     return null;
   }
 };
 
-const buildAICatalogHints = async (prisma) => {
-  const rows = await prisma.$queryRawUnsafe(
-    `
-    SELECT p.name, COALESCE(pe.content, '') AS content
-    FROM products p
-    LEFT JOIN product_embeddings pe ON p.id = pe.product_id
-    WHERE p.deleted_at IS NULL
-    ORDER BY p.updated_at DESC NULLS LAST
-    LIMIT 30;
-    `
-  );
-  return (rows || [])
-    .map((r) => `${r?.name || ""} | ${String(r?.content || "").slice(0, 120)}`)
-    .filter(Boolean)
-    .join("\n");
-};
-
-const expandSemanticTokens = async (prisma, question, baseTokens) => {
-  const expanded = new Set(baseTokens);
-  let focusTerms = [];
-  let strictFocus = false;
-  if (!hasGeminiApiKey() || !question) {
-    return { tokens: Array.from(expanded), focusTerms, strictFocus };
+/**
+ * Dựng khối ngữ cảnh từ kết quả truy hồi.
+ *
+ * Mô tả sản phẩm là do người bán tự nhập nên phải coi là dữ liệu không đáng
+ * tin: đi qua neutralizeUntrustedText để gỡ mọi câu lệnh giấu trong đó, rồi
+ * bọc trong khối có nonce. Nonce làm người bán không đoán được chuỗi đóng
+ * khối, nên không thể "thoát" ra ngoài để giả làm chỉ dẫn hệ thống.
+ */
+const buildContextBlock = (rows, nonce) => {
+  if (!rows || rows.length === 0) {
+    return { block: "", removedInstructions: 0 };
   }
 
-  try {
-    const catalogHints = await buildAICatalogHints(prisma);
-    const messages = [
-      new SystemMessage(
-        [
-          "Bạn là bộ mở rộng từ khóa tìm kiếm cho catalog sản phẩm điện tử.",
-          "Nhiệm vụ: dựa trên câu hỏi user + danh sách sản phẩm hiện có, trả JSON object để tăng recall nhưng không drift chủ đề.",
-          'Schema bắt buộc: {"expand_tokens":[...], "focus_terms":[...], "strict_focus": true|false}',
-          "expand_tokens: 4-8 keyword lowercase để mở rộng tìm kiếm.",
-          "focus_terms: 1-4 cụm từ thể hiện nhóm sản phẩm chính user đang hỏi (vd: may anh, canon, eos).",
-          "strict_focus=true nếu user đang nói rõ 1 nhóm sản phẩm cụ thể (camera/máy ảnh, laptop, tai nghe...).",
-          "Chỉ trả JSON object, không giải thích.",
-        ].join(" ")
-      ),
-      new HumanMessage(
-        `User query: ${question}\nBase tokens: ${baseTokens.join(
-          ", "
-        )}\nCatalog hints:\n${catalogHints}`
-      ),
-    ];
-
-    const response = await createResearchModel().invoke(messages);
-    const parsed = parseJsonObjectFromText(response?.content);
-    const rawExpandTokens = Array.isArray(parsed?.expand_tokens)
-      ? parsed.expand_tokens
-      : parseJsonArrayFromText(response?.content);
-    const aiTokens = rawExpandTokens
-      .map(sanitizeToken)
-      .filter((t) => t.length >= 3 && t.length <= 24);
-    focusTerms = (Array.isArray(parsed?.focus_terms) ? parsed.focus_terms : [])
-      .map(normalizePhrase)
-      .filter((t) => t.length >= 3 && t.length <= 40)
-      .slice(0, 4);
-    strictFocus = Boolean(parsed?.strict_focus);
-    aiTokens.forEach((t) => expanded.add(t));
-  } catch (err) {
-    logDebugError("expandSemanticTokens ai-research error:", err, {
-      questionLength: question?.length ?? 0,
-      baseTokenCount: baseTokens.length,
-    });
-  }
-
-  return { tokens: Array.from(expanded), focusTerms, strictFocus };
-};
-
-const scoreCandidateRow = (row, tokens, source, focusTerms = []) => {
-  const name = String(row?.name || "");
-  const content = String(row?.content || "");
-  const text = normalizePhrase(`${name} ${content}`);
-
-  let score = 0;
-  let tokenHits = 0;
-  for (const token of tokens) {
-    if (text.includes(token)) {
-      tokenHits += 1;
-      score += 2;
-      if (name.toLowerCase().includes(token)) score += 1;
-    }
-  }
-
-  if (source.keyword) score += 3;
-  if (source.vector) score += 2;
-  if (source.keyword && source.vector) score += 3;
-
-  const focusHits = focusTerms.filter((term) => text.includes(term)).length;
-  if (focusHits > 0) score += 6 + focusHits * 2;
-  else if (focusTerms.length > 0) score -= 2;
+  let removedInstructions = 0;
+  const lines = rows.map((r, idx) => {
+    const priced = calculateProductPrices(r);
+    const cleaned = neutralizeUntrustedText(r.content ?? "");
+    removedInstructions += cleaned.removed;
+    const cleanedName = neutralizeUntrustedText(r.name ?? "");
+    removedInstructions += cleanedName.removed;
+    const link = `${PRODUCT_BASE_URL}/product/${slugify(
+      `${r.name}-p${r.id}`
+    )}`;
+    return [
+      `${idx + 1}. product_id=${r.id}`,
+      `Tên: ${cleanedName.text}`,
+      `Gian hàng: ${r.shop_name ?? ""}`,
+      `Giá hiện tại: ${priced.final_price}` +
+        (priced.discount > 0 ? ` (giá gốc ${priced.price})` : ""),
+      `Tồn kho: ${priced.quantity}`,
+      `Mô tả: ${cleaned.text}`,
+      `Link: ${link}`,
+    ].join(" | ");
+  });
 
   return {
-    ...row,
-    _score: score,
-    _tokenHits: tokenHits,
-    _focusHits: focusHits,
+    block: wrapUntrustedBlock(nonce, lines.join("\n")),
+    removedInstructions,
   };
 };
 
-const rankAndSliceCandidates = (
-  rows,
-  tokens,
-  topN,
-  focusTerms = [],
-  strictFocus = false
-) => {
-  const byId = new Map();
-  for (const row of rows) {
-    const key = String(row?.id ?? "");
-    if (!key) continue;
-    const prev = byId.get(key);
-    if (!prev) {
-      byId.set(key, {
-        ...row,
-        _source: { keyword: Boolean(row?._fromKeyword), vector: Boolean(row?._fromVector) },
-      });
-      continue;
-    }
-    prev._source.keyword = prev._source.keyword || Boolean(row?._fromKeyword);
-    prev._source.vector = prev._source.vector || Boolean(row?._fromVector);
-    // Prefer richer content if current one is empty.
-    if (!prev.content && row.content) prev.content = row.content;
-    if ((!prev.img || prev.img.length === 0) && row.img) prev.img = row.img;
-  }
-
-  const scored = Array.from(byId.values()).map((row) =>
-    scoreCandidateRow(row, tokens, row._source, focusTerms)
-  );
-
-  const focused =
-    strictFocus && focusTerms.length > 0 && scored.some((r) => r._focusHits > 0)
-      ? scored.filter((r) => r._focusHits > 0)
-      : scored;
-
-  focused.sort((a, b) => {
-    if (b._score !== a._score) return b._score - a._score;
-    if (b._focusHits !== a._focusHits) return b._focusHits - a._focusHits;
-    if (b._tokenHits !== a._tokenHits) return b._tokenHits - a._tokenHits;
-    return String(a.name || "").localeCompare(String(b.name || ""));
-  });
-
-  return focused.slice(0, topN);
-};
-
-const createChatModel = () =>
-  createGeminiChatModel({
-    model: GEMINI_CHAT_MODEL,
-    temperature: 0.2,
-    maxRetries: 2,
-  });
-
-const retrieveContext = async (prisma, question) => {
-  const baseTokens = [...new Set(normalizeTokens(question))].slice(0, 6);
-  const aiResearch = await expandSemanticTokens(prisma, question, baseTokens);
-  const tokens = (aiResearch?.tokens || []).slice(0, 12);
-  const focusTerms = aiResearch?.focusTerms || [];
-  const strictFocus = Boolean(aiResearch?.strictFocus);
-  const candidateLimit = Math.max(topK * 6, 24);
-  const keywordClause = tokens
-    .map((t) => {
-      const safe = escapeSqlLiteral(t);
-      return `lower(p.name) LIKE '%${safe}%' OR lower(COALESCE(pe.content, '')) LIKE '%${safe}%'`;
-    })
-    .join(" OR ");
-
-  let keywordRows = [];
-  if (keywordClause) {
-    try {
-      keywordRows = await prisma.$queryRawUnsafe(
-        `
-        SELECT p.id, p.name, p.price, p.img, COALESCE(pe.content, '') AS content
-        FROM products p
-        LEFT JOIN product_embeddings pe ON p.id = pe.product_id
-        WHERE p.deleted_at IS NULL
-          AND (${keywordClause})
-        ORDER BY p.updated_at DESC NULLS LAST
-        LIMIT ${candidateLimit};
-        `
-      );
-      keywordRows = keywordRows.map((r) => ({ ...r, _fromKeyword: true }));
-    } catch (err) {
-      logDebugError("retrieveContext keyword error:", err, {
-        questionLength: question?.length ?? 0,
-        tokenCount: tokens.length,
-      });
-    }
-  }
-
-  if (!embeddings) {
-    return rankAndSliceCandidates(
-      keywordRows,
-      tokens,
-      topK,
-      focusTerms,
-      strictFocus
-    );
-  }
-
+/** Mã giảm giá đang có hiệu lực, dùng cho lớp kiểm tra đầu ra. */
+const loadActiveCouponCodes = async (prisma) => {
   try {
-    const queryVector = await embeddings.embedQuery(question);
-    const vectorLiteral = `[${queryVector.join(",")}]`;
-    const vectorRows = await prisma.$queryRawUnsafe(
-      `
-      SELECT p.id, p.name, p.price, p.img, pe.content
-      FROM product_embeddings pe
-      JOIN products p ON p.id = pe.product_id
-      WHERE p.deleted_at IS NULL
-      ORDER BY pe.embedding <-> '${vectorLiteral}'::vector
-      LIMIT ${candidateLimit};
-      `
-    );
-    const taggedVectorRows = (vectorRows ?? []).map((r) => ({
-      ...r,
-      _fromVector: true,
-    }));
-    return rankAndSliceCandidates(
-      [...(keywordRows ?? []), ...taggedVectorRows],
-      tokens,
-      topK,
-      focusTerms,
-      strictFocus
-    );
-  } catch (err) {
-    logDebugError("retrieveContext error:", err, {
-      questionLength: question?.length ?? 0,
-      embedModel: EMBED_MODEL,
-      hasEmbeddingKey: Boolean(EMBED_API_KEY),
+    const now = new Date();
+    const rows = await prisma.coupon.findMany({
+      where: {
+        deleted_at: null,
+        OR: [{ expires_at: null }, { expires_at: { gte: now } }],
+      },
+      select: { code: true },
+      take: 200,
     });
-    return rankAndSliceCandidates(
-      keywordRows ?? [],
-      tokens,
-      topK,
-      focusTerms,
-      strictFocus
-    );
+    return rows.map((r) => r.code).filter(Boolean);
+  } catch (err) {
+    logDebugError("loadActiveCouponCodes error:", err);
+    return [];
   }
 };
 
-export const runAgent = async (prisma, chatId) => {
+/**
+ * Gọi model một lượt. Có onToken thì đọc theo luồng và đẩy từng mẩu ra ngoài,
+ * không có thì gọi thường.
+ *
+ * Vẫn stream cả lượt đầu dù lượt đó có thể chỉ chứa yêu cầu gọi công cụ: khi
+ * model quyết định gọi công cụ thì phần nội dung rỗng nên không mất gì, còn
+ * khi model trả lời thẳng thì người dùng thấy chữ ngay từ lượt đầu.
+ */
+const runModelTurn = async (model, messages, onToken) => {
+  if (!onToken) return model.invoke(messages);
+
+  const stream = await model.stream(messages);
+  let merged = null;
+  for await (const chunk of stream) {
+    merged = merged === null ? chunk : merged.concat(chunk);
+    const piece =
+      typeof chunk.content === "string"
+        ? chunk.content
+        : Array.isArray(chunk.content)
+        ? chunk.content
+            .map((c) => (typeof c === "string" ? c : c?.text || ""))
+            .join("")
+        : "";
+    if (piece) onToken(piece);
+  }
+  return merged;
+};
+
+const messageText = (message) => {
+  const content = message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((c) => (typeof c === "string" ? c : c?.text || ""))
+      .join("");
+  }
+  return String(content ?? "");
+};
+
+/**
+ * Chạy trợ lý ảo cho một phiên chat.
+ *
+ * @param {object} opts.onToken callback nhận từng mẩu chữ khi trả lời theo luồng.
+ * @returns {{text:string, blocked:boolean, violations:Array, toolCalls:Array, meta:object}}
+ */
+export const runAgent = async (prisma, chatId, { onToken = null } = {}) => {
   try {
     assertGeminiApiKey();
 
@@ -479,13 +297,27 @@ export const runAgent = async (prisma, chatId) => {
       orderBy: { created_at: "asc" },
     });
 
-    // Chỉ giữ lại một số message gần nhất để làm context (giảm token + độ trễ)
     const history =
       fullHistory.length > MAX_HISTORY
         ? fullHistory.slice(fullHistory.length - MAX_HISTORY)
         : fullHistory;
 
     const lastUser = history.length ? history[history.length - 1].content : "";
+
+    // Lớp 1 - chặn ngay tại cửa, không tốn một lượt gọi model nào.
+    const inputCheck = inspectUserInput(lastUser);
+    if (inputCheck.blocked) {
+      if (onToken) onToken(INPUT_REFUSAL);
+      return {
+        text: INPUT_REFUSAL,
+        blocked: true,
+        blockedAt: "input",
+        violations: inputCheck.violations,
+        toolCalls: [],
+        meta: {},
+      };
+    }
+
     const previousUserMessage = [...history]
       .slice(0, -1)
       .reverse()
@@ -494,10 +326,39 @@ export const runAgent = async (prisma, chatId) => {
       .slice(0, -1)
       .slice(-4)
       .map((m) => ({ role: m.role, content: m.content }));
-    const modeDecision = await classifyConversationMode({
-      latestUserText: lastUser,
-      recentMessages: recentForClassifier,
-    });
+
+    // Phân loại ngữ cảnh và truy hồi không phụ thuộc nhau, chạy song song để
+    // độ trễ là max của hai việc chứ không phải tổng. Trước đây còn một lượt
+    // gọi model nữa để mở rộng từ khoá; truy hồi lai đã làm thay việc đó nên
+    // lượt gọi ấy được bỏ hẳn khỏi đường tới câu trả lời.
+    // Đo thực tế: bộ phân loại ngữ cảnh bằng LLM tốn khoảng 3.3 giây, chiếm
+    // phần lớn thời gian tới ký tự đầu tiên, trong khi heuristic dựa trên độ
+    // trùng từ khoá cho kết quả tương đương ở hầu hết lượt hỏi và tốn 0 giây.
+    // Mặc định dùng heuristic; đặt AI_LLM_TOPIC_CLASSIFIER=1 để bật lại bản
+    // gọi model khi cần so sánh chất lượng.
+    const useLlmClassifier = process.env.AI_LLM_TOPIC_CLASSIFIER === "1";
+    const [modeDecision, retrieved] = await Promise.all([
+      useLlmClassifier
+        ? classifyConversationMode({
+            latestUserText: lastUser,
+            recentMessages: recentForClassifier,
+          })
+        : Promise.resolve(null),
+      lastUser
+        ? retrieveHybrid(prisma, lastUser, {
+            topK,
+            embedQuery: embeddings
+              ? (text) => {
+                  incrementAiCallCounter();
+                  return embeddings.embedQuery(text);
+                }
+              : null,
+            onError: (branch, err) =>
+              logDebugError(`retrieveHybrid ${branch} error:`, err),
+          })
+        : Promise.resolve([]),
+    ]);
+
     const aiSaysNewTopic =
       modeDecision?.mode === "new_topic" && modeDecision?.confidence >= 0.65;
     const fallbackTopicShift = modeDecision
@@ -505,52 +366,126 @@ export const runAgent = async (prisma, chatId) => {
       : detectTopicShiftHeuristic(lastUser, previousUserMessage?.content || "");
     const isTopicShift = aiSaysNewTopic || fallbackTopicShift;
     const effectiveHistory =
-      isTopicShift && history.length > 0 ? [history[history.length - 1]] : history;
-    const retrieved = lastUser ? await retrieveContext(prisma, lastUser) : [];
-    const contextBlock =
-      retrieved.length > 0
-        ? "Ngữ cảnh sản phẩm:\n" +
-          retrieved
-            .map((r, idx) => {
-              const imgs = Array.isArray(r.img) ? r.img : [];
-              const firstImg = imgs[0] || "";
-              const slug =
-                slugify(r.name + "-p" + r.id || "") || `san-pham-${r.id}`;
-              const link = `${PRODUCT_BASE_URL}/product/${slug}`;
-              return `${idx + 1}. ${r.name ?? "Sản phẩm"} | Giá: ${
-                r.price ?? ""
-              } | ${r.content ?? ""}${
-                firstImg ? ` | Ảnh: ${firstImg}` : ""
-              } | Link: ${link}`;
-            })
-            .join("\n")
-        : "";
+      isTopicShift && history.length > 0
+        ? [history[history.length - 1]]
+        : history;
 
-    const messages = [
-      new SystemMessage(
-        SYSTEM_PROMPT +
-          (contextBlock
-            ? "\nDữ liệu dưới đây là hàng hóa có liên quan, hãy ưu tiên dùng nó khi trả lời:\n" +
-              contextBlock
-            : "")
-      ),
-      ...effectiveHistory.map((m) =>
-        m.role === "assistant"
-          ? new AIMessage(m.content)
-          : new HumanMessage(m.content)
-      ),
-    ];
+    const nonce = createContextNonce();
+    // Cau hoi neu dich danh mot san pham (diem RRF vuot troi) thi chi can 1-2
+    // ung vien trong ngu canh thay vi ca 5 - giam nhieu tu cac ung vien khong
+    // lien quan, nang Context Relevance ma khong doi Recall@5 (do do tren
+    // chinh retrieveHybrid, khong qua buoc nay).
+    const { block, removedInstructions } = buildContextBlock(
+      pickConfidentSubset(retrieved),
+      nonce
+    );
 
-    const response = await createChatModel().invoke(messages);
-    return response.content;
+    const systemText = [
+      SYSTEM_PROMPT,
+      buildGuardInstruction(nonce),
+      block
+        ? "\nỨng viên sản phẩm tìm được cho câu hỏi này (dùng product_id bên dưới để gọi công cụ lấy giá và tồn kho):\n" +
+          block
+        : "",
+    ].join(" ");
+
+    const conversation = effectiveHistory.map((m) =>
+      m.role === "assistant"
+        ? new AIMessage(m.content)
+        : new HumanMessage(m.content)
+    );
+
+    const { tools, byName } = createShoppingTools(prisma);
+    const bindTools = needsTools(lastUser, retrieved);
+    const model = bindTools
+      ? createChatModel().bindTools(tools)
+      : createChatModel();
+
+    // Kết quả công cụ được nạp lại dưới dạng khối số liệu, chứ không đẩy
+    // ngược AIMessage chứa functionCall vào lịch sử theo kiểu ReAct chuẩn.
+    // Lý do rất cụ thể: Gemini 3 bắt buộc mọi functionCall gửi lại phải kèm
+    // thought_signature của chính nó, mà @langchain/google-genai bản đang
+    // dùng không giữ trường đó, nên vòng lặp ReAct chuẩn bị API trả về 400.
+    // Cách này giữ nguyên phần cốt lõi - mô hình tự chọn công cụ và tự đặt
+    // tham số - chỉ khác ở chỗ số liệu quay lại dưới dạng ngữ cảnh.
+    const toolCalls = [];
+    const facts = [];
+    let response = null;
+    let rounds = 0;
+
+    while (rounds <= MAX_TOOL_ROUNDS) {
+      // Gemini chỉ chấp nhận một system message và nó phải đứng đầu, nên khối
+      // số liệu được gộp vào chính system message chứ không nối thêm ở cuối.
+      const systemForTurn =
+        facts.length === 0
+          ? systemText
+          : [
+              systemText,
+              "",
+              "Số liệu vừa đọc trực tiếp từ cơ sở dữ liệu tại thời điểm này.",
+              "Chỉ dùng đúng các con số dưới đây khi nói về giá, tồn kho và phí vận chuyển.",
+              ...facts,
+            ].join("\n");
+      const turnMessages = [new SystemMessage(systemForTurn), ...conversation];
+
+      response = await runModelTurn(model, turnMessages, onToken);
+
+      const calls = response?.tool_calls ?? [];
+      if (calls.length === 0 || rounds === MAX_TOOL_ROUNDS) break;
+
+      for (const call of calls) {
+        const impl = byName.get(call.name);
+        let output;
+        try {
+          output = impl
+            ? await impl.invoke(call.args)
+            : JSON.stringify({ error: `Không có công cụ tên ${call.name}` });
+        } catch (err) {
+          logDebugError("tool invoke error:", err, { tool: call.name });
+          output = JSON.stringify({ error: "Không truy vấn được dữ liệu" });
+        }
+        toolCalls.push({ name: call.name, args: call.args });
+        facts.push(`- ${call.name}(${JSON.stringify(call.args)}) => ${output}`);
+      }
+      rounds += 1;
+    }
+
+    const rawText = messageText(response);
+
+    // Lớp 3 - soi câu trả lời. Khi trả lời theo luồng thì người dùng đã thấy
+    // chữ trước khi tới bước này, nên nơi gọi phải phát thêm một sự kiện thay
+    // thế nội dung. Đổi lại, bản ghi lưu vào cơ sở dữ liệu luôn là bản đã lọc.
+    const knownCouponCodes = await loadActiveCouponCodes(prisma);
+    const outputCheck = inspectModelOutput(rawText, { knownCouponCodes });
+
+    return {
+      text: outputCheck.text,
+      blocked: outputCheck.blocked,
+      blockedAt: outputCheck.blocked ? "output" : null,
+      violations: outputCheck.violations,
+      toolCalls,
+      meta: {
+        retrieved: retrieved.map((r) => ({
+          id: Number(r.id),
+          name: r.name,
+          sources: r._sources,
+        })),
+        // Ngu canh that su da dua vao model, ke ca so lieu tra ve tu cong
+        // cu. Bo danh gia phai cham diem tren dung thu nay, neu chi cham
+        // tren danh sach ten san pham thi Faithfulness bi bao thap gia.
+        contextText: block,
+        toolFacts: facts,
+        topicShift: isTopicShift,
+        toolRounds: rounds,
+        removedInstructions,
+      },
+    };
   } catch (err) {
     logDebugError("runAgent invoke error:", err, {
       chatId: String(chatId),
       model: GEMINI_CHAT_MODEL,
       embedModel: EMBED_MODEL,
-      provider: "google-ai-studio",
       hasGeminiKey: hasGeminiApiKey(),
-      hasEmbeddingKey: Boolean(EMBED_API_KEY),
     });
     throw err;
   }

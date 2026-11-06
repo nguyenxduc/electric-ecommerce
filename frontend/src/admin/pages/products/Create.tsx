@@ -1,14 +1,39 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useCreateAdminProduct, useAdminCategories } from '../../hooks'
+import { useValidateToken } from '../../../client/hooks/useAuth'
+import adminShopService from '../../services/shopService'
+import VariantsEditor, {
+  VariantRow,
+  variantsFromProduct,
+  variantsToPayload,
+  variantsTotal
+} from './VariantsEditor'
 
-export default function AdminProductCreate() {
+export default function AdminProductCreate({
+  basePath = '/admin/products'
+}: {
+  basePath?: string
+} = {}) {
   const nav = useNavigate()
   const create = useCreateAdminProduct()
   const { data: catData } = useAdminCategories({ limit: 100 })
+  const { data: userData } = useValidateToken()
+  const isAdmin = userData?.user?.role === 'admin'
+
+  // Admins must pick which shop the product belongs to; sellers' products
+  // are automatically assigned to their own shop by the backend.
+  const { data: shopsData } = useQuery({
+    queryKey: ['admin-shops', 'picker'],
+    queryFn: () => adminShopService.list({ limit: 100 }),
+    enabled: isAdmin
+  })
+  const [shopId, setShopId] = useState<number | ''>('')
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState<number>(0)
+  const [weightGrams, setWeightGrams] = useState<number>(500)
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [subCategoryId, setSubCategoryId] = useState<number | ''>('')
   const [colors, setColors] = useState<
@@ -18,6 +43,7 @@ export default function AdminProductCreate() {
   const [specsDetail, setSpecsDetail] = useState<
     { label: string; value: any }[]
   >([])
+  const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [newSpecLabel, setNewSpecLabel] = useState('')
@@ -44,20 +70,25 @@ export default function AdminProductCreate() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const totalQty = colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
+    const totalQty = variants.length
+      ? variantsTotal(variants)
+      : colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
     await (create as any).mutateAsync({
       name,
       price: Number(price),
       quantity: totalQty,
+      weight_grams: weightGrams || undefined,
+      shop_id: isAdmin && shopId !== '' ? Number(shopId) : undefined,
       category_id: Number(categoryId || 0),
       sub_category_id: subCategoryId === '' ? undefined : Number(subCategoryId),
       images,
       color: colors,
       product_colors: colors,
       specs,
-      specs_detail: specsDetail
+      specs_detail: specsDetail,
+      variants: variants.length ? variantsToPayload(variants) : undefined
     })
-    nav('/admin/products')
+    nav(basePath)
   }
 
   return (
@@ -85,6 +116,25 @@ export default function AdminProductCreate() {
                   onChange={e => setName(e.target.value)}
                 />
               </div>
+              {isAdmin && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">Shop</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={shopId}
+                    onChange={e =>
+                      setShopId(e.target.value ? Number(e.target.value) : '')
+                    }
+                  >
+                    <option value="">Select shop</option>
+                    {shopsData?.data?.data?.shops?.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.status})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm mb-1">Category</label>
                 <select
@@ -101,6 +151,16 @@ export default function AdminProductCreate() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Weight (grams, for shipping)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border rounded px-3 py-2"
+                  value={weightGrams}
+                  onChange={e => setWeightGrams(Number(e.target.value))}
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">Product Price</label>
@@ -228,6 +288,7 @@ export default function AdminProductCreate() {
               </div>
             </div>
           </div>
+          <VariantsEditor rows={variants} onChange={setVariants} />
         </form>
 
         <div className="space-y-4">

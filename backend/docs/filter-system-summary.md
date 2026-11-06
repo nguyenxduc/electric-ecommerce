@@ -54,7 +54,7 @@ for (const singleValue of filterValues) {
 - CSS styling
 - API integration examples
 
-### 4. `backend/test-filter-logic.js` (Mới)
+### 4. `backend/scripts/test-filter-logic.js` (Mới)
 
 **Chức năng:**
 
@@ -98,13 +98,13 @@ const query = getQueryString();
 
 ```bash
 cd backend
-node test-filter-logic.js --setup
+node scripts/test-filter-logic.js --setup
 ```
 
 ### Run Tests:
 
 ```bash
-node test-filter-logic.js --test
+node scripts/test-filter-logic.js --test
 ```
 
 ### Manual Testing:
@@ -167,7 +167,7 @@ curl "http://localhost:5000/api/products?brand=apple,samsung&ram=8,16"
 
 1. **Filter Controller**: Sửa `syncFilterOptionsFromProducts`
 2. **Seed Data**: Cập nhật specs_detail structure
-3. **New Test Scripts**: `test-specs-sync.js`
+3. **New Test Scripts**: `scripts/test-specs-sync.js`
 4. **Documentation**: `specs-detail-filter-guide.md`
 
 ### Specs Detail Structure:

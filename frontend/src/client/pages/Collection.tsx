@@ -249,6 +249,13 @@ const Collection = () => {
           : categoryId
     }
   )
+  // The products query is disabled (not "loading") while collectionParam is
+  // null - the window right after switching category, before its slug
+  // resolves to a category_id. Without folding that in, isLoading alone
+  // stays false during a category switch and the previous category's grid
+  // is shown stale with no loading indicator until the new data arrives.
+  const isCollectionLoading = isLoading || isCategoryLoading || !collectionParam
+
   const navigate = useNavigate()
 
   const handleToggleCompare = (product: Product) => {
@@ -506,14 +513,14 @@ const Collection = () => {
             )}
           </div>
 
-          {(searchQuery ? isSearching : isLoading) && (
+          {(searchQuery ? isSearching : isCollectionLoading) && (
             <div className="space-y-4">
               <SectionSkeleton />
               <ProductGridSkeleton count={9} />
             </div>
           )}
 
-          {!(searchQuery ? isSearching : isLoading) && products && (
+          {!(searchQuery ? isSearching : isCollectionLoading) && products && (
             <>
               {products.products.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">

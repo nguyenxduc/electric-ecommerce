@@ -41,6 +41,11 @@ const CartContent = ({ cartProducts }: CartProps) => {
               <h3 className="text-sm font-medium text-gray-900 truncate mb-1">
                 {name}
               </h3>
+              {product.variant && (
+                <p className="text-xs text-gray-500 mb-1">
+                  {product.variant.name}
+                </p>
+              )}
               {colorName && (
                 <p className="text-xs text-gray-500 mb-1">{colorName}</p>
               )}

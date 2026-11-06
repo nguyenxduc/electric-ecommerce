@@ -24,22 +24,34 @@ const ChatWidget = () => {
   return <ChatWidgetInner />
 }
 
-function ChatWidgetInner() {
-  const [isOpen, setIsOpen] = useState(false)
+// shopId: chat with that shop (seller answers); without it: platform support
+function ChatWidgetInner({
+  shopId,
+  externalOpen,
+  onExternalClose
+}: {
+  shopId?: number
+  externalOpen?: boolean
+  onExternalClose?: () => void
+} = {}) {
+  const [isOpenState, setIsOpen] = useState(false)
+  const isOpen = externalOpen ?? isOpenState
+  const close = onExternalClose ?? (() => setIsOpen(false))
   const [message, setMessage] = useState('')
   const [panelHeight, setPanelHeight] = useState(600)
   const [preview, setPreview] = useState<SupportMessagePreview | null>(null)
   const [socket, setSocket] = useState<Socket | null>(null)
 
-  const { data: chatData, isLoading, refetch } = useChat(isOpen)
+  const { data: chatData, isLoading, refetch } = useChat(isOpen, shopId)
   const sendMessageMutation = useSendMessage()
   const markAsReadMutation = useMarkMessagesAsRead()
 
   const chat = chatData?.data
   const messages = chat?.messages || []
 
+  // Unread = messages from the other party (admin or seller)
   const unreadCount = messages.filter(
-    m => !m.is_read && m.sender?.role === 'admin'
+    m => !m.is_read && m.sender?.role !== 'user'
   ).length
 
   useEffect(() => {
@@ -131,7 +143,7 @@ function ChatWidgetInner() {
 
   return (
     <>
-      {!isOpen && (
+      {!isOpen && externalOpen === undefined && (
         <SupportChatFab
           onClick={() => setIsOpen(true)}
           unreadCount={unreadCount}
@@ -141,7 +153,7 @@ function ChatWidgetInner() {
       {isOpen && (
         <SupportChatPanel
           panelHeight={panelHeight}
-          onClose={() => setIsOpen(false)}
+          onClose={close}
           onResizeStart={startResize}
           messages={messages}
           messagesLoading={isLoading}
@@ -163,6 +175,29 @@ function ChatWidgetInner() {
         />
       )}
     </>
+  )
+}
+
+// Chat panel bound to one shop, opened from the shop's public page.
+// Renders nothing until `open` is true (no floating FAB of its own).
+export const ShopChatPanel = ({
+  shopId,
+  open,
+  onClose
+}: {
+  shopId: number
+  open: boolean
+  onClose: () => void
+}) => {
+  const { data: userData } = useValidateToken()
+  const hasToken = !!localStorage.getItem('accessToken')
+  if (!hasToken || !userData?.user || !open) return null
+  return (
+    <ChatWidgetInner
+      shopId={shopId}
+      externalOpen={open}
+      onExternalClose={onClose}
+    />
   )
 }
 

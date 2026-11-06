@@ -1,6 +1,9 @@
 # Node
 node_modules/
+# Mọi biến thể .env đều chứa secret, chỉ .env.example được theo dõi.
 .env
+.env.*
+!.env.example
 
 # Build
 dist/
@@ -12,3 +15,17 @@ build/
 # MacOS & IDEs
 .DS_Store
 .vscode/
+
+# Claude Code: settings.json dung chung, ban local rieng tung may
+.claude/settings.local.json
+
+# oh-my-claudecode: trang thai phien cuc bo
+.omc/
+
+# Backup DB (db-backup service)
+backups/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.state.json

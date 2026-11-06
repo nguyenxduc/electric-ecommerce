@@ -1,13 +1,15 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { useDashboardStats, useTopProducts } from '../hooks'
+import { useDashboardStats, useTopProducts, useBehaviorAnalytics } from '../hooks'
 
 export default function AdminDashboard() {
   const { data: statsData, isLoading: statsLoading } = useDashboardStats()
   const { data: topProductsData, isLoading: topProductsLoading } = useTopProducts(4)
+  const { data: behaviorData, isLoading: behaviorLoading } = useBehaviorAnalytics(30)
 
   const stats = statsData?.data
   const topProducts = topProductsData?.data || []
+  const behavior = behaviorData?.data
 
   if (statsLoading) {
     return (
@@ -51,6 +53,54 @@ export default function AdminDashboard() {
             delta: stats?.cancelled.delta || '0%'
           }}
         />
+      </div>
+
+      <div className="bg-white rounded border">
+        <div className="p-4 border-b">
+          <div className="font-semibold">Retention &amp; phễu chuyển đổi</div>
+          <div className="text-xs text-gray-400">30 ngày gần nhất (UTC)</div>
+        </div>
+        {behaviorLoading ? (
+          <div className="p-4 text-center text-gray-500 text-sm">Loading...</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 text-center text-sm">
+              <div>
+                <div className="text-2xl font-semibold">{behavior?.visitors ?? 0}</div>
+                <div className="text-gray-500">Khách truy cập</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold">{behavior?.returningRate ?? 0}%</div>
+                <div className="text-gray-500">Khách quay lại</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold">
+                  {behavior?.funnel.viewToCartRate ?? 0}%
+                </div>
+                <div className="text-gray-500">Xem → giỏ hàng</div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold">
+                  {behavior?.funnel.cartToOrderRate ?? 0}%
+                </div>
+                <div className="text-gray-500">
+                  Giỏ hàng → đơn hàng
+                  <div className="text-xs text-gray-400">chỉ khách đã đăng nhập</div>
+                </div>
+              </div>
+            </div>
+            {/* Doc thang tu response de UI khong bao gio lech so voi cach query thuc su chay. */}
+            <div className="px-4 pb-4 space-y-1 text-xs text-gray-400">
+              {behavior && (
+                <>
+                  <div>{behavior.caveats.rollupLag}</div>
+                  <div>{behavior.caveats.anonymousExcluded}</div>
+                  <div>{behavior.caveats.identityNote}</div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

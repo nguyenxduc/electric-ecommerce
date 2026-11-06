@@ -1,5 +1,10 @@
 export function slugifyName(name: string): string {
+  // 'đ' khong phai nguyen am mang dau nen NFD khong tach ra duoc, buoc loc
+  // [^a-z0-9] se xoa luon ca chu: 'dien thoai' thanh 'ien thoai'. Doi truoc
+  // khi chuan hoa, giong het unaccent ben Postgres.
   return name
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')

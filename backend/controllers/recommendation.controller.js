@@ -1,4 +1,11 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "../constants/status.js";
+import { asyncHandler } from "../middleware/error.middleware.js";
+
+// Buyers only ever see recommendations from active shops
+const activeShopWhere = {
+  shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
+};
 
 const toBigIntOrNull = (value) => {
   if (value === undefined || value === null || value === "") return null;
@@ -13,6 +20,7 @@ async function getColdStartProducts(limit, categoryId = null) {
   const half = Math.ceil(limit / 2);
   const where = {
     deleted_at: null,
+    ...activeShopWhere,
     ...(categoryId ? { category_id: categoryId } : {}),
   };
   const [bestSellers, newest] = await Promise.all([
@@ -50,6 +58,7 @@ async function hydrateProductsByIds(productIds, categoryId = null, limit = 12) {
     where: {
       id: { in: ids },
       deleted_at: null,
+      ...activeShopWhere,
       ...(categoryId ? { category_id: categoryId } : {}),
     },
   });
@@ -74,69 +83,61 @@ async function getLatestOfflineRecommendation({ userId, sessionId }) {
 }
 
 // Gợi ý trang chủ: đọc kết quả thuật toán precompute (offline).
-export const getHomeRecommendations = async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const limit = Number(req.query.limit || 12);
-    const categoryId = toBigIntOrNull(req.query.category_id);
-    const sessionId = req.headers["x-session-id"]
-      ? String(req.headers["x-session-id"]).slice(0, 64)
-      : null;
+export const getHomeRecommendations = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  const limit = Number(req.query.limit || 12);
+  const categoryId = toBigIntOrNull(req.query.category_id);
+  const sessionId = req.headers["x-session-id"]
+    ? String(req.headers["x-session-id"]).slice(0, 64)
+    : null;
 
-    if (req.query.category_id !== undefined && categoryId === null) {
-      return res.status(400).json({
-        success: false,
-        error: "category_id không hợp lệ",
-      });
-    }
-
-    let products = [];
-    let strategy = "cold_start_best_seller_newest";
-    const offline = await getLatestOfflineRecommendation({ userId, sessionId });
-    if (offline?.product_ids?.length) {
-      products = await hydrateProductsByIds(offline.product_ids, categoryId, limit);
-      if (products.length > 0) {
-        strategy = String(offline.strategy || "").replace(/^offline_/, "") || strategy;
-      }
-    }
-
-    if (products.length < limit) {
-      const cold = await getColdStartProducts(limit, categoryId);
-      const map = new Map();
-      products.forEach((p) => map.set(p.id.toString(), p));
-      cold.forEach((p) => {
-        if (!map.has(p.id.toString())) map.set(p.id.toString(), p);
-      });
-      products = Array.from(map.values()).slice(0, limit);
-      if (strategy !== "cold_start_best_seller_newest") {
-        strategy = "hybrid_offline_cold_start";
-      }
-    }
-
-    // Log serving result (separate from offline precompute rows).
-    await prisma.recommendationLog.create({
-      data: {
-        user_id: userId ? BigInt(userId) : null,
-        session_id: req.headers["x-session-id"]
-          ? String(req.headers["x-session-id"])
-          : null,
-        strategy: `serve_${strategy}`,
-        product_ids: products.map((p) => BigInt(p.id)),
-      },
-    });
-
-    return res.json({
-      success: true,
-      data: {
-        products,
-        strategy,
-      },
-    });
-  } catch (error) {
-    console.error("getHomeRecommendations error:", error);
-    return res.status(500).json({
+  if (req.query.category_id !== undefined && categoryId === null) {
+    return res.status(400).json({
       success: false,
-      error: "Không thể lấy gợi ý sản phẩm",
+      error: "category_id không hợp lệ",
     });
   }
-};
+
+  let products = [];
+  let strategy = "cold_start_best_seller_newest";
+  const offline = await getLatestOfflineRecommendation({ userId, sessionId });
+  if (offline?.product_ids?.length) {
+    products = await hydrateProductsByIds(offline.product_ids, categoryId, limit);
+    if (products.length > 0) {
+      strategy = String(offline.strategy || "").replace(/^offline_/, "") || strategy;
+    }
+  }
+
+  if (products.length < limit) {
+    const cold = await getColdStartProducts(limit, categoryId);
+    const map = new Map();
+    products.forEach((p) => map.set(p.id.toString(), p));
+    cold.forEach((p) => {
+      if (!map.has(p.id.toString())) map.set(p.id.toString(), p);
+    });
+    products = Array.from(map.values()).slice(0, limit);
+    if (strategy !== "cold_start_best_seller_newest") {
+      strategy = "hybrid_offline_cold_start";
+    }
+  }
+
+  // Log serving result (separate from offline precompute rows).
+  await prisma.recommendationLog.create({
+    data: {
+      user_id: userId ? BigInt(userId) : null,
+      session_id: req.headers["x-session-id"]
+        ? String(req.headers["x-session-id"])
+        : null,
+      strategy: `serve_${strategy}`,
+      product_ids: products.map((p) => BigInt(p.id)),
+    },
+  });
+
+  return res.json({
+    success: true,
+    data: {
+      products,
+      strategy,
+    },
+  });
+});

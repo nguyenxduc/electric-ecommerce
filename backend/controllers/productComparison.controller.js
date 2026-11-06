@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.js";
+import { SHOP_STATUS } from "../constants/status.js";
 import { compareProductsWithAi } from "../ai/productComparison.js";
 
 /** Keep in sync with frontend/src/client/constants/compare.ts */
@@ -27,6 +28,8 @@ export const compareProductsByAi = async (req, res) => {
       where: {
         id: { in: ids },
         deleted_at: null,
+        // Comparison is buyer-facing: only active shops' products
+        shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
       },
       include: {
         product_colors: true,

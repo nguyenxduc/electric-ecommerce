@@ -14,25 +14,34 @@ const MIN_COPURCHASE = 1;
 async function main() {
   console.log("[CF] Building co-purchase matrix from order items...");
 
+  // Gom theo GIO HANG (order_group_id), khong phai theo don con (order_id).
+  //
+  // Sau khi ap dung tach don da gian hang, mot Order chi con la phan hang cua
+  // MOT shop trong mot lan mua. Gio hang that su ma nguoi dung chon la ca
+  // OrderGroup. Gom theo order_id se xoa sach tin hieu dong mua lien shop —
+  // dung thu tin hieu ma mot san TMDT can nhat — va tren du lieu hien tai no
+  // cho ra dung 0 cap.
   const orderItems = await prisma.orderItem.findMany({
     where: { deleted_at: null },
     select: {
-      order_id: true,
       product_id: true,
+      order: { select: { order_group_id: true } },
     },
   });
 
-  const byOrder = new Map();
+  const byBasket = new Map();
   for (const row of orderItems) {
-    const oid = row.order_id.toString();
-    if (!byOrder.has(oid)) byOrder.set(oid, []);
-    byOrder.get(oid).push(row.product_id);
+    const groupId = row.order?.order_group_id;
+    if (!groupId) continue;
+    const key = groupId.toString();
+    if (!byBasket.has(key)) byBasket.set(key, []);
+    byBasket.get(key).push(row.product_id);
   }
 
   const pairCounts = new Map();
   const productFreq = new Map();
 
-  for (const [, products] of byOrder) {
+  for (const [, products] of byBasket) {
     const uniq = [...new Set(products.map((p) => p.toString()))].map((id) =>
       BigInt(id)
     );

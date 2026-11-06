@@ -13,21 +13,31 @@ import {
 } from '../types'
 
 export const adminProductService = {
-  list(params?: ProductListQuery) {
+  list(params?: ProductListQuery & { shop_id?: number }) {
     return axiosClient.get<ProductListResponse>('/products', { params })
+  },
+  // Seller dashboard: own shop's products (any shop status)
+  listMine(params?: ProductListQuery) {
+    return axiosClient.get<ProductListResponse>('/products/shop/mine', {
+      params
+    })
   },
   getById(id: number) {
     return axiosClient.get<ProductResponse>(`/products/${id}`)
   },
-  create(payload: CreateProductRequest & { images?: File[] }) {
+  create(payload: CreateProductRequest & { images?: File[]; shop_id?: number }) {
     const form = new FormData()
     const data = (payload as any).product || payload
+    if (data?.shop_id !== undefined && data?.shop_id !== null && data?.shop_id !== '')
+      form.append('shop_id', String(data.shop_id))
     if (data?.name) form.append('name', String(data.name))
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)
       form.append('discount', String(data.discount))
     if (data?.quantity !== undefined)
       form.append('quantity', String(data.quantity))
+    if (data?.weight_grams !== undefined)
+      form.append('weight_grams', String(data.weight_grams))
     if (data?.product_colors)
       form.append('product_colors', JSON.stringify(data.product_colors))
     if (data?.category_id !== undefined)
@@ -38,6 +48,8 @@ export const adminProductService = {
     if (data?.specs_detail)
       form.append('specs_detail', JSON.stringify(data.specs_detail))
     if (data?.color) form.append('color', JSON.stringify(data.color))
+    if (data?.variants)
+      form.append('variants', JSON.stringify(data.variants))
     if (Array.isArray(payload.images))
       payload.images.forEach(f => form.append('images', f))
     if (Array.isArray(data?.img)) form.append('img', JSON.stringify(data.img))
@@ -54,6 +66,8 @@ export const adminProductService = {
       form.append('discount', String(data.discount))
     if (data?.quantity !== undefined)
       form.append('quantity', String(data.quantity))
+    if (data?.weight_grams !== undefined)
+      form.append('weight_grams', String(data.weight_grams))
     if (data?.product_colors !== undefined)
       form.append('product_colors', JSON.stringify(data.product_colors))
     if (data?.category_id !== undefined)
@@ -66,6 +80,8 @@ export const adminProductService = {
       form.append('specs_detail', JSON.stringify(data.specs_detail))
     if (data?.color !== undefined)
       form.append('color', JSON.stringify(data.color))
+    if (data?.variants !== undefined)
+      form.append('variants', JSON.stringify(data.variants))
     if (Array.isArray(payload.images))
       payload.images.forEach(f => form.append('images', f))
     if (Array.isArray(data?.img)) form.append('img', JSON.stringify(data.img))

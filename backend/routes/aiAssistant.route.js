@@ -4,6 +4,7 @@ import {
   createAiChat,
   getAiMessages,
   sendAiChatMessage,
+  streamAiChatMessage,
   deleteAiChat,
 } from "../controllers/aiAssistant.controller.js";
 import {
@@ -13,7 +14,10 @@ import {
 } from "../controllers/aiFeedback.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
+import { registerIdParams } from "../middleware/validateId.middleware.js";
+
 const router = express.Router();
+registerIdParams(router);
 
 router.get("/", protectRoute, listAiChats);
 router.post("/", protectRoute, createAiChat);
@@ -23,6 +27,8 @@ router.get("/feedback/list", protectRoute, listAiFeedbackAdmin);
 
 router.get("/:chatId/messages", protectRoute, getAiMessages);
 router.post("/:chatId/messages", protectRoute, sendAiChatMessage);
+// Bản trả lời theo luồng. Endpoint trên giữ lại làm dự phòng.
+router.post("/:chatId/messages/stream", protectRoute, streamAiChatMessage);
 router.delete("/:chatId", protectRoute, deleteAiChat);
 router.post("/:chatId/feedback", protectRoute, createAiFeedback);
 

@@ -7,8 +7,18 @@ import {
   useUpdateAdminProduct,
   useAdminCategories
 } from '../../hooks'
+import VariantsEditor, {
+  VariantRow,
+  variantsFromProduct,
+  variantsToPayload,
+  variantsTotal
+} from './VariantsEditor'
 
-export default function AdminProductEdit() {
+export default function AdminProductEdit({
+  basePath = '/admin/products'
+}: {
+  basePath?: string
+} = {}) {
   const { id } = useParams()
   const isNew = id === 'new'
   const pid = isNew ? undefined : Number(id)
@@ -21,6 +31,7 @@ export default function AdminProductEdit() {
 
   const [name, setName] = useState('')
   const [price, setPrice] = useState<number>(0)
+  const [weightGrams, setWeightGrams] = useState<number>(500)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
   const [quantity, setQuantity] = useState<number>(0)
   const [categoryId, setCategoryId] = useState<number | ''>('')
@@ -32,6 +43,7 @@ export default function AdminProductEdit() {
   const [specsDetail, setSpecsDetail] = useState<
     { label: string; value: any }[]
   >([])
+  const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
@@ -50,6 +62,7 @@ export default function AdminProductEdit() {
       const p = data.data
       setName(p.name)
       setPrice(Number(p.price))
+      setWeightGrams(Number((p as any).weight_grams) || 500)
       setDiscountPercent(
         p.price
           ? Math.round((Number(p.discount || 0) / Number(p.price)) * 100)
@@ -66,6 +79,7 @@ export default function AdminProductEdit() {
           : []
       ) as any
       setColors(colorArr)
+      setVariants(variantsFromProduct((p as any).variants))
       setSpecs(Array.isArray(p.specs) ? (p.specs as any) : [])
       setSpecsDetail(
         Array.isArray(p.specs_detail) ? (p.specs_detail as any) : []
@@ -110,21 +124,30 @@ export default function AdminProductEdit() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (Number(price) < 0) {
+      toast.error('Price cannot be negative')
+      return
+    }
+    if (!isNew && (Number(discountPercent) < 0 || Number(discountPercent) > 100)) {
+      toast.error('Discount must be between 0 and 100%')
+      return
+    }
     const colorsPayload = colors.map(c => ({
       name: c.name,
       code: c.code,
       quantity: Number(c.quantity || 0)
     }))
-    const totalQty = colorsPayload.reduce(
-      (s, c) => s + Number(c.quantity || 0),
-      0
-    )
+    const totalQty = variants.length
+      ? variantsTotal(variants)
+      : colorsPayload.reduce((s, c) => s + Number(c.quantity || 0), 0)
+    const variantsPayload = variantsToPayload(variants)
     try {
       if (isNew) {
         await (create as any).mutateAsync({
           name,
           price: Number(price),
           quantity: totalQty,
+          weight_grams: weightGrams || undefined,
           category_id: Number(categoryId || 0),
           sub_category_id:
             subCategoryId === '' ? undefined : Number(subCategoryId),
@@ -132,7 +155,8 @@ export default function AdminProductEdit() {
           color: colorsPayload,
           product_colors: colorsPayload,
           specs,
-          specs_detail: specsDetail
+          specs_detail: specsDetail,
+          variants: variantsPayload.length ? variantsPayload : undefined
         })
       } else {
         const discountAmount =
@@ -142,6 +166,7 @@ export default function AdminProductEdit() {
           price: Number(price),
           discount: Number(discountAmount.toFixed(2)),
           quantity: totalQty,
+          weight_grams: weightGrams || undefined,
           category_id: categoryId === '' ? undefined : Number(categoryId),
           sub_category_id: subCategoryId === '' ? null : Number(subCategoryId),
           color: colorsPayload,
@@ -149,18 +174,19 @@ export default function AdminProductEdit() {
           img: [...existingImages, ...imageUrls], // Combine existing and new URL images
           images, // New file uploads
           specs, // ✅ ADD: specs
-          specs_detail: specsDetail // ✅ ADD: specs_detail
+          specs_detail: specsDetail, // ✅ ADD: specs_detail
+          variants: variantsPayload // full set; missing ones are removed
         })
       }
       toast.success(isNew ? 'Product created' : 'Product updated')
       // Try to preserve page from referrer or go back in history
-      if (document.referrer && document.referrer.includes('/admin/products')) {
+      if (document.referrer && document.referrer.includes(basePath)) {
         const referrerUrl = new URL(document.referrer)
         const referrerParams = referrerUrl.searchParams
         const page = referrerParams.get('page')
         const q = referrerParams.get('q')
 
-        let backUrl = '/admin/products'
+        let backUrl = basePath
         const params = new URLSearchParams()
         if (page) params.set('page', page)
         if (q) params.set('q', q)
@@ -168,7 +194,7 @@ export default function AdminProductEdit() {
 
         nav(backUrl)
       } else {
-        nav('/admin/products')
+        nav(basePath)
       }
     } catch (err) {
       toast.error('Failed to save product')
@@ -233,9 +259,20 @@ export default function AdminProductEdit() {
               </div>
 
               <div>
+                <label className="block text-sm mb-1">Weight (grams, for shipping)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border rounded px-3 py-2"
+                  value={weightGrams}
+                  onChange={e => setWeightGrams(Number(e.target.value))}
+                />
+              </div>
+              <div>
                 <label className="block text-sm mb-1">Product Price</label>
                 <input
                   type="number"
+                  min={0}
                   className="w-full border rounded px-3 py-2"
                   value={price === 0 ? '' : price}
                   onChange={e =>
@@ -248,6 +285,8 @@ export default function AdminProductEdit() {
                   <label className="block text-sm mb-1">Discount (%)</label>
                   <input
                     type="number"
+                    min={0}
+                    max={100}
                     className="w-full border rounded px-3 py-2"
                     value={discountPercent}
                     onChange={e => setDiscountPercent(Number(e.target.value))}
@@ -368,6 +407,7 @@ export default function AdminProductEdit() {
               </div>
             </div>
           </div>
+          <VariantsEditor rows={variants} onChange={setVariants} />
         </form>
 
         <div className="space-y-4">

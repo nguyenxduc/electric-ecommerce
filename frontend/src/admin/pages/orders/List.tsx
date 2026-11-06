@@ -110,6 +110,7 @@ export default function AdminOrdersList() {
               <tr>
                 <th className="text-left p-2">No.</th>
                 <th className="text-left p-2">Order</th>
+                <th className="text-left p-2">Shop</th>
                 <th className="text-left p-2">Items</th>
                 <th className="text-left p-2">Date</th>
                 <th className="text-left p-2">Amount</th>
@@ -136,6 +137,7 @@ export default function AdminOrdersList() {
                       </span>
                     </div>
                   </td>
+                  <td className="p-2">{(o as any).shop?.name || '—'}</td>
                   <td className="p-2">{o.order_items?.length || 0}</td>
                   <td className="p-2">
                     {o.created_at

@@ -9,14 +9,13 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { PrismaClient } from "@prisma/client";
 
 import "dotenv/config";
+import { prisma } from "../lib/db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.join(__dirname, "..");
 const node = process.execPath;
-const prisma = new PrismaClient();
 const DAILY_JOBS_LOCK_ID = 782_026_001;
 const DAILY_JOBS_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 

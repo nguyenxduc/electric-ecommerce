@@ -6,7 +6,8 @@ import StockIcon from '../../../assets/stock-icon.svg'
 import GuaranteeIcon from '../../../assets/guarantee-icon.svg'
 // @ts-ignore
 import DeliveryIcon from '../../../assets/delivery-icon.svg'
-import { Star } from 'lucide-react'
+import { Star, Store as StoreIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
 import Payment from './Payment'
@@ -19,6 +20,7 @@ import { useSimilarProducts } from '../../hooks/useProducts'
 import ListProduct from './ListProduct'
 import ReviewComponent from './Review'
 import { getProductColors } from '../../utils/productColors'
+import VariantPicker from './VariantPicker'
 
 interface ProductDetailProps {
   product: Product
@@ -31,6 +33,12 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
   )
   const [selectedColor, setSelectedColor] = useState<string>('')
   const [expanded, setExpanded] = useState(false)
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
+    null
+  )
+  const variants = product.variants ?? []
+  const selectedVariant =
+    variants.find(v => v.id === selectedVariantId) ?? null
   const visibleCount = expanded ? product.specs.length : 5
 
   const { data: similarProducts } = useSimilarProducts(Number(product.id), 6)
@@ -61,6 +69,10 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
       setSelectedColor('')
     }
   }, [product, colors])
+
+  useEffect(() => {
+    setSelectedVariantId(null)
+  }, [product?.id])
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -118,6 +130,17 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     <span className="font-medium">{product.sold}</span> sold
                   </div>
                 </div>
+                {product.shop && (
+                  <Link
+                    to={`/shop/${product.shop.slug}`}
+                    className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 border rounded-lg px-3 py-2 transition"
+                  >
+                    <StoreIcon className="w-4 h-4" />
+                    Sold by{' '}
+                    <span className="font-semibold">{product.shop.name}</span>
+                    <span className="text-blue-600">Visit shop →</span>
+                  </Link>
+                )}
               </div>
 
               {/* Color Selection */}
@@ -142,6 +165,15 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     ))}
                   </div>
                 </div>
+              )}
+
+              {variants.length > 0 && (
+                <VariantPicker
+                  key={product.id}
+                  variants={variants}
+                  selectedId={selectedVariantId}
+                  onSelect={setSelectedVariantId}
+                />
               )}
 
               {/* Specifications */}
@@ -188,6 +220,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 colors={colors}
                 id={product.id}
                 quantity={product.quantity}
+                variants={variants}
+                selectedVariant={selectedVariant}
               />
             </div>
           </div>

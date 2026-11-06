@@ -17,8 +17,19 @@ export const adminOrderService = {
     limit?: number
     status?: string
     q?: string
+    shop_id?: number
   }) {
     return axiosClient.get<OrderListResponse>('/orders', { params })
+  },
+
+  // Seller dashboard: own shop's orders only
+  listMine(params?: {
+    page?: number
+    limit?: number
+    status?: string
+    q?: string
+  }) {
+    return axiosClient.get<OrderListResponse>('/orders/shop/mine', { params })
   },
 
   getById(id: number) {
@@ -38,6 +49,10 @@ export const adminOrderService = {
   },
   stats() {
     return axiosClient.get<OrderStatsResponse>('/orders/stats')
+  },
+  // Seller dashboard: own shop's stats
+  shopStats() {
+    return axiosClient.get<OrderStatsResponse>('/orders/shop/stats')
   }
 }
 

@@ -22,7 +22,11 @@ import {
   MessageCircle,
   ScrollText,
   Bell,
-  Bot
+  Bot,
+  Activity,
+  Banknote,
+  ShieldAlert,
+  Receipt
 } from 'lucide-react'
 import { useValidateToken } from '../../client/hooks/useAuth'
 import { useAllChats } from '../../client/hooks/useChat'
@@ -44,6 +48,7 @@ const sections: NavSection[] = [
     title: 'Main menu',
     items: [
       { to: '/admin', label: 'Dashboard', icon: Home, end: true },
+      { to: '/admin/shops', label: 'Shops', icon: Store, end: true },
       { to: '/admin/orders', label: 'Order Management', icon: ShoppingCart },
       { to: '/admin/customers', label: 'Customers', icon: Users },
       { to: '/admin/coupons', label: 'Coupon Code', icon: TicketPercent },
@@ -84,6 +89,15 @@ const sections: NavSection[] = [
         icon: Bot,
         end: true
       },
+      {
+        to: '/admin/health',
+        label: 'System Health',
+        icon: Activity,
+        end: true
+      },
+      { to: '/admin/cod', label: 'COD Reconciliation', icon: Banknote, end: true },
+      { to: '/admin/fraud', label: 'Fraud Flags', icon: ShieldAlert, end: true },
+      { to: '/admin/tax', label: 'Tax & Invoices', icon: Receipt, end: true },
       { to: '/admin/settings', label: 'Settings', icon: Settings2, end: true }
     ]
   },

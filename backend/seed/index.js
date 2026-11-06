@@ -22,13 +22,24 @@ async function clearDatabase() {
   await prisma.filterKey.deleteMany();
   await prisma.productEmbedding.deleteMany();
   await prisma.productColor.deleteMany();
+  await prisma.returnRequest.deleteMany();
+  await prisma.shipmentEvent.deleteMany();
+  await prisma.shipment.deleteMany();
+  await prisma.codSettlement.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.taxWithholding.deleteMany();
+  await prisma.fraudFlag.deleteMany();
+  await prisma.otpCode.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.orderGroup.deleteMany();
   await prisma.cartItem.deleteMany();
+  await prisma.productVariant.deleteMany();
   await prisma.cart.deleteMany();
   await prisma.review.deleteMany();
   await prisma.wishlist.deleteMany();
   await prisma.product.deleteMany();
+  await prisma.shop.deleteMany();
   await prisma.subCategory.deleteMany();
   await prisma.category.deleteMany();
   await prisma.coupon.deleteMany();
@@ -144,6 +155,33 @@ async function seedUsers() {
       address: "147 River Street, Hue",
       email_verified: true,
     },
+    {
+      name: "Tech World Seller",
+      email: "seller1@example.com",
+      password_digest: password,
+      role: "seller",
+      phone: "0901112223",
+      address: "12 Nguyen Hue, HCMC",
+      email_verified: true,
+    },
+    {
+      name: "Gadget Hub Seller",
+      email: "seller2@example.com",
+      password_digest: password,
+      role: "seller",
+      phone: "0904445556",
+      address: "34 Trang Tien, Hanoi",
+      email_verified: true,
+    },
+    {
+      name: "Pending Seller",
+      email: "seller3@example.com",
+      password_digest: password,
+      role: "user",
+      phone: "0907778889",
+      address: "56 Bach Dang, Da Nang",
+      email_verified: true,
+    },
   ];
 
   const createdUsers = [];
@@ -152,7 +190,65 @@ async function seedUsers() {
     createdUsers.push(created);
   }
 
-  return { admin: createdUsers[0], users: createdUsers };
+  return {
+    admin: createdUsers[0],
+    users: createdUsers,
+    sellers: createdUsers.filter((u) => u.role === "seller"),
+    pendingSeller: createdUsers.find((u) => u.email === "seller3@example.com"),
+  };
+}
+
+async function seedShops({ sellers, pendingSeller }) {
+  const [seller1, seller2] = sellers;
+
+  const techWorld = await prisma.shop.create({
+    data: {
+      owner_id: seller1.id,
+      name: "Tech World",
+      slug: "tech-world",
+      description:
+        "Authorized retailer of flagship smartphones, laptops and tablets.",
+      status: "active",
+      contact_email: seller1.email,
+      contact_phone: seller1.phone,
+      address: seller1.address,
+      approved_at: new Date(),
+    },
+  });
+
+  const gadgetHub = await prisma.shop.create({
+    data: {
+      owner_id: seller2.id,
+      name: "Gadget Hub",
+      slug: "gadget-hub",
+      description:
+        "Audio gear, wearables, cameras and gaming accessories at great prices.",
+      status: "active",
+      contact_email: seller2.email,
+      contact_phone: seller2.phone,
+      address: seller2.address,
+      // Demo: this shop sets its own shipping policy (cheaper than platform default)
+      shipping_fee_override: 4.99,
+      free_shipping_threshold_override: 150,
+      approved_at: new Date(),
+    },
+  });
+
+  // A pending application so the admin approval queue has something to review.
+  const pendingShop = await prisma.shop.create({
+    data: {
+      owner_id: pendingSeller.id,
+      name: "New Corner Store",
+      slug: "new-corner-store",
+      description: "Aspiring electronics reseller awaiting approval.",
+      status: "pending",
+      contact_email: pendingSeller.email,
+      contact_phone: pendingSeller.phone,
+      address: pendingSeller.address,
+    },
+  });
+
+  return { techWorld, gadgetHub, pendingShop, shops: [techWorld, gadgetHub] };
 }
 
 async function seedCategories() {
@@ -616,14 +712,40 @@ async function seedFilterOptions(filterKeys, categories) {
   return createdFilterOptions;
 }
 
-async function seedProducts(categories, subCategories) {
+// Bien the SKU cho vai dien thoai (tong quantity = product.quantity).
+// Co y khong gan cho Galaxy S24 Ultra: test dung san pham ton kho cao nhat
+// cua Tech World va khong gui variant_id.
+const SEED_VARIANTS = {
+  "Google Pixel 8 Pro": [
+    { sku: "PIXEL8P-128", name: "128GB", attributes: { storage: "128GB" }, price_delta: 0, quantity: 12 },
+    { sku: "PIXEL8P-256", name: "256GB", attributes: { storage: "256GB" }, price_delta: 100, quantity: 12 },
+    { sku: "PIXEL8P-512", name: "512GB", attributes: { storage: "512GB" }, price_delta: 250, quantity: 8 },
+  ],
+  "Xiaomi 14": [
+    { sku: "XIAOMI14-256", name: "256GB", attributes: { storage: "256GB" }, price_delta: 0, quantity: 20 },
+    { sku: "XIAOMI14-512", name: "512GB", attributes: { storage: "512GB" }, price_delta: 80, quantity: 14 },
+    { sku: "XIAOMI14-1TB", name: "1TB", attributes: { storage: "1TB" }, price_delta: 180, quantity: 6 },
+  ],
+};
+
+async function seedProducts(categories, subCategories, shops) {
   const products = PRODUCTS_CATALOG.map((entry) =>
     resolveCatalogProduct(entry, categories, subCategories)
+  );
+
+  // Tech World sells smartphones/laptops/tablets; Gadget Hub sells the rest.
+  const techWorldCategoryIds = new Set(
+    categories
+      .filter((c) => ["smartphones", "laptops", "tablets"].includes(c.slug))
+      .map((c) => c.id.toString())
   );
 
   const createdProducts = [];
   for (const product of products) {
     const data = enrichProduct(product);
+    const shop = techWorldCategoryIds.has(data.category_id.toString())
+      ? shops.techWorld
+      : shops.gadgetHub;
     const created = await prisma.product.create({
       data: {
         name: data.name,
@@ -637,11 +759,15 @@ async function seedProducts(categories, subCategories) {
         specs_detail: data.specs_detail,
         color: data.color,
         description: data.description,
+        shop_id: shop.id,
         category_id: data.category_id,
         sub_category_id: data.sub_category_id,
         product_colors: {
           create: parseColorsWithQuantities(data.color, data.quantity),
         },
+        ...(SEED_VARIANTS[data.name] && {
+          variants: { create: SEED_VARIANTS[data.name] },
+        }),
       },
     });
     createdProducts.push(created);
@@ -835,8 +961,30 @@ async function seedProductFilterValues(products, filterOptions, filterKeys) {
   return productFilterValues;
 }
 
-async function seedCoupons() {
+async function seedCoupons(shops) {
   const coupons = [
+    {
+      code: "TECHWORLD10",
+      description: "Shop voucher: 10% off all Tech World items",
+      discount_type: "percent",
+      discount_value: 10,
+      min_order: 50,
+      usage_limit: 100,
+      used_count: 0,
+      shop_id: shops.techWorld.id,
+      expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+    },
+    {
+      code: "GADGET5",
+      description: "Shop voucher: $5 off at Gadget Hub",
+      discount_type: "fixed",
+      discount_value: 5,
+      min_order: 30,
+      usage_limit: 100,
+      used_count: 0,
+      shop_id: shops.gadgetHub.id,
+      expires_at: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+    },
     {
       code: "WELCOME10",
       description: "10% off for new users",
@@ -947,37 +1095,57 @@ async function seedOrders(users, products) {
       // Ignore error
     }
 
+    const paymentMethod = [
+      "credit_card",
+      "debit_card",
+      "cash_on_delivery",
+      "paypal",
+      "momo",
+      "bank_transfer",
+    ][i % 6];
+    const shippingAddress = JSON.stringify({
+      street: `${Math.floor(Math.random() * 999) + 1} Sample Street`,
+      city: ["HCMC", "Hanoi", "Da Nang", "Nha Trang", "Can Tho", "Da Lat"][
+        i % 6
+      ],
+      district: [
+        "District 1",
+        "Cau Giay",
+        "Hai Chau",
+        "Ninh Kieu",
+        "District 3",
+      ][i % 5],
+      country: "VN",
+      zip_code: "70000",
+    });
+
+    const orderGroup = await prisma.orderGroup.create({
+      data: {
+        user_id: user.id,
+        group_number: `GRP-${Date.now()}-${i}`,
+        subtotal_amount: totalPrice,
+        total_amount: totalPrice,
+        payment_method: paymentMethod,
+        shipping_address: shippingAddress,
+        receiver_name: user.name || "Customer",
+        receiver_phone: user.phone || "0000000000",
+      },
+    });
+
     const order = await prisma.order.create({
       data: {
         user_id: user.id,
+        shop_id: product.shop_id,
+        order_group_id: orderGroup.id,
         order_number: `ORD-${Date.now()}-${i}`,
         total_amount: totalPrice,
-        status: ["pending", "confirmed", "processing", "shipped", "delivered"][
-          i % 5
-        ],
-        payment_method: [
-          "credit_card",
-          "debit_card",
-          "cash_on_delivery",
-          "paypal",
-          "momo",
-          "bank_transfer",
-        ][i % 6],
-        shipping_address: JSON.stringify({
-          street: `${Math.floor(Math.random() * 999) + 1} Sample Street`,
-          city: ["HCMC", "Hanoi", "Da Nang", "Nha Trang", "Can Tho", "Da Lat"][
-            i % 6
-          ],
-          district: [
-            "District 1",
-            "Cau Giay",
-            "Hai Chau",
-            "Ninh Kieu",
-            "District 3",
-          ][i % 5],
-          country: "VN",
-          zip_code: "70000",
-        }),
+        // Chi dung trang thai co that trong may trang thai cua ung dung.
+        // Truoc day seed sinh ca "confirmed" - mot trang thai khong co trong
+        // ORDER_STATUS_FLOW, khien don do bi ket vinh vien: seller khong
+        // chuyen tiep duoc ma cung khong huy duoc.
+        status: ["pending", "processing", "shipped", "delivered"][i % 4],
+        payment_method: paymentMethod,
+        shipping_address: shippingAddress,
         receiver_name: user.name || "Customer",
         receiver_phone: user.phone || "0000000000",
         order_items: {
@@ -995,6 +1163,48 @@ async function seedOrders(users, products) {
     });
 
     orders.push(order);
+
+    // Them mon thu hai TU SHOP KHAC vao cung gio hang nay.
+    //
+    // Lam viec nay vi thuat toan loc cong tac hoc tu cac cap san pham duoc mua
+    // CHUNG mot gio. Neu moi gio chi co dung mot mon thi khong ton tai cap nao,
+    // ma tran dong mua rong, va goi y luon roi ve cold-start (ban chay + hang
+    // moi) — tinh nang goi y ca nhan hoa coi nhu khong demo duoc.
+    const otherShopProducts = products.filter(
+      (p) => p.shop_id?.toString() !== product.shop_id?.toString()
+    );
+    if (otherShopProducts.length > 0) {
+      const companion =
+        otherShopProducts[Math.floor(Math.random() * otherShopProducts.length)];
+      const companionQty = Math.floor(Math.random() * 2) + 1;
+      const companionUnit =
+        Number(companion.price) - Number(companion.discount || 0);
+
+      await prisma.order.create({
+        data: {
+          user_id: user.id,
+          shop_id: companion.shop_id,
+          order_group_id: orderGroup.id,
+          order_number: `ORD-${Date.now()}-${i}-b`,
+          total_amount: companionUnit * companionQty,
+          status: ["pending", "processing", "shipped", "delivered"][i % 4],
+          payment_method: paymentMethod,
+          shipping_address: shippingAddress,
+          receiver_name: user.name || "Customer",
+          receiver_phone: user.phone || "0000000000",
+          order_items: {
+            create: [
+              {
+                product_id: companion.id,
+                quantity: companionQty,
+                unit_price: companionUnit,
+                total_price: companionUnit * companionQty,
+              },
+            ],
+          },
+        },
+      });
+    }
   }
 
   return orders;
@@ -1160,6 +1370,14 @@ async function seedSettings() {
       is_public: true,
     },
     {
+      key: "platform_commission_rate",
+      value: process.env.PLATFORM_COMMISSION_RATE || "0.05",
+      description: "Platform commission rate charged on seller revenue (0.05 = 5%)",
+      category: "payment",
+      data_type: "number",
+      is_public: false,
+    },
+    {
       key: "store_name",
       value: process.env.STORE_NAME || "Tech Shop",
       description: "Store display name",
@@ -1282,9 +1500,16 @@ async function main() {
   await clearDatabase();
   console.log("✓ Database cleared");
 
-  const { admin, users } = await seedUsers();
+  const { admin, users, sellers, pendingSeller } = await seedUsers();
   console.log(
-    `✓ Created ${users.length} users (1 admin, ${users.length - 1} customers)`
+    `✓ Created ${users.length} users (1 admin, ${sellers.length} sellers, ${
+      users.length - sellers.length - 1
+    } customers)`
+  );
+
+  const shops = await seedShops({ sellers, pendingSeller });
+  console.log(
+    `✓ Created ${shops.shops.length} active shops + 1 pending application`
   );
 
   const categories = await seedCategories();
@@ -1299,7 +1524,7 @@ async function main() {
   const filterOptions = await seedFilterOptions(filterKeys, categories);
   console.log(`✓ Created ${filterOptions.length} filter options`);
 
-  const products = await seedProducts(categories, subCategories);
+  const products = await seedProducts(categories, subCategories, shops);
   console.log(`✓ Created ${products.length} products`);
 
   const productColors = await seedProductColors(products);
@@ -1312,8 +1537,10 @@ async function main() {
   );
   console.log(`✓ Created ${productFilterValues.length} product filter values`);
 
-  const coupons = await seedCoupons();
-  console.log(`✓ Created ${coupons.length} coupons`);
+  const coupons = await seedCoupons(shops);
+  console.log(
+    `✓ Created ${coupons.length} coupons (incl. 2 shop vouchers)`
+  );
 
   const orders = await seedOrders(users, products);
   console.log(`✓ Created ${orders.length} orders`);
@@ -1339,6 +1566,7 @@ async function main() {
   console.log({
     admin: { id: admin.id?.toString?.(), email: admin.email },
     totalUsers: users.length,
+    totalShops: shops.shops.length + 1,
     totalCategories: categories.length,
     totalSubCategories: subCategories.length,
     totalProducts: products.length,
@@ -1353,6 +1581,15 @@ async function main() {
     totalSettings: settings.length,
   });
   console.log("\n🌱 Database is now seeded and ready to use!");
+
+  // clearDatabase() xoa ca product_embeddings, ma embedding phai gan voi id
+  // san pham moi nen khong the giu lai. Neu khong sinh lai, chatbot RAG am
+  // tham tut xuong chi con tim theo tu khoa - rat de vo tran luc demo.
+  console.log(
+    "\n[!] product_embeddings da bi xoa theo du lieu cu." +
+      "\n    Chay: npm run embed:products (hoac khoi dong lai backend)" +
+      "\n    truoc khi demo chatbot AI. Gon hon: npm run seed:full"
+  );
 }
 
 main()

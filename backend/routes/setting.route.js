@@ -7,6 +7,7 @@ import {
   updateSetting,
   deleteSetting,
 } from "../controllers/setting.controller.js";
+import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
@@ -17,9 +18,9 @@ router.get("/public", getPublicSettings);
 router.get("/:key", getSettingByKey);
 
 // Admin routes - require authentication and admin role
-router.get("/", getAllSettings);
-router.post("/", upsertSetting);
-router.put("/:key", updateSetting);
-router.delete("/:key", deleteSetting);
+router.get("/", protectRoute, adminRoute, getAllSettings);
+router.post("/", protectRoute, adminRoute, upsertSetting);
+router.put("/:key", protectRoute, adminRoute, updateSetting);
+router.delete("/:key", protectRoute, adminRoute, deleteSetting);
 
 export default router;

@@ -48,13 +48,30 @@ async function main() {
     _count: { id: true },
   });
 
-  const rows = groups.map((g) => ({
-    visitor_key: visitorKey(g.user_id, g.session_id),
-    product_id: g.product_id ?? BigInt(0),
-    event_type: g.event_type,
-    day: dayStart,
-    event_count: g._count.id,
-  }));
+  // visitorKey() collapses every session_id into one `user:<id>` key for a
+  // logged-in user, so two sessions on the same day can land on the same
+  // (visitor_key, product_id, event_type) - merge and sum those instead of
+  // inserting them as separate rows, which would violate the table's unique
+  // constraint and abort the whole day's rollup.
+  const merged = new Map();
+  for (const g of groups) {
+    const key = visitorKey(g.user_id, g.session_id);
+    const productId = g.product_id ?? BigInt(0);
+    const mapKey = `${key}|${productId.toString()}|${g.event_type}`;
+    const existing = merged.get(mapKey);
+    if (existing) {
+      existing.event_count += g._count.id;
+    } else {
+      merged.set(mapKey, {
+        visitor_key: key,
+        product_id: productId,
+        event_type: g.event_type,
+        day: dayStart,
+        event_count: g._count.id,
+      });
+    }
+  }
+  const rows = Array.from(merged.values());
 
   await prisma.$transaction(async (tx) => {
     const del = await tx.userBehaviorDaily.deleteMany({

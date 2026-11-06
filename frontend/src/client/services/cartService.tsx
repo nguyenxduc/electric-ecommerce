@@ -16,6 +16,7 @@ export const fetchCart = async (): Promise<CartResponse> => {
 
 export type AddToCartPayload = {
   quantity?: number
+  variant_id?: number
   color?: string | { name: string; code: string } | null
 }
 

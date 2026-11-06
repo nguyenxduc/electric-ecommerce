@@ -11,10 +11,25 @@ export type CartItem = {
   sold_quantity: number
   max_quantity: number
   quantity: number
+  variant?: {
+    id: number
+    sku: string
+    name: string
+    attributes?: Record<string, string> | null
+    price_delta: number
+  } | null
   color: {
     code: string
     name: string
   }
+  shop?: {
+    id: number
+    name: string
+    slug: string
+    status: string
+    shipping_fee_override?: number | null
+    free_shipping_threshold_override?: number | null
+  } | null
 }
 
 export type Cart = {

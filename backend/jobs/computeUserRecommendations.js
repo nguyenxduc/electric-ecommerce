@@ -2,11 +2,12 @@
  * Offline job: precompute home recommendations per user from behavior + CF.
  * Run: npm run job:offline-user-recommendation
  */
+import { pathToFileURL } from "url";
 import { prisma } from "../lib/db.js";
 
 const LIMIT = 24;
 
-async function getColdStartProducts(limit) {
+export async function getColdStartProducts(limit) {
   const half = Math.ceil(limit / 2);
   const [bestSellers, newest] = await Promise.all([
     prisma.product.findMany({
@@ -28,7 +29,7 @@ async function getColdStartProducts(limit) {
   return Array.from(map.values()).slice(0, limit);
 }
 
-async function getCfProductsFromBehavior(userId, limit) {
+export async function getCfProductsFromBehavior(userId, limit) {
   const rows = await prisma.userBehavior.findMany({
     where: {
       user_id: userId,
@@ -80,7 +81,7 @@ async function getCfProductsFromBehavior(userId, limit) {
   return products.slice(0, limit);
 }
 
-async function getBehaviorOnlyProducts(userId, limit) {
+export async function getBehaviorOnlyProducts(userId, limit) {
   const rows = await prisma.userBehavior.findMany({
     where: {
       user_id: userId,
@@ -178,11 +179,15 @@ async function main() {
   console.log(`[offline-reco] Done. Computed ${ok} users.`);
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Chi tu chay khi goi truc tiep (node jobs/computeUserRecommendations.js),
+// khong chay khi file nay duoc import de dung lai ham (vd. eval:reco).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+    .catch((e) => {
+      console.error(e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
