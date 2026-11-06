@@ -24,3 +24,8 @@ build/
 
 # Backup DB (db-backup service)
 backups/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.state.json

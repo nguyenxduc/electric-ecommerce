@@ -103,10 +103,11 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
                 className="border rounded px-2 py-1 text-sm"
                 value=""
                 disabled={run.isPending}
-                onChange={e =>
-                  e.target.value &&
-                  run.mutate(() => simulateShipment(sh.id, e.target.value))
-                }
+                onChange={e => {
+                  // Doc value ngay: select controlled bi reset ve '' truoc khi mutationFn chay
+                  const next = e.target.value
+                  if (next) run.mutate(() => simulateShipment(sh.id, next))
+                }}
               >
                 <option value="">Simulate...</option>
                 {['picked', 'in_transit', 'delivered', 'returned', 'failed'].map(
