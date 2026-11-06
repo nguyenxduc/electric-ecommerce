@@ -119,7 +119,9 @@ const openHtml = async (url: string) => {
   if (!w) return void toast.error('Allow pop-ups to view')
   try {
     const { data } = await axiosClient.get(url, { responseType: 'text' })
-    w.location.href = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+    const blobUrl = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+    w.location.href = blobUrl
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
   } catch (e) {
     w.close()
     throw e

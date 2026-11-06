@@ -18,6 +18,7 @@ import { useValidateToken } from '../hooks/useAuth'
 import { usePublicSettings } from '../hooks/useSettings'
 
 import {
+  cancelMyOrder,
   createOrder,
   quoteShipping,
   type ShippingQuote
@@ -73,6 +74,8 @@ const Checkout = () => {
   const [momoOrderMeta, setMomoOrderMeta] = useState<{
     orderNumber: string
     orderDbId: number
+    amount: number
+    voucherDiscount: number
   } | null>(null)
   const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null)
@@ -332,10 +335,16 @@ const Checkout = () => {
       return
     }
 
+    // Don da tao nhung chua tao duoc thanh toan: huy ngay de tra kho/voucher,
+    // neu khong gio con nguyen va khach thu lai se tao don thu hai.
+    let pendingOrderIds: number[] = []
+    const rollbackPendingOrders = () =>
+      Promise.allSettled(pendingOrderIds.map(id => cancelMyOrder(id)))
     try {
       isSubmittingRef.current = true
       setProcessing(true)
       const orderResult = await createOrderFromCart('momo', false)
+      pendingOrderIds = (orderResult.orders ?? []).map((o: { id: number }) => Number(o.id))
       // Number() tra ve NaN chu khong bao gio nullish, nen chuoi ?? cu khien
       // nhanh du phong momoPayAmount khong bao gio chay: total_amount thieu se
       // cho ra NaN va don hang vua tao bi ket o trang thai chua thanh toan.
@@ -345,6 +354,7 @@ const Checkout = () => {
         (Number.isFinite(groupTotal) ? groupTotal : momoPayAmount)
 
       if (!canPayWithMomo(serverPayAmount)) {
+        await rollbackPendingOrders()
         toast.error(
           `Order total is too low for MoMo (min ~$${momoMinOrderUsd()}). Use COD instead.`
         )
@@ -358,13 +368,17 @@ const Checkout = () => {
         order_group_id: orderResult.order_group.id,
         orderNumber: orderResult.order_group.group_number
       })
-      // Chi xoa gio sau khi tao thanh toan thanh cong de loi thi gio van con
-      await clearCartAfterOrder()
-
+      pendingOrderIds = []
+      // Luu so tien/giam gia truoc khi xoa gio: xoa gio doi quoteKey va xoa
+      // couponResult, trang ket qua se hien 0 neu doc lai tu state.
       setMomoOrderMeta({
         orderNumber: orderResult.order_group.group_number,
-        orderDbId: orderResult.order_group.id
+        orderDbId: orderResult.order_group.id,
+        amount: serverPayAmount,
+        voucherDiscount: couponResult?.discount ?? 0
       })
+      // Chi xoa gio sau khi tao thanh toan thanh cong de loi thi gio van con
+      await clearCartAfterOrder()
 
       const target = momoData.payUrl || momoData.deeplink
       if (target) {
@@ -376,6 +390,7 @@ const Checkout = () => {
       setQrData(momoData)
       setShowQRModal(true)
     } catch (err: any) {
+      await rollbackPendingOrders()
       handleOrderError(err, 'Failed to create MoMo payment')
     } finally {
       isSubmittingRef.current = false
@@ -399,8 +414,8 @@ const Checkout = () => {
         navigate(
           `/payment-result?method=momo&order=${encodeURIComponent(
             momoOrderMeta.orderNumber
-          )}&amount=${displayTotal}&subtotal=${totals.grandTotal}&tierDiscount=${tierDiscountAmount}&voucherDiscount=${
-            couponResult?.discount ?? 0
+          )}&amount=${momoOrderMeta.amount}&subtotal=${totals.grandTotal}&tierDiscount=${tierDiscountAmount}&voucherDiscount=${
+            momoOrderMeta.voucherDiscount
           }`
         )
         return

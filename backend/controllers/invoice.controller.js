@@ -127,6 +127,10 @@ export const getAllInvoices = asyncHandler(async (req, res) => {
 
 export const getShopTaxSummary = asyncHandler(async (req, res) => {
   if (!req.shop) return badRequest(res, "Seller shop required");
+  // Nam rac (99999, 2026.5) tao Invalid Date -> Prisma nem loi -> 500.
+  if (req.query.year !== undefined && !/^(19|20|21)\d{2}$/.test(String(req.query.year))) {
+    return badRequest(res, "year must be YYYY");
+  }
   const year = Number(req.query.year) || Number(vnPeriod(new Date()).slice(0, 4));
   const months = await shopYearSummary(req.shop.id, year);
   res.json({ success: true, data: { year, months } });

@@ -231,3 +231,12 @@ test('syncShipments: van don loi duoc bump updated_at de khong chan hang doi', a
   const fresh = await prisma.shipment.findUnique({ where: { id: s.id } })
   assert.ok(fresh.updated_at > new Date(Date.now() - 5 * 60 * 1000), 'updated_at da duoc bump')
 })
+
+test('seller tax summary: nam khong hop le tra 400 thay vi 500', async () => {
+  const seller = await login(ACCOUNTS.seller2)
+  for (const y of ['99999', '2026.5', '-1', 'abc']) {
+    const r = await req(`/tax/shop/mine/summary?year=${y}`, { token: seller })
+    assert.equal(r.status, 400, `year=${y}: ${JSON.stringify(r.json)}`)
+  }
+  assert.equal((await req('/tax/shop/mine/summary?year=2026', { token: seller })).status, 200)
+})

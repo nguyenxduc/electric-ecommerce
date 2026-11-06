@@ -45,7 +45,9 @@ export const openInvoiceHtml = async (id: number | string) => {
   if (!w) return void toast.error('Allow pop-ups to view')
   try {
     const { data } = await axiosClient.get(`/invoices/${id}/html`, { responseType: 'text' })
-    w.location.href = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+    const url = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+    w.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
   } catch (e) {
     w.close()
     throw e

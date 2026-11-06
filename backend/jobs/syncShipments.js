@@ -3,7 +3,7 @@
 import "dotenv/config";
 import { prisma } from "../lib/db.js";
 import { runWithJobLock, runJobScript } from "./lib/jobLock.js";
-import { getProvider } from "../services/shipping/providers/index.js";
+import { getProvider, PROVIDER_NAMES } from "../services/shipping/providers/index.js";
 import { applyShipmentStatus } from "../services/shipping/shipment.service.js";
 
 const LOCK_ID = 782_026_010;
@@ -18,7 +18,9 @@ const main = () =>
     const stale = await prisma.shipment.findMany({
       where: {
         status: { in: ["created", "picking", "in_transit", "failed"] },
-        carrier: { not: "mock" },
+        // Chi nha van chuyen co getStatus: van don khac khong bao gio duoc bump
+        // updated_at nen se chiem cho dau hang doi cua moi lan chay.
+        carrier: { in: PROVIDER_NAMES.filter((n) => getProvider(n)?.getStatus) },
         tracking_code: { not: null },
         updated_at: { lt: new Date(Date.now() - STALE_MS) },
       },
