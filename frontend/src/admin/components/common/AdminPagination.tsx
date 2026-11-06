@@ -33,7 +33,7 @@ export default function AdminPagination({
 
   return (
     <div
-      className={`flex items-center justify-between p-3 border-t text-sm ${className}`}
+      className={`flex flex-wrap items-center justify-between gap-2 p-3 border-t text-sm ${className}`}
     >
       <span className="text-gray-400 text-xs">
         Page {safePage} of {safeTotalPages}
@@ -42,7 +42,7 @@ export default function AdminPagination({
           : ''}
       </span>
 
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <button
           className="px-3 py-1.5 border rounded disabled:opacity-40"
           disabled={safePage <= 1}

@@ -39,7 +39,7 @@ const Footer = () => {
 
   return (
     <footer className="border-t bg-gradient-to-b from-blue-950 to-blue-900 pt-5">
-      <div className="container grid gird-cols-1 xl:grid-cols-4 gap-8 px-14">
+      <div className="container grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 px-6 sm:px-14">
         <div className="flex flex-col text-white font-thin space-y-1">
           <h3 className="text-xl font-normal mb-2">Company</h3>
           <p>about us</p>

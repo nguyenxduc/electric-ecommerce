@@ -71,7 +71,7 @@ export default function AdminProductsList() {
         </div>
       ) : (
         <div className="bg-white rounded border">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-left p-2">Image</th>
@@ -138,7 +138,7 @@ export default function AdminProductsList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
 
           <AdminPagination
             page={data?.data.pagination.current_page || page}

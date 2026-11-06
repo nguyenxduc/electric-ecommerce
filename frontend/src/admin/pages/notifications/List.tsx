@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  Bell, Plus, Search, RefreshCw, Package, Tag, Info,
+  Bell, Plus, RefreshCw, Package, Tag, Info,
   CheckCircle2, Clock, X, Send
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -265,7 +265,7 @@ export default function AdminNotificationsList() {
           </div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="text-left p-3 text-gray-600 font-medium">Title / Message</th>
@@ -324,7 +324,7 @@ export default function AdminNotificationsList() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
 
             <AdminPagination
               page={pagination?.page ?? page}

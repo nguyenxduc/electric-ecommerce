@@ -267,7 +267,7 @@ export default function AdminOrderDetail() {
       <ShipmentPanel orderId={oid} status={order.status} />
       <InvoicePanel orderId={oid} />
       <div className="bg-white rounded border">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
               <th className="text-left p-2">Product</th>
@@ -314,7 +314,7 @@ export default function AdminOrderDetail() {
               )
             })}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </div>
   )

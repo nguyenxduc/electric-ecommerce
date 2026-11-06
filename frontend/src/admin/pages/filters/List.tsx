@@ -137,7 +137,7 @@ export default function AdminFiltersList() {
       />
 
       <div className="bg-white p-4 rounded border grid gap-3">
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <input
             className="border rounded px-3 py-2 text-sm"
             placeholder="Search by ID, key, label, or value"
@@ -190,7 +190,7 @@ export default function AdminFiltersList() {
           </div>
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left p-2">ID</th>
@@ -225,7 +225,7 @@ export default function AdminFiltersList() {
                   ))
                 )}
               </tbody>
-            </table>
+            </table></div>
 
             <AdminPagination
               page={data?.data?.pagination?.current_page || page}

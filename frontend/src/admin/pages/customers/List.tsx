@@ -10,7 +10,6 @@ import Modal from '../../components/common/Modal'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
-import type { CustomerListResponse } from '../../types'
 
 const TIER_STYLE: Record<string, { bg: string; text: string; label: string; icon: string }> = {
   BRONZE:   { bg: 'bg-orange-100', text: 'text-orange-700', label: 'Bronze',   icon: '🥉' },
@@ -80,7 +79,7 @@ export default function AdminCustomersList() {
           <SkeletonTable rows={5} cols={8} />
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Name</th>
@@ -142,7 +141,7 @@ export default function AdminCustomersList() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
 
             <AdminPagination
               page={data?.data.pagination.current_page || page}

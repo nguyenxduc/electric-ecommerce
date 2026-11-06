@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
 import { useAdminOrders, useAdminOrderStats } from '../../hooks'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
@@ -58,8 +57,8 @@ export default function AdminOrdersList() {
       </div>
 
       <div className="bg-white rounded border">
-        <div className="flex items-center justify-between p-3 border-b">
-          <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b">
+          <div className="flex gap-2 overflow-x-auto">
             {[
               { label: 'All order', value: undefined },
               { label: 'Completed', value: 'delivered' },
@@ -82,19 +81,17 @@ export default function AdminOrdersList() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full sm:w-auto items-center gap-2">
             <input
-              className="border rounded px-3 py-1.5 text-sm w-56"
+              className="border rounded px-3 py-1.5 text-sm w-full sm:w-56"
               placeholder="Search order report"
               value={q}
               onChange={e => setQ(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && setPage(1)}
             />
-            <button className="p-2 border rounded" onClick={() => setPage(1)}>
+            <button className="p-2 border rounded" onClick={() => setPage(1)} aria-label="Search">
               ⟳
             </button>
-            <button className="p-2 border rounded">≣</button>
-            <button className="p-2 border rounded">⋮</button>
           </div>
         </div>
 
@@ -105,7 +102,7 @@ export default function AdminOrdersList() {
             Failed to load orders. Please retry.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-green-50">
               <tr>
                 <th className="text-left p-2">No.</th>
@@ -161,7 +158,7 @@ export default function AdminOrdersList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
 
         <AdminPagination

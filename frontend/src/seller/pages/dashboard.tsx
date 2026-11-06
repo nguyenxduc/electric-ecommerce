@@ -171,7 +171,7 @@ export default function SellerDashboard() {
             <h2 className="font-semibold">Top Selling Products</h2>
           </div>
           {topData?.data?.length ? (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-500 border-b">
                   <th className="py-2">Product</th>
@@ -198,7 +198,7 @@ export default function SellerDashboard() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : (
             <p className="text-sm text-gray-500">No sales yet.</p>
           )}

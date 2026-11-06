@@ -134,6 +134,7 @@ const Collection = () => {
     return { selected, tags }
   }, [searchParams])
 
+  const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<DynamicFilters>(() => {
     const { selected } = getFiltersFromURL()
     return {
@@ -454,18 +455,31 @@ const Collection = () => {
       {categories.length > 0 && <CategoryNav categories={categories} />}
       <FilterTagsBar tags={selectedTags} onRemoveTag={removeTag} />
 
-      <div className="max-w-7xl mx-auto px-6 py-6 flex gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
         {(isLoadingFilters || Object.keys(filters.options).length > 0) && (
-          <SidebarFilters
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            onClearAll={handleClearAll}
-            isLoading={isLoadingFilters}
-          />
+          <>
+            {/* Mobile: bo loc thu gon sau nut, khong chiem cho cua luoi san pham */}
+            <button
+              type="button"
+              onClick={() => setShowFilters(v => !v)}
+              aria-expanded={showFilters}
+              className="lg:hidden self-start rounded-lg border px-4 py-2 text-sm font-medium"
+            >
+              {showFilters ? 'Hide filters' : `Filters${selectedTags.length ? ` (${selectedTags.length})` : ''}`}
+            </button>
+            <div className={showFilters ? 'block' : 'hidden lg:block'}>
+              <SidebarFilters
+                filters={filters}
+                onFilterChange={handleFilterChange}
+                onClearAll={handleClearAll}
+                isLoading={isLoadingFilters}
+              />
+            </div>
+          </>
         )}
 
         <div
-          className={`flex-1 ${
+          className={`flex-1 min-w-0 ${
             !(isLoadingFilters || Object.keys(filters.options).length > 0)
               ? 'max-w-none'
               : ''

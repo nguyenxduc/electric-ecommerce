@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Settings, Store } from 'lucide-react'
+import { LayoutGrid, Settings, Store } from 'lucide-react'
 
 import Login from './Login'
 import Search from './Search'
@@ -32,7 +32,6 @@ const Navbar = () => {
 
   useEffect(() => {
     setUserLoggedIn(isLoggedIn)
-    console.log('User logged in status:', isLoggedIn)
   }, [isLoggedIn])
 
   const handleAuthSuccess = () => {
@@ -63,26 +62,15 @@ const Navbar = () => {
           >
             Product
           </Link>
-          <Link
-            to="#"
-            className="text-gray-700 hover:text-blue-600 text-sm font-light"
-          >
-            Blog
-          </Link>
-          <Link
-            to="#"
-            className="text-gray-700 hover:text-blue-600 text-sm font-light"
-          >
-            FAQ
-          </Link>
-          <Link
-            to="#"
-            className="text-gray-700 hover:text-blue-600 text-sm font-light"
-          >
-            Contact Us
-          </Link>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <Link
+            to="/collection/all"
+            aria-label="Products"
+            className="md:hidden p-1 text-gray-700 hover:text-blue-600"
+          >
+            <LayoutGrid className="w-5 h-5" />
+          </Link>
           <Search />
           {isCartLoading && <CartDrawer cartProducts={null} />}
           {!isCartLoading && (
@@ -136,7 +124,7 @@ const Navbar = () => {
             </div>
           ) : (
             <button
-              className="rounded-lg bg-blue-600 px-4 py-3 text-white text-light hover:bg-white hover:text-blue-600 hover:ring"
+              className="rounded-lg bg-blue-600 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base text-white hover:bg-white hover:text-blue-600 hover:ring"
               onClick={() => setOpenAuth(true)}
             >
               Login / Sign Up

@@ -1,6 +1,8 @@
-import React from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import React, { useEffect, useRef, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  Menu,
+  X,
   Home,
   ShoppingCart,
   Users,
@@ -111,6 +113,25 @@ const sections: NavSection[] = [
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  // Mobile: sidebar la drawer, dong lai sau moi lan chuyen trang
+  const [navOpen, setNavOpen] = useState(false)
+  useEffect(() => setNavOpen(false), [pathname])
+  const closeRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!navOpen) return
+    closeRef.current?.focus()
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false)
+    // Len md drawer thanh sidebar tinh: bo trang thai mo de thu nho lai khong bat len
+    const mq = window.matchMedia('(min-width: 768px)')
+    const onMq = () => mq.matches && setNavOpen(false)
+    document.addEventListener('keydown', onKey)
+    mq.addEventListener('change', onMq)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      mq.removeEventListener('change', onMq)
+    }
+  }, [navOpen])
   const { data: userData } = useValidateToken()
   const { data: chatsData } = useAllChats(1, 50)
 
@@ -125,47 +146,72 @@ export default function AdminLayout() {
       await logout()
       toast.success('Logged out successfully')
       navigate('/')
-    } catch (error) {
+    } catch {
       toast.error('Failed to logout')
     }
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-[256px_1fr] grid-rows-[56px_1fr]">
+    <div className="min-h-screen md:grid md:grid-cols-[256px_1fr] md:grid-rows-[56px_1fr]">
       {/* Header */}
-      <header className="col-start-2 bg-white border-b flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <h1 className="text-lg font-semibold text-gray-800">Admin Panel</h1>
+      <header className="md:col-start-2 h-14 bg-white border-b flex items-center justify-between gap-2 px-3 md:px-6">
+        <div className="flex min-w-0 items-center gap-2 md:gap-4">
+          <button
+            type="button"
+            onClick={() => setNavOpen(true)}
+            aria-label="Open menu"
+            aria-expanded={navOpen}
+            aria-controls="side-nav"
+            className="md:hidden p-2 -ml-1 rounded-lg hover:bg-gray-100"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <h1 className="truncate text-base md:text-lg font-semibold text-gray-800">Admin Panel</h1>
         </div>
         <div className="flex items-center gap-3">
           <Link
             to="/"
-            className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition"
+            className="flex items-center gap-2 px-2 md:px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Shop</span>
+            <span className="hidden sm:inline">Back to Shop</span>
           </Link>
           {userData?.user && (
-            <div className="flex items-center gap-3 pl-3 border-l">
+            <div className="flex items-center gap-3 pl-2 md:pl-3 border-l">
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
+                className="flex items-center gap-2 px-2 md:px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
                 title="Logout"
               >
                 <LogOut className="w-4 h-4" />
-                <span>Logout</span>
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           )}
         </div>
       </header>
 
-      <aside className="row-span-2 border-r bg-white">
+      {navOpen && (
+        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setNavOpen(false)} aria-hidden="true" />
+      )}
+      <aside
+        id="side-nav"
+        className={`${navOpen ? 'fixed inset-y-0 left-0 z-40 w-64 overflow-y-auto shadow-xl' : 'hidden'} md:static md:block md:row-span-2 md:row-start-1 border-r bg-white`}
+      >
         <div className="h-14 flex items-center px-4 font-semibold border-b">
           <Store className="w-5 h-5 mr-2" />
           TechShop Admin
+          <button
+            type="button"
+            ref={closeRef}
+            onClick={() => setNavOpen(false)}
+            aria-label="Close menu"
+            className="md:hidden ml-auto p-1 rounded hover:bg-gray-100"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <nav className="px-2 py-3 space-y-6">
+        <nav className="px-2 py-3 space-y-6" onClick={e => (e.target as HTMLElement).closest('a') && setNavOpen(false)}>
           {sections.map(section => (
             <div key={section.title ?? 'root'}>
               {section.title && (
@@ -213,7 +259,7 @@ export default function AdminLayout() {
         </nav>
       </aside>
 
-      <main className="col-start-2 p-6 bg-gray-50">
+      <main className="md:col-start-2 min-w-0 p-3 md:p-6 bg-gray-50">
         <Outlet />
       </main>
     </div>

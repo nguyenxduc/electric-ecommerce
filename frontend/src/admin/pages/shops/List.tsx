@@ -159,7 +159,7 @@ export default function AdminShopsList() {
           <SkeletonTable rows={5} cols={7} />
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Shop</th>
@@ -275,7 +275,7 @@ export default function AdminShopsList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
             <AdminPagination
               page={pagination?.current_page || page}
               totalPages={pages}

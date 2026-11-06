@@ -203,7 +203,7 @@ export default function SellerCouponsList() {
             ))}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-blue-50">
               <tr>
                 <th className="text-left p-2">Code</th>
@@ -253,7 +253,7 @@ export default function SellerCouponsList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
     </div>

@@ -14,7 +14,7 @@ const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle }
   const selectedCategoryId = selectedCompareProducts[0]?.category_id;
 
   return (
-    <div className="grid grid-cols-3 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
       {products.slice(0, 9).map((product) => (
         <ProductCard
           key={product.id}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { User, Mail, Phone, Key, Home, MapPin, Edit2, X } from 'lucide-react'
+import { User, Mail, Phone, Home, Edit2, X } from 'lucide-react'
 import { useValidateToken, useUpdateProfile } from '../../hooks/useAuth'
 import { toast } from 'sonner'
 
@@ -161,7 +161,6 @@ export default function Profile() {
   const [showNameModal, setShowNameModal] = useState(false)
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [showAddressModal, setShowAddressModal] = useState(false)
-  const [showPostalCodeModal, setShowPostalCodeModal] = useState(false)
 
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -171,8 +170,6 @@ export default function Profile() {
   const [phoneEdit, setPhoneEdit] = useState('')
   const [address, setAddress] = useState('')
   const [addressEdit, setAddressEdit] = useState('')
-  const [postalCode, setPostalCode] = useState('')
-  const [postalCodeEdit, setPostalCodeEdit] = useState('')
 
   // Initialize from user data
   useEffect(() => {
@@ -186,7 +183,6 @@ export default function Profile() {
       setPhoneEdit(userData.user.phone || '')
       setAddress(userData.user.address || '')
       setAddressEdit(userData.user.address || '')
-      // Load postal code from localStorage
     }
   }, [userData])
 
@@ -251,19 +247,20 @@ export default function Profile() {
         {/* Form Fields */}
         <div className="space-y-6">
           {/* Full name and Email row */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Full name */}
             <div>
               <label className="block text-sm text-gray-600 mb-2">
                 Full name
               </label>
               <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-3">
+                <div className="flex min-w-0 items-center space-x-3">
                   <User className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-700">{fullName}</span>
                 </div>
                 <button
                   onClick={() => setShowNameModal(true)}
+                  aria-label="Edit name"
                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -277,23 +274,23 @@ export default function Profile() {
                 E-mail Address
               </label>
               <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-3">
+                <div className="flex min-w-0 items-center space-x-3">
                   <Mail className="w-5 h-5 text-gray-400" />
-                  <span className="text-gray-700">{email}</span>
+                  <span className="text-gray-700 truncate">{email}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Phone number and Password row */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Phone number */}
             <div>
               <label className="block text-sm text-gray-600 mb-2">
                 Phone number
               </label>
               <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-3">
+                <div className="flex min-w-0 items-center space-x-3">
                   <Phone className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-700">{phone || 'Not set'}</span>
                 </div>
@@ -302,6 +299,7 @@ export default function Profile() {
                     setPhoneEdit(phone)
                     setShowPhoneModal(true)
                   }}
+                  aria-label="Edit phone number"
                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -310,15 +308,15 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Address and Postal code row */}
-          <div className="grid grid-cols-2 gap-6">
+          {/* Address row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Address */}
             <div>
               <label className="block text-sm text-gray-600 mb-2">
                 Address
               </label>
               <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between group hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-3">
+                <div className="flex min-w-0 items-center space-x-3">
                   <Home className="w-5 h-5 text-gray-400" />
                   <span className="text-gray-700">{address || 'Not set'}</span>
                 </div>
@@ -327,6 +325,7 @@ export default function Profile() {
                     setAddressEdit(address)
                     setShowAddressModal(true)
                   }}
+                  aria-label="Edit address"
                   className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 >
                   <Edit2 className="w-4 h-4" />

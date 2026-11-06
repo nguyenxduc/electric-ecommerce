@@ -46,8 +46,8 @@ export default function SellerOrdersList() {
       </div>
 
       <div className="bg-white rounded border">
-        <div className="flex items-center justify-between p-3 border-b">
-          <div className="flex gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b">
+          <div className="flex gap-2 overflow-x-auto">
             {[
               { label: 'All orders', value: undefined },
               { label: 'Pending', value: 'pending' },
@@ -73,7 +73,7 @@ export default function SellerOrdersList() {
             ))}
           </div>
           <input
-            className="border rounded px-3 py-1.5 text-sm w-56"
+            className="border rounded px-3 py-1.5 text-sm w-full sm:w-56"
             placeholder="Search by order number"
             value={q}
             onChange={e => setQ(e.target.value)}
@@ -88,7 +88,7 @@ export default function SellerOrdersList() {
             Failed to load orders. Please retry.
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-blue-50">
               <tr>
                 <th className="text-left p-2">No.</th>
@@ -142,7 +142,7 @@ export default function SellerOrdersList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
 
         <AdminPagination

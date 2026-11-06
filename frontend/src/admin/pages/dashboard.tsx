@@ -115,7 +115,7 @@ export default function AdminDashboard() {
               <button className="p-2 rounded border">⋮</button>
             </div>
           </div>
-          <div className="grid grid-cols-5 gap-4 p-4 text-center text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 p-4 text-center text-sm">
             <div>
               <div className="text-2xl font-semibold">{stats?.customers.formatted || '0'}</div>
               <div className="text-gray-500">Customers</div>

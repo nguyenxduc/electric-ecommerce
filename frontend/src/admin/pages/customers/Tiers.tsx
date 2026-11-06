@@ -82,7 +82,7 @@ export default function AdminCustomerTiersPage() {
           <SkeletonTable rows={5} cols={7} />
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="text-left p-2">Name</th>
@@ -145,7 +145,7 @@ export default function AdminCustomerTiersPage() {
                   )
                 })}
               </tbody>
-            </table>
+            </table></div>
 
             <AdminPagination
               page={data?.data.pagination.current_page || page}

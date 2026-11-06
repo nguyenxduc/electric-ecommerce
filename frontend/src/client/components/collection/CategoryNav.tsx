@@ -1,6 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { Grid3X3 } from 'lucide-react'
-import type { Category } from '../../types/category'
 
 interface CategoryNavProps {
   categories: Array<{
@@ -32,17 +31,19 @@ const CategoryNav = ({ categories }: CategoryNavProps) => {
 
   return (
     <div className="border-b">
-      <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="flex justify-between items-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex items-center gap-6 overflow-x-auto lg:justify-between">
           {categories.map(cat => {
             const categorySlug =
               cat.id === 0 ? 'all' : cat.slug || cat.id.toString()
             const isActive = currentSlug === categorySlug
             return (
-              <div
+              <button
+                type="button"
                 onClick={() => goTo(cat)}
                 key={cat.id}
-                className={`flex flex-col items-center gap-2 cursor-pointer transition-colors ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex flex-shrink-0 flex-col items-center gap-2 cursor-pointer transition-colors ${
                   isActive
                     ? 'text-blue-600'
                     : 'text-gray-600 hover:text-blue-600'
@@ -54,19 +55,19 @@ const CategoryNav = ({ categories }: CategoryNavProps) => {
                 ) : cat.image_url ? (
                   <img
                     src={cat.image_url}
-                    alt={cat.name}
+                    alt=""
                     className="w-6 h-6 object-contain"
                   />
                 ) : (
                   <div className="w-6 h-6 bg-gray-200 rounded"></div>
                 )}
-                <span className={`text-xs ${isActive ? 'font-medium' : ''}`}>
+                <span className={`text-xs whitespace-nowrap ${isActive ? 'font-medium' : ''}`}>
                   {cat.name}
                 </span>
                 {isActive && (
                   <div className="w-full h-0.5 bg-blue-600 rounded-full"></div>
                 )}
-              </div>
+              </button>
             )
           })}
         </div>

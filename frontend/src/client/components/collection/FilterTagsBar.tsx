@@ -6,6 +6,7 @@ type FilterTagsBarProps = {
 }
 
 const FilterTagsBar = ({ tags, onRemoveTag }: FilterTagsBarProps) => {
+  if (tags.length === 0) return null
   return (
     <div className="border-b bg-gray-50">
       <div className="max-w-7xl mx-auto px-6 py-4">

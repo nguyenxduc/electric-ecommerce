@@ -83,7 +83,7 @@ export default function AdminCouponsList() {
           <SkeletonTable rows={5} cols={7} />
         ) : (
           <>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Code</th>
@@ -133,7 +133,7 @@ export default function AdminCouponsList() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
 
             <AdminPagination
               page={data?.data.pagination.current_page || page}
@@ -196,7 +196,7 @@ export default function AdminCouponsList() {
               })
               toast.success('Coupon created')
               setCreateOpen(false)
-            } catch (err) {
+            } catch {
               toast.error('Failed to create coupon')
             }
           }}
@@ -332,7 +332,7 @@ export default function AdminCouponsList() {
               await updateMut.mutateAsync(payload)
               toast.success('Coupon updated')
               setEditOpen(null)
-            } catch (err) {
+            } catch {
               toast.error('Failed to update coupon')
             }
           }}

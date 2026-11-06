@@ -15,7 +15,7 @@ const UserLayout = () => {
     <>
       <BehaviorSession />
       <Header />
-      <main className="pt-40">
+      <main>
         <Outlet/>
       </main>
       <Footer />

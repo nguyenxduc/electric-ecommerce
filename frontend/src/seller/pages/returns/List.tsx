@@ -90,7 +90,7 @@ export default function SellerReturnsList() {
             ))}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-blue-50">
               <tr>
                 <th className="text-left p-2">Order</th>
@@ -164,7 +164,7 @@ export default function SellerReturnsList() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

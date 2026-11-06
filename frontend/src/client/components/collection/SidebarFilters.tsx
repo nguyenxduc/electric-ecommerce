@@ -24,7 +24,7 @@ const SidebarFilters = ({
 
   if (filterKeys.length === 0) {
     return (
-      <div className="w-64 flex-shrink-0 flex flex-col h-full">
+      <div className="w-full lg:w-64 flex-shrink-0 flex flex-col h-full">
         <div className="flex items-center justify-between mb-6 flex-shrink-0">
           <h2 className="text-lg font-semibold">Filters</h2>
         </div>
@@ -34,7 +34,7 @@ const SidebarFilters = ({
   }
 
   return (
-    <div className="w-64 flex-shrink-0 flex flex-col h-full">
+    <div className="w-full lg:w-64 flex-shrink-0 flex flex-col h-full">
       {/* Fixed header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <h2 className="text-lg font-semibold">Filters</h2>

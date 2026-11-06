@@ -62,7 +62,7 @@ const ShopPublic = () => {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-4">
         <div className="h-48 bg-gray-200 rounded-xl animate-pulse" />
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-72 bg-gray-200 rounded-lg animate-pulse" />
           ))}
@@ -227,7 +227,7 @@ const ShopPublic = () => {
       </div>
 
       {productsLoading ? (
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-72 bg-gray-200 rounded-lg animate-pulse" />
           ))}
