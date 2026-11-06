@@ -222,6 +222,19 @@ const Cart = () => {
                 const colorCode = item.color?.code || '#000000'
                 const productId = item.product_id
                 const productSlug = makeProductSlug(item.name, productId)
+                if (item.unavailable) {
+                  return (
+                    <div key={item.id} className="bg-white rounded-lg shadow p-6 flex items-center justify-between gap-4 opacity-70">
+                      <span className="text-gray-700">{item.name}</span>
+                      <button
+                        onClick={() => handleRemove(item.product_id, item.id, item.name)}
+                        className="text-sm text-red-600 underline"
+                      >
+                        No longer available — remove
+                      </button>
+                    </div>
+                  )
+                }
                 return (
                   <div key={item.id} className="bg-white rounded-lg shadow p-6">
                     <div className="flex gap-6">
@@ -402,7 +415,7 @@ const Cart = () => {
 
                 <button
                   onClick={() => navigate('/checkout')}
-                  disabled={items.length === 0}
+                  disabled={items.every(i => i.unavailable)}
                   className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   Proceed to checkout

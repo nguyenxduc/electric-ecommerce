@@ -9,7 +9,11 @@ const num = (n: any) => Number(n ?? 0).toLocaleString('en-US')
 const inp = 'border rounded px-3 py-2 text-sm'
 
 export default function AdminTaxPage() {
-  const [period, setPeriod] = useState(new Date().toISOString().slice(0, 7))
+  const [period, setPeriod] = useState(
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit' })
+      .format(new Date())
+      .slice(0, 7)
+  )
   const [shopId, setShopId] = useState('')
   const [status, setStatus] = useState('')
   const [from, setFrom] = useState('')

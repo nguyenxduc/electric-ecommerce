@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import axiosClient from '../../lib/axios'
 
 export type CreateOrderPayload = {
@@ -159,13 +160,21 @@ export const fetchInvoice = async (orderId: number): Promise<{ id: number; invoi
 
 // Fetch with the auth token, then open the HTML in a new tab via Blob URL
 export const openInvoiceHtml = async (invoiceId: number) => {
-  const { data } = await axiosClient.get(`/invoices/${invoiceId}/html`, {
-    responseType: 'text',
-    transformResponse: r => r
-  })
-  const url = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
-  window.open(url, '_blank')
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  // Mo tab rong dong bo (con trong user gesture) roi moi await, tranh bi chan popup
+  const w = window.open('', '_blank')
+  if (!w) return void toast.error('Allow pop-ups to view')
+  try {
+    const { data } = await axiosClient.get(`/invoices/${invoiceId}/html`, {
+      responseType: 'text',
+      transformResponse: r => r
+    })
+    const url = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+    w.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (e) {
+    w.close()
+    throw e
+  }
 }
 
 export const sendPhoneOtp = async (phone: string) => {

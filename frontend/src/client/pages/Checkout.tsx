@@ -45,7 +45,8 @@ const Checkout = () => {
   const { data: settingsData } = usePublicSettings('shipping')
 
   const cart = cartData?.cart
-  const items = cart?.items || []
+  // Dong het hang (variant bi xoa) khong duoc gui len server
+  const items = (cart?.items || []).filter(i => !i.unavailable)
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
@@ -214,7 +215,7 @@ const Checkout = () => {
     toast.error(data?.message || data?.error || fallback)
   }
 
-  const createOrderFromCart = async (paymentMethod: string) => {
+  const createOrderFromCart = async (paymentMethod: string, clearCart = true) => {
     const token = localStorage.getItem('accessToken')
     if (!token) {
       throw new Error('NOT_AUTHENTICATED')
@@ -252,14 +253,17 @@ const Checkout = () => {
 
     const result = await createOrder(orderPayload)
 
-    // Clear cart after successful order creation
+    if (clearCart) await clearCartAfterOrder()
+
+    return result
+  }
+
+  const clearCartAfterOrder = async () => {
     try {
       await clearCartMutation.mutateAsync()
     } catch (err) {
       console.error('Failed to clear cart:', err)
     }
-
-    return result
   }
 
   // Tier discount applies to merchandise only (matches the backend);
@@ -284,6 +288,12 @@ const Checkout = () => {
     }
     if (!address.trim() || !phone.trim() || !name.trim()) {
       toast.error('Please fill in contact and address info')
+      return
+    }
+
+    // Khong am tham bo qua yeu cau hoa don khi thieu thong tin
+    if (wantInvoice && (!invoice.company_name.trim() || !invoice.tax_code.trim())) {
+      toast.error('Please enter company name and tax code for the VAT invoice')
       return
     }
 
@@ -325,7 +335,7 @@ const Checkout = () => {
     try {
       isSubmittingRef.current = true
       setProcessing(true)
-      const orderResult = await createOrderFromCart('momo')
+      const orderResult = await createOrderFromCart('momo', false)
       // Number() tra ve NaN chu khong bao gio nullish, nen chuoi ?? cu khien
       // nhanh du phong momoPayAmount khong bao gio chay: total_amount thieu se
       // cho ra NaN va don hang vua tao bi ket o trang thai chua thanh toan.
@@ -348,6 +358,8 @@ const Checkout = () => {
         order_group_id: orderResult.order_group.id,
         orderNumber: orderResult.order_group.group_number
       })
+      // Chi xoa gio sau khi tao thanh toan thanh cong de loi thi gio van con
+      await clearCartAfterOrder()
 
       setMomoOrderMeta({
         orderNumber: orderResult.order_group.group_number,
@@ -446,6 +458,12 @@ const Checkout = () => {
     toast.success('Voucher applied')
     return true
   }
+
+  // Gio hang doi thi ban xem truoc giam gia khong con dung
+  useEffect(() => {
+    setAppliedCoupon(null)
+    setCouponResult(null)
+  }, [quoteKey])
 
   const handleApplyCoupon = () => {
     const code = couponInput.trim()
@@ -820,7 +838,10 @@ const Checkout = () => {
                 )}
                 <button
                   type="button"
-                  onClick={() => setAppliedCoupon(null)}
+                  onClick={() => {
+                    setAppliedCoupon(null)
+                    setCouponResult(null)
+                  }}
                   className="text-xs text-red-600 underline"
                 >
                   Remove

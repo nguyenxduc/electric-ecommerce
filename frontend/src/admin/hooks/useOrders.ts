@@ -65,6 +65,9 @@ export function useUpdateAdminOrderStatus(id: number) {
   >({
     mutationFn: payload => adminOrderService.updateStatus(id, payload),
     onSuccess: () => {
+      // Doi trang thai co the sinh/huy van don va hoa don
+      qc.invalidateQueries({ queryKey: ['shipment', id] })
+      qc.invalidateQueries({ queryKey: ['order-invoice', id] })
       qc.invalidateQueries({ queryKey: orderKeys.detail(id) })
       qc.invalidateQueries({ queryKey: orderKeys.all })
     }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import SkeletonTable from '../../components/common/SkeletonTable'
@@ -33,6 +33,10 @@ export default function AdminCodPage() {
   })
   const rows: any[] = pending.data?.shipments ?? []
   const picked = rows.filter(r => selected.includes(r.id))
+  // Bo id da bien mat sau khi refetch de khong gui nham
+  useEffect(() => {
+    if (pending.data && picked.length !== selected.length) setSelected(picked.map(p => p.id))
+  }, [pending.data, picked.length, selected.length])
   const total = picked.reduce((s, r) => s + Number(r.cod_amount_vnd || 0), 0)
   const oneCarrier = new Set(picked.map(p => p.carrier)).size <= 1
 
@@ -40,7 +44,7 @@ export default function AdminCodPage() {
     mutationFn: () =>
       createCodSettlement({
         carrier: picked[0].carrier,
-        shipment_ids: selected,
+        shipment_ids: picked.map(p => p.id),
         received_amount_vnd: Number(received),
         reference: reference || undefined,
         note: note || undefined

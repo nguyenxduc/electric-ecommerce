@@ -11,7 +11,7 @@ const money = (v: number | string) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(v || 0))
 
 export default function SellerTax() {
-  const thisYear = new Date().getFullYear()
+  const thisYear = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric' }).format(new Date()))
   const [year, setYear] = useState(thisYear)
   const [page, setPage] = useState(1)
 

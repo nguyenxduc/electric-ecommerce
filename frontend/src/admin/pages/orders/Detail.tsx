@@ -33,6 +33,7 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['shipment', orderId] })
     qc.invalidateQueries({ queryKey: ['admin', 'orders'] })
+    qc.invalidateQueries({ queryKey: ['order-invoice', orderId] })
   }
   const run = useMutation({
     mutationFn: (fn: () => Promise<unknown>) => fn(),

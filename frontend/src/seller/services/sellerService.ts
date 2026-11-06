@@ -1,3 +1,4 @@
+import { toast } from 'sonner'
 import axiosClient from '../../lib/axios'
 
 // ---- Shop vouchers ----
@@ -113,9 +114,16 @@ export const simulateShipment = async (id: number, status: string) =>
 
 // Fetch an authenticated HTML document and open it in a new tab.
 const openHtml = async (url: string) => {
-  const { data } = await axiosClient.get(url, { responseType: 'text' })
-  const blob = new Blob([data], { type: 'text/html' })
-  window.open(URL.createObjectURL(blob), '_blank')
+  // Mo tab rong dong bo (con trong user gesture) roi moi await, tranh bi chan popup
+  const w = window.open('', '_blank')
+  if (!w) return void toast.error('Allow pop-ups to view')
+  try {
+    const { data } = await axiosClient.get(url, { responseType: 'text' })
+    w.location.href = URL.createObjectURL(new Blob([data], { type: 'text/html' }))
+  } catch (e) {
+    w.close()
+    throw e
+  }
 }
 export const openShipmentLabel = (id: number) => openHtml(`/shipments/${id}/label`)
 export const openInvoiceHtml = (id: number) => openHtml(`/invoices/${id}/html`)

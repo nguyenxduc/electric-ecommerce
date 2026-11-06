@@ -11,6 +11,8 @@ export type CartItem = {
   sold_quantity: number
   max_quantity: number
   quantity: number
+  // Backend danh dau true khi variant da bi xoa mem; dong nay khong tinh vao tong
+  unavailable?: boolean
   variant?: {
     id: number
     sku: string
