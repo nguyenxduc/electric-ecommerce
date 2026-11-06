@@ -149,12 +149,23 @@ cd backend && npm run seed:full
 - **AI**: RAG trên pgvector (chatbot), Gemini Vision (tìm bằng ảnh), so sánh
   sản phẩm sinh bảng có cấu trúc, collaborative filtering (gợi ý). Mọi nguồn
   hiển thị sản phẩm đều lọc shop `active`.
+- **Vận chuyển**: provider mock / GHN / GHTK (`services/shipping/`), phí theo
+  cân nặng + tỉnh (`shipping_rate_mode=carrier`), vận đơn, nhãn in, webhook
+  trạng thái có token riêng mỗi hãng, job đồng bộ dự phòng, đối soát COD.
+- **Tồn kho theo biến thể (SKU)**: `ProductVariant` (thuộc tính, chênh giá, tồn
+  riêng), trừ kho có điều kiện khi checkout; đơn MoMo chưa trả bị huỷ và hoàn kho.
+- **Chống gian lận**: OTP số điện thoại, chấm điểm rủi ro lúc checkout (tốc độ
+  đặt đơn, tự mua của shop, lạm dụng voucher theo thiết bị/SĐT/địa chỉ), quét
+  review giả, và phát hiện shipper gian lận (giao giả, giữ COD, khu vực bất
+  thường theo kiểm định z, Gemini viết nhận định) — admin xử lý ở trang Fraud.
+- **Hoá đơn & thuế**: hoá đơn VAT phát hành khi giao, khấu trừ thuế hộ kinh
+  doanh (1% VAT + 0,5% TNCN), bút toán đảo khi trả hàng ghi vào kỳ phát sinh.
 
 ## 5. Tài liệu thiết kế & số liệu thực nghiệm
 
 | Tài liệu | Nội dung | Sinh bằng |
 |---|---|---|
-| [`backend/docs/erd.md`](backend/docs/erd.md) | ERD 34 bảng, chia theo 5 miền nghiệp vụ | `npm run docs:erd` — đọc thẳng `schema.prisma` nên không bao giờ lệch |
+| [`backend/docs/erd.md`](backend/docs/erd.md) | ERD 42 bảng, chia theo 6 miền nghiệp vụ | `npm run docs:erd` — đọc thẳng `schema.prisma` nên không bao giờ lệch |
 | [`backend/docs/architecture.md`](backend/docs/architecture.md) | Kiến trúc tổng thể, sơ đồ tuần tự (tách đơn, RAG, IPN MoMo), máy trạng thái đơn & shop, phân quyền 3 lớp | viết tay |
 | [`backend/docs/ai-evaluation.md`](backend/docs/ai-evaluation.md) | Số liệu đo thật: độ chính xác truy hồi RAG, ma trận nhầm lẫn kiểm duyệt, độ phủ gợi ý | `npm run eval:ai` |
 
@@ -175,7 +186,7 @@ npm run eval:ai -- --quick   # bản rút gọn khi chỉ cần thử
 ## 6. Kiểm thử
 
 Bộ kiểm thử API end-to-end viết bằng **node:test** (test runner có sẵn của
-Node.js, không cần cài thêm), chia 11 suite theo nghiệp vụ trong `backend/tests/`:
+Node.js, không cần cài thêm), chia 26 suite theo nghiệp vụ trong `backend/tests/`:
 
 | Suite | Phạm vi |
 |---|---|
@@ -190,6 +201,15 @@ Node.js, không cần cài thêm), chia 11 suite theo nghiệp vụ trong `backe
 | `09-payment-security` | Xác minh chữ ký HMAC của IPN MoMo: chặn callback giả mạo, sửa số tiền, sửa resultCode |
 | `10-api-contract` | Hợp đồng tầng hạ tầng: 404 dạng JSON, ID sai trả 400 (không phải 500), lỗi không lộ chi tiết nội bộ |
 | `11-business-rules` | Quy tắc nghiệp vụ: voucher không bị dùng vượt hạn mức khi mua đồng thời, bảng chi tiết tiền cộng đúng bằng tổng, mọi trạng thái đơn đều chuyển tiếp được, đơn huỷ không tính vào doanh thu |
+| `12`–`18` | AI guard chống prompt injection, truy hồi RRF + cache, tranh chấp tồn kho/IPN, tính giá, analytics hành vi, health metrics |
+| `19-shipping` | Phí ship, vận đơn, nhãn, webhook, mô phỏng giao, đối soát COD |
+| `20-variants` | Biến thể SKU: giỏ, đơn, trừ/hoàn kho, tranh chấp đơn vị cuối, hết hạn giữ chỗ |
+| `21-fraud` | OTP, chặn COD chưa xác thực, chấm điểm checkout, lạm dụng voucher, review giả |
+| `22-invoice-tax` | Hoá đơn VAT, phân quyền xem, khấu trừ thuế hộ kinh doanh |
+| `23`–`25` | Hồi quy sau các vòng review (số lượng âm, giá ≤ 0, vận đơn còn sống, giờ VN, kỳ thuế) |
+| `26-shipper-fraud` | Luật phát hiện shipper gian lận, kiểm định khu vực, báo chưa nhận hàng |
+
+Giao diện có thêm E2E bằng Playwright (`frontend/e2e/`, chạy `cd frontend && npm run e2e`).
 
 ```bash
 # Yêu cầu: backend đang chạy (npm run dev). Lệnh test tự seed lại dữ liệu.

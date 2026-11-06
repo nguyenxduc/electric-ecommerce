@@ -3,7 +3,7 @@
 > Sinh tu `prisma/schema.prisma` bang `npm run docs:erd`.
 > **Khong sua tay file nay** — sua schema roi chay lai lenh tren.
 
-Tong cong 34 bang nghiep vu (chua tinh 2 bang ha tang cua
+Tong cong 42 bang nghiep vu (chua tinh 2 bang ha tang cua
 cong cu migration). Chia theo mien de doc duoc; quan he bac cau giua cac
 mien duoc noi trong phan mo ta cua tung muc.
 
@@ -28,6 +28,12 @@ erDiagram
     string address
     decimal shipping_fee_override
     decimal free_shipping_threshold_override
+    string pickup_province
+    string pickup_district
+    string pickup_ward
+    string pickup_address
+    string tax_code
+    string tax_entity_type
     datetime approved_at
     bigint approved_by
     datetime created_at
@@ -53,6 +59,7 @@ erDiagram
     datetime updated_at
     datetime deleted_at
     string description
+    int weight_grams
   }
   Category {
     bigint id "PK"
@@ -79,6 +86,18 @@ erDiagram
     bigint product_id
     string name
     string code
+    int quantity
+    datetime created_at
+    datetime updated_at
+    datetime deleted_at
+  }
+  ProductVariant {
+    bigint id "PK"
+    bigint product_id
+    string sku "UK"
+    string name
+    json attributes
+    decimal price_delta
     int quantity
     datetime created_at
     datetime updated_at
@@ -130,6 +149,7 @@ erDiagram
   Product }|--|| Category : ""
   Product }o--|| SubCategory : ""
   Product ||--o{ ProductFilterValue : ""
+  Product ||--o{ ProductVariant : ""
   Category ||--o{ SubCategory : ""
   Category ||--o{ FilterOption : ""
   ProductFilterValue }|--|| FilterKey : ""
@@ -155,6 +175,7 @@ erDiagram
     datetime reset_expires_at
     string role
     string phone
+    datetime phone_verified_at
     string address
     string avatar
     int loyalty_points
@@ -165,7 +186,7 @@ erDiagram
   }
   Cart {
     bigint id "PK"
-    bigint user_id
+    bigint user_id "UK"
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -176,6 +197,7 @@ erDiagram
     bigint product_id
     int quantity
     json color
+    bigint variant_id
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -237,6 +259,10 @@ erDiagram
     json shipping_address
     string receiver_name
     string receiver_phone
+    json invoice_request
+    string client_ip
+    string device_id
+    int risk_score
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -267,6 +293,7 @@ erDiagram
     decimal unit_price
     decimal total_price
     string color
+    bigint variant_id
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -312,6 +339,8 @@ erDiagram
     bigint product_id
     int rating
     string comment
+    string client_ip
+    string device_id
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -452,4 +481,109 @@ erDiagram
     datetime deleted_at
   }
   Chat ||--o{ Message : ""
+```
+
+## 6. Van chuyen, chong gian lan, hoa don va thue
+
+Moi Order co toi da mot Shipment (van don cua GHN/GHTK/mock) va mot Invoice; CodSettlement gom cac van don da thu COD khi doi soat; FraudFlag la hang doi nghi van cho admin.
+
+```mermaid
+erDiagram
+  Shipment {
+    bigint id "PK"
+    bigint order_id "UK"
+    string carrier
+    string tracking_code "UK"
+    string status
+    int fee_vnd
+    int cod_amount_vnd
+    int weight_grams
+    string label_url
+    json raw
+    datetime cod_collected_at
+    bigint cod_settlement_id
+    datetime created_at
+    datetime updated_at
+  }
+  ShipmentEvent {
+    bigint id "PK"
+    bigint shipment_id
+    string status
+    string description
+    datetime occurred_at
+    json raw
+    datetime created_at
+  }
+  CodSettlement {
+    bigint id "PK"
+    string carrier
+    string reference
+    int expected_amount_vnd
+    int received_amount_vnd
+    int difference_vnd
+    string note
+    bigint created_by
+    datetime created_at
+  }
+  OtpCode {
+    bigint id "PK"
+    bigint user_id
+    string phone
+    string purpose
+    string code_hash
+    int attempts
+    datetime expires_at
+    datetime consumed_at
+    datetime created_at
+  }
+  FraudFlag {
+    bigint id "PK"
+    string type
+    string subject
+    bigint subject_id
+    bigint user_id
+    int score
+    json reasons
+    json details
+    string status
+    bigint resolved_by
+    datetime resolved_at
+    datetime created_at
+  }
+  Invoice {
+    bigint id "PK"
+    bigint order_id "UK"
+    bigint shop_id
+    string invoice_number "UK"
+    string series
+    string provider
+    string provider_ref
+    json seller
+    json buyer
+    json items
+    decimal subtotal
+    decimal vat_rate
+    decimal vat_amount
+    decimal total
+    string currency
+    string status
+    datetime issued_at
+    datetime cancelled_at
+    datetime created_at
+  }
+  TaxWithholding {
+    bigint id "PK"
+    bigint order_id "UK"
+    bigint shop_id
+    string period
+    decimal base_amount
+    decimal vat_rate
+    decimal vat_amount
+    decimal pit_rate
+    decimal pit_amount
+    datetime reversed_at
+    datetime created_at
+  }
+  Shipment ||--o{ ShipmentEvent : ""
+  Shipment }o--|| CodSettlement : ""
 ```

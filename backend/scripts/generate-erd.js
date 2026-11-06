@@ -27,7 +27,7 @@ const DOMAINS = [
     note: "Xuong song cua mo hinh da gian hang: mot nguoi dung so huu toi da mot Shop, moi Product thuoc dung mot Shop.",
     models: [
       "Shop", "Product", "Category", "SubCategory",
-      "ProductColor", "ProductSpec", "ProductFilterValue",
+      "ProductColor", "ProductVariant", "ProductSpec", "ProductFilterValue",
       "FilterKey", "FilterOption",
     ],
   },
@@ -53,6 +53,11 @@ const DOMAINS = [
     title: "5. Ho tro va van hanh",
     note: "Chat hai kenh (buyer-san va buyer-shop), thong bao, nhat ky thao tac va tham so van hanh.",
     models: ["Chat", "Message", "Notification", "AuditLog", "Setting"],
+  },
+  {
+    title: "6. Van chuyen, chong gian lan, hoa don va thue",
+    note: "Moi Order co toi da mot Shipment (van don cua GHN/GHTK/mock) va mot Invoice; CodSettlement gom cac van don da thu COD khi doi soat; FraudFlag la hang doi nghi van cho admin.",
+    models: ["Shipment", "ShipmentEvent", "CodSettlement", "OtpCode", "FraudFlag", "Invoice", "TaxWithholding"],
   },
 ];
 
