@@ -16,6 +16,7 @@ interface Order {
   total: number
   delivered?: string
   sentTo: string
+  shopName?: string
   address?: string
   products: Product[]
   status?: 'processing' | 'on-the-way' | 'delivered' | string
@@ -37,6 +38,9 @@ interface Product {
 interface OrderDetail {
   order: Order
 }
+
+// Ma phuong thuc thanh toan -> nhan cho nguoi mua
+const PAYMENT_LABEL: Record<string, string> = { cod: 'Cash on delivery', momo: 'MoMo' }
 
 const OrderDetails = ({ order }: OrderDetail) => {
   const { data: shipment } = useQuery({
@@ -63,45 +67,24 @@ const OrderDetails = ({ order }: OrderDetail) => {
   return (
     <div className="bg-white rounded-lg p-6">
       <div className="flex flex-col mb-10">
-        <dl className="divide-y divide-gray-100 rounded-md">
-          <div className="flex justify-between py-3 px-3 bg-gray-100 rounded-md">
-            <dt className="text-black font-normal w-1/2">order code</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.orderNumber || `#${order.id}`}
-            </dd>
-          </div>
-          <div className="flex justify-between py-3 px-3">
-            <dt className="text-black font-normal w-1/2">Placed on</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.placedOn}
-            </dd>
-          </div>
-          <div className="flex justify-between py-3 px-3 bg-gray-100 rounded-md">
-            <dt className="text-black font-normal w-1/2">Sent to</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.address}
-            </dd>
-          </div>
-          <div className="flex justify-between py-3 px-3">
-            <dt className="text-black font-normal w-1/2">Payment type</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.paymentType || '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between py-3 px-3 bg-gray-100 rounded-md">
-            <dt className="text-black font-normal w-1/2">Transaction id</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.transactionId || '—'}
-            </dd>
-          </div>
-          <div className="flex justify-between py-3 px-3">
-            <dt className="text-black font-normal w-1/2">Amount Paid</dt>
-            <dd className="text-gray-700 w-1/2 font-light text-left">
-              {order.amountPaid !== undefined
-                ? formatUsd(order.amountPaid)
-                : formatUsd(order.total)}
-            </dd>
-          </div>
+        <dl className="rounded-xl border border-gray-100 divide-y divide-gray-100 text-sm">
+          {(
+            [
+              ['Order code', order.orderNumber || `#${order.id}`],
+              ['Placed on', order.placedOn],
+              ['Shop', order.shopName],
+              ['Recipient', [order.sentTo, order.address].filter(Boolean).join(' · ')],
+              ['Payment method', PAYMENT_LABEL[order.paymentType || ''] || order.paymentType],
+              ['Order total', formatUsd(order.amountPaid ?? order.total)]
+            ] as [string, string | undefined][]
+          )
+            .filter(([, v]) => v)
+            .map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-4 px-4 py-3">
+                <dt className="text-gray-500">{k}</dt>
+                <dd className="text-gray-900 text-right break-all">{v}</dd>
+              </div>
+            ))}
         </dl>
       </div>
 

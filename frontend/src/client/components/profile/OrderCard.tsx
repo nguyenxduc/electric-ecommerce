@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Store, ChevronRight } from 'lucide-react'
 import { formatUsd } from '../../utils/formatMoney'
 
 interface Order {
@@ -26,6 +26,7 @@ interface Product {
   quantity?: number
   price?: number
   originalPrice?: number
+  variant?: string
 }
 
 interface OrderDetail {
@@ -33,86 +34,90 @@ interface OrderDetail {
   onClick?: () => void
 }
 
+// Nhan trang thai theo ngon ngu nguoi mua (giong tab "To ship / Shipping" cua app san)
+const STATUS: Record<string, { label: string; cls: string }> = {
+  pending: { label: 'To confirm', cls: 'text-amber-600' },
+  processing: { label: 'To ship', cls: 'text-blue-600' },
+  shipped: { label: 'Shipping', cls: 'text-indigo-600' },
+  delivered: { label: 'Delivered', cls: 'text-green-600' },
+  cancelled: { label: 'Cancelled', cls: 'text-gray-500' },
+  returned: { label: 'Returned', cls: 'text-rose-600' }
+}
+
+const isUrl = (v?: string) => typeof v === 'string' && /^https?:\/\//.test(v)
+
 const OrderCard = ({ order, onClick }: OrderDetail) => {
+  const st = STATUS[order.status || ''] || { label: order.status || '', cls: 'text-gray-600' }
+  const shown = order.products.slice(0, 2)
+  const more = order.products.length - shown.length
+  const itemCount = order.products.reduce((n, p) => n + (p.quantity || 1), 0)
+
   return (
-    <div className="bg-gray-50 rounded-lg p-6 mb-4">
-      {order.shopName && (
-        <div className="mb-3 text-sm font-semibold text-gray-700">
-          🏪{' '}
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
+      <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-gray-100">
+        <span className="flex items-center gap-2 min-w-0 text-sm font-semibold text-gray-900">
+          <Store className="w-4 h-4 text-blue-600 shrink-0" />
           {order.shopSlug ? (
-            <a
-              href={`/shop/${order.shopSlug}`}
-              className="hover:text-blue-600 hover:underline"
-            >
+            <a href={`/shop/${order.shopSlug}`} className="truncate hover:text-blue-600">
               {order.shopName}
             </a>
           ) : (
-            order.shopName
+            <span className="truncate">{order.shopName || 'Order'}</span>
           )}
-        </div>
-      )}
-      <div className="flex flex-row mx-auto mb-4 bg-gray-100 p-5 rounded-md items-center justify-between">
-        <div className="flex flex-col items-center justify-between">
-          <p className="text-sm mb-1 font-semibold">order code</p>
-          <p className="font-light">{order.orderNumber || `#${order.id}`}</p>
-        </div>
-        <div className="flex flex-col items-center justify-between">
-          <p className="text-sm mb-1 font-semibold">Placed on</p>
-          <p className="font-light">{order.placedOn}</p>
-        </div>
-        <div className="flex flex-col items-center justify-between">
-          <p className="text-sm mb-1 font-semibold">Total</p>
-          <p className="font-light">{formatUsd(order.total)}</p>
-        </div>
-        {order.delivered && (
-          <div className="flex flex-col items-center justify-between">
-            <p className="text-sm mb-1 font-semibold">Delivered</p>
-            <p className="font-light">{order.delivered}</p>
-          </div>
-        )}
-
-        <div>
-          {onClick && (
-            <button
-              onClick={onClick}
-              className="text-blue-600 hover:text-blue-700 flex items-center text-sm font-light"
-            >
-              Order Status
-            </button>
-          )}
-        </div>
+        </span>
+        <span className={`text-sm font-semibold shrink-0 ${st.cls}`}>{st.label}</span>
       </div>
 
-      <div className="flex items-center space-x-2">
-        {order.products.slice(0, 6).map((product, index) => {
-          const isUrl =
-            typeof product.image === 'string' &&
-            /^https?:\/\//.test(product.image)
-          return (
-            <div
-              key={index}
-              className="w-20 h-20 bg-white rounded-lg flex items-center justify-center text-2xl shadow-sm overflow-hidden"
-            >
-              {isUrl ? (
+      <ul className="divide-y divide-gray-50">
+        {shown.map((product, index) => (
+          <li key={index} className="flex gap-3 px-4 sm:px-5 py-3">
+            <div className="w-16 h-16 shrink-0 bg-gray-50 rounded-lg border border-gray-100 overflow-hidden flex items-center justify-center">
+              {isUrl(product.image) ? (
                 <img
-                  src={product.image as string}
+                  src={product.image}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain"
                   onError={e => {
                     ;(e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
               ) : (
-                <span>{product.image || '🛒'}</span>
+                <span className="text-2xl">{product.image || '🛒'}</span>
               )}
             </div>
-          )
-        })}
-        {order.products.length > 6 && (
-          <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
-            +{order.products.length - 6}
-          </div>
-        )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-gray-900 line-clamp-2">{product.name}</p>
+              {product.variant && <p className="text-xs text-gray-500 mt-0.5">{product.variant}</p>}
+              <p className="text-xs text-gray-500 mt-0.5">x{product.quantity ?? 1}</p>
+            </div>
+            {product.price != null && (
+              <span className="text-sm text-gray-900 shrink-0">{formatUsd(Number(product.price))}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {more > 0 && (
+        <p className="px-4 sm:px-5 pb-2 text-xs text-gray-500">+{more} more item{more > 1 ? 's' : ''}</p>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 bg-gray-50 border-t border-gray-100">
+        <span className="text-xs text-gray-500">
+          {order.orderNumber || `#${order.id}`} · {order.placedOn}
+        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">
+            {itemCount} item{itemCount > 1 ? 's' : ''}:{' '}
+            <span className="font-semibold text-rose-600">{formatUsd(order.total)}</span>
+          </span>
+          {onClick && (
+            <button
+              onClick={onClick}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+            >
+              View details <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
