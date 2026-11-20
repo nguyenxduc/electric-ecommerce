@@ -1,18 +1,14 @@
 import React, { useState, useRef } from 'react'
+import { apiErrorResponse } from '../../lib/apiError'
 import { Camera, LogOut, X, Loader2, Ticket, Store } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
 
-// @ts-ignore
 import ProfileIcon from '../../assets/profile2-icon.svg'
-// @ts-ignore
 import OrderIcon from '../../assets/order-icon.svg'
-// @ts-ignore
 import WishlistIcon from '../../assets/wishlist-icon.svg'
-// @ts-ignore
 import SecurityIcon from '../../assets/security-icon.svg'
-// @ts-ignore
 import LogoutIcon from '../../assets/logout-icon.svg'
 import { Star } from 'lucide-react'
 
@@ -40,12 +36,6 @@ export type ProfileTabKey =
   | 'vouchers'
   | 'seller'
   | 'logout'
-
-interface ProfileLayoutProps {
-  active: ProfileTabKey
-  children?: React.ReactNode
-  onNavigate?: (key: ProfileTabKey) => void
-}
 
 const Icon: Record<string, string> = {
   profile: ProfileIcon,
@@ -90,7 +80,7 @@ function Profile() {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(false)
   const navigate = useNavigate()
 
-  const { data: userData, isLoading } = useValidateToken()
+  const { data: userData } = useValidateToken()
   const logoutMutation = useLogout()
   const uploadAvatarMutation = useUploadAvatar()
   const deleteAvatarMutation = useDeleteAvatar()
@@ -100,8 +90,8 @@ function Profile() {
       await logoutMutation.mutateAsync()
       toast.success('Logged out successfully')
       navigate('/')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to logout')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error && error.message ? error.message : 'Failed to logout')
     }
   }
 
@@ -142,8 +132,8 @@ function Profile() {
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to upload avatar')
+    } catch (error: unknown) {
+      toast.error(apiErrorResponse(error).data?.error as string || 'Failed to upload avatar')
     }
   }
 
@@ -152,8 +142,8 @@ function Profile() {
       await deleteAvatarMutation.mutateAsync()
       toast.success('Avatar deleted successfully')
       setDeleteConfirmModal(false)
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to delete avatar')
+    } catch (error: unknown) {
+      toast.error(apiErrorResponse(error).data?.error as string || 'Failed to delete avatar')
     }
   }
 

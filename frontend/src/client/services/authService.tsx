@@ -14,14 +14,14 @@ export const validateToken = async (): Promise<{ user: AuthUser }> => {
   if (!token) {
     throw new Error('No access token')
   }
-  const { data } = await axiosClient.get<{ success: boolean; data: AuthUser }>(
+  const { data } = await axiosClient.get<{ success: boolean; data?: AuthUser; user?: AuthUser }>(
     '/auth/me'
   )
   // Backend returns: { success: true, data: { id, name, email, role, phone, ... } }
   if (data.success && data.data) {
     return { user: data.data }
-  } else if ((data as any).user) {
-    return { user: (data as any).user }
+  } else if (data.user) {
+    return { user: data.user }
   }
   throw new Error('Invalid response format')
 }

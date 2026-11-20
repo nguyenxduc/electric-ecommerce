@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import { BadgeCheck, Clock, Ban, CircleSlash, Store } from 'lucide-react'
 import { getMyShop, updateMyShop } from '../../../client/services/shopService'
 import { updateShopSettings } from '../../services/sellerService'
@@ -55,12 +56,11 @@ export default function SellerShopProfile() {
 
   useEffect(() => {
     if (shop) {
-      const sx = shop as any
       setExt({
-        pickup_province: sx.pickup_province || '',
-        pickup_district: sx.pickup_district || '',
-        pickup_ward: sx.pickup_ward || '',
-        pickup_address: sx.pickup_address || ''
+        pickup_province: shop.pickup_province || '',
+        pickup_district: shop.pickup_district || '',
+        pickup_ward: shop.pickup_ward || '',
+        pickup_address: shop.pickup_address || ''
       })
       setName(shop.name || '')
       setDescription(shop.description || '')
@@ -101,8 +101,8 @@ export default function SellerShopProfile() {
       )
       qc.invalidateQueries({ queryKey: ['my-shop'] })
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to update shop')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to update shop'))
   })
 
   if (isLoading) {
@@ -289,7 +289,7 @@ export default function SellerShopProfile() {
               <input
                 className="w-full border rounded-lg px-3 py-2 bg-gray-50"
                 disabled
-                value={(shop as any).tax_code || ''}
+                value={shop.tax_code || ''}
                 placeholder="Not set"
               />
             </div>
@@ -301,7 +301,7 @@ export default function SellerShopProfile() {
                 className="w-full border rounded-lg px-3 py-2 bg-gray-50"
                 disabled
                 value={
-                  (shop as any).tax_entity_type === 'company'
+                  shop.tax_entity_type === 'company'
                     ? 'Company'
                     : 'Household / individual'
                 }

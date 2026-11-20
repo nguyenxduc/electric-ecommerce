@@ -8,17 +8,6 @@ import {
 import { useFilterKeys } from '../../hooks/useFilterKeys'
 import { toast } from 'sonner'
 
-const SUGGESTED_FILTER_KEYS = [
-  { value: 'brand', label: 'Brand' },
-  { value: 'ram', label: 'RAM' },
-  { value: 'screen_size', label: 'Screen Size' },
-  { value: 'processor', label: 'Processor' },
-  { value: 'gpu_brand', label: 'GPU Brand' },
-  { value: 'drive_size', label: 'Drive Size' },
-  { value: 'color', label: 'Color' },
-  { value: 'operating_system', label: 'Operating System' }
-]
-
 export default function AdminFilterEdit() {
   const { id } = useParams()
   const filterId = Number(id)
@@ -37,8 +26,8 @@ export default function AdminFilterEdit() {
   const [isActive, setIsActive] = useState(true)
 
   const categories = categoriesData?.data?.categories || []
-  const filterKeys = (filterKeysData as any)?.data || []
-  const filterOption = (data as any)?.data
+  const filterKeys = filterKeysData?.data || []
+  const filterOption = data?.data
 
   useEffect(() => {
     if (filterOption) {
@@ -75,8 +64,8 @@ export default function AdminFilterEdit() {
       })
       toast.success('Filter option updated successfully')
       nav('/admin/filters')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update filter option')
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to update filter option')
     }
   }
 
@@ -110,7 +99,7 @@ export default function AdminFilterEdit() {
             required
           >
             <option value="">Select a filter key</option>
-            {filterKeys.map((key: any) => (
+            {filterKeys.map(key => (
               <option key={key.id} value={key.id}>
                 {key.label} ({key.key})
               </option>

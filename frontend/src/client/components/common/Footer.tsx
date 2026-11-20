@@ -1,18 +1,14 @@
 import { useState } from 'react'
 import { usePublicSettings } from '../../hooks/useSettings'
 
-// @ts-ignore
 import LocationIcon from '../../../assets/location-icon.svg'
-// @ts-ignore
 import PhoneIcon from '../../../assets/phone-icon.svg'
-// @ts-ignore
 import EmailIcon from '../../../assets/email-icon.svg'
 
 import { TbBrandMeta } from 'react-icons/tb'
 import { IoLogoInstagram } from 'react-icons/io'
 import { RiTwitterXLine } from 'react-icons/ri'
 
-// @ts-ignore
 import CompanyIcon from '../../../assets/company-icon.svg'
 
 const Footer = () => {

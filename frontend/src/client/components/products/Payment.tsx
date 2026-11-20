@@ -9,6 +9,7 @@ import {
   useWishlist
 } from '../../hooks/useWishlist'
 import { useValidateToken } from '../../hooks/useAuth'
+import { apiErrorMessage } from '../../../lib/apiError'
 import type { ProductVariant } from '../../types/product'
 import { fetchCart } from '../../services/cartService'
 import { setExcluded } from '../../utils/cartSelection'
@@ -129,13 +130,12 @@ const Payment = ({
         onSuccess: () => {
           toast.success('Added to cart successfully')
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           console.error('Add to cart error:', err)
-          const errorMessage =
-            err?.response?.data?.message ||
-            err?.response?.data?.error ||
-            err?.message ||
-            'Failed to add to cart. Please try again.'
+          const errorMessage = apiErrorMessage(
+            err,
+            err instanceof Error ? err.message : 'Failed to add to cart. Please try again.'
+          )
           toast.error(errorMessage)
         }
       }
@@ -192,13 +192,12 @@ const Payment = ({
           toast.success('Redirecting to checkout...')
           navigate('/checkout')
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
           console.error('Buy now error:', err)
-          const errorMessage =
-            err?.response?.data?.message ||
-            err?.response?.data?.error ||
-            err?.message ||
-            'Failed to proceed. Please try again.'
+          const errorMessage = apiErrorMessage(
+            err,
+            err instanceof Error ? err.message : 'Failed to proceed. Please try again.'
+          )
           toast.error(errorMessage)
         }
       }
@@ -216,10 +215,8 @@ const Payment = ({
         onSuccess: () => {
           toast.success('Removed from wishlist')
         },
-        onError: (err: any) => {
-          toast.error(
-            err?.response?.data?.message || 'Failed to remove from wishlist'
-          )
+        onError: (err: unknown) => {
+          toast.error(apiErrorMessage(err, 'Failed to remove from wishlist'))
         }
       })
     } else {
@@ -227,10 +224,8 @@ const Payment = ({
         onSuccess: () => {
           toast.success('Added to wishlist')
         },
-        onError: (err: any) => {
-          toast.error(
-            err?.response?.data?.message || 'Failed to add to wishlist'
-          )
+        onError: (err: unknown) => {
+          toast.error(apiErrorMessage(err, 'Failed to add to wishlist'))
         }
       })
     }

@@ -22,7 +22,7 @@ export const useLogin = () =>
   })
 
 export const useRegister = () =>
-  useMutation<any, Error, RegisterReq>({
+  useMutation<unknown, Error, RegisterReq>({
     mutationFn: payload => registerSvc(payload)
   })
 

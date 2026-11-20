@@ -8,6 +8,7 @@ import AdminPagination from '../../components/common/AdminPagination'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
 import { fmtDate } from '../../utils/date'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 const STATUS_TABS = [
   { key: '', label: 'All' },
@@ -28,8 +29,16 @@ type ReasonAction = { type: 'reject' | 'suspend'; shop: AdminShop } | null
 
 export default function AdminShopsList() {
   const [limit] = useState(10)
-  const { page, q: query, setPage, setQ: setQuery } = useListQueryParams()
-  const [statusTab, setStatusTab] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '')
+  const { page, q: query, setPage, setQ: setQuery, searchParams, setSearchParams } = useListQueryParams()
+  // Tab trang thai song o URL (?status=); doi tab = ve trang 1 trong CUNG mot lan cap nhat
+  const statusTab = searchParams.get('status') || ''
+  const setStatusTab = (v: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (v) next.set('status', v)
+    else next.delete('status')
+    next.set('page', '1')
+    setSearchParams(next)
+  }
   const [approveShopTarget, setApproveShopTarget] = useState<AdminShop | null>(
     null
   )
@@ -60,8 +69,8 @@ export default function AdminShopsList() {
       toast.success('Shop approved')
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to approve shop')
+    onError: err =>
+      toast.error(apiErrorMessage(err, 'Failed to approve shop'))
   })
 
   const rejectMut = useMutation({
@@ -71,8 +80,8 @@ export default function AdminShopsList() {
       toast.success('Shop rejected')
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to reject shop')
+    onError: err =>
+      toast.error(apiErrorMessage(err, 'Failed to reject shop'))
   })
 
   const suspendMut = useMutation({
@@ -82,8 +91,8 @@ export default function AdminShopsList() {
       toast.success('Shop suspended')
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to suspend shop')
+    onError: err =>
+      toast.error(apiErrorMessage(err, 'Failed to suspend shop'))
   })
 
   const taxMut = useMutation({
@@ -97,8 +106,8 @@ export default function AdminShopsList() {
       setTaxShop(null)
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to update tax info')
+    onError: err =>
+      toast.error(apiErrorMessage(err, 'Failed to update tax info'))
   })
 
   const shops = data?.data?.data?.shops || []
@@ -138,7 +147,6 @@ export default function AdminShopsList() {
             key={tab.key}
             onClick={() => {
               setStatusTab(tab.key)
-              setPage(1)
             }}
             className={`px-4 py-2 text-sm border-b-2 -mb-px transition ${
               statusTab === tab.key

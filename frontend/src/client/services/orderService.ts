@@ -1,5 +1,6 @@
 import { toast } from 'sonner'
 import axiosClient from '../../lib/axios'
+import { apiErrorResponse } from '../../lib/apiError'
 
 export type CreateOrderPayload = {
   items: Array<{
@@ -31,7 +32,7 @@ export type Order = {
   order_number: string
   total_amount: number
   status: string
-  shipping_address: any
+  shipping_address: CreateOrderPayload['shipping_address'] | null
   payment_method: string | null
   created_at: string
   shop?: {
@@ -155,8 +156,8 @@ export const fetchInvoice = async (orderId: number): Promise<{ id: number; invoi
   try {
     const { data } = await axiosClient.get(`/invoices/orders/${orderId}`)
     return data.data ?? null
-  } catch (err: any) {
-    if (err?.response?.status === 404) return null
+  } catch (err: unknown) {
+    if (apiErrorResponse(err).status === 404) return null
     throw err
   }
 }

@@ -134,7 +134,7 @@ export default function SellerProductsList() {
                       )
                     })()}
                   </td>
-                  <td className="p-2">{(p as any).sold ?? 0}</td>
+                  <td className="p-2">{p.sold ?? 0}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-2">
                       <Link

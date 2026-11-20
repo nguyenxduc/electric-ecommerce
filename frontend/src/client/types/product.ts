@@ -1,5 +1,3 @@
-import { Category } from './category'
-
 export type ProductSpec = { label: string; value: string }
 
 export type ProductSpecDetail =

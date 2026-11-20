@@ -95,7 +95,7 @@ export function useDeleteAdminFilterOption() {
 export function useSyncFilterOptions() {
   const qc = useQueryClient()
   return useMutation<
-    { success: boolean; message: string; data: any },
+    { success: boolean; message: string; data: unknown },
     Error,
     number | undefined
   >({

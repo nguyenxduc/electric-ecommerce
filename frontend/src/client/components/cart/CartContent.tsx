@@ -1,4 +1,3 @@
-import RemoveCart from '../../assets/remove-cart.svg'
 
 import type { CartItem } from '../../types/cart'
 

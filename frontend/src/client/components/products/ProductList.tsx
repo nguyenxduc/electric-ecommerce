@@ -20,7 +20,7 @@ interface ProductSimilarProps {
 }
 
 const ProductSimilar = ({ productId }: ProductSimilarProps) => {
-  const { data: product, isLoading, error } = useSimilarProducts(productId, 8)
+  const { data: product } = useSimilarProducts(productId, 8)
 
   const navigate = useNavigate()
   const listProducts = product?.products || []

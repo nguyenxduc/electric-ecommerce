@@ -34,7 +34,7 @@ const ACTION_OPTIONS = [
 ]
 
 // ─── Expandable metadata cell ─────────────────────────────────────────────────
-function MetaCell({ metadata }: { metadata?: Record<string, any> | null }) {
+function MetaCell({ metadata }: { metadata?: Record<string, unknown> | null }) {
   const [open, setOpen] = useState(false)
   if (!metadata || Object.keys(metadata).length === 0)
     return <span className="text-gray-400 text-xs">—</span>

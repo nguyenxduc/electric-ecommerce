@@ -5,8 +5,6 @@ import {
   createFilterKey,
   updateFilterKey,
   deleteFilterKey,
-  type FilterKey,
-  type CreateFilterKeyPayload,
   type UpdateFilterKeyPayload
 } from '../services/filterKeyService'
 

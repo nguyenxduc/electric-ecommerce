@@ -13,7 +13,7 @@ export default function VoucherWarehouse() {
     staleTime: 60 * 1000
   })
 
-  const vouchers = data?.coupons ?? []
+  const vouchers = useMemo(() => data?.coupons ?? [], [data])
   const filterStats = useMemo(() => {
     const usable = vouchers.filter(v => v.is_usable).length
     const usedUp = vouchers.filter(v => v.is_exhausted).length

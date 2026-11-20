@@ -22,7 +22,7 @@ const TopDeals = () => {
             Top deals
           </h2>
           <Link
-            to="/collection/all?discount=true"
+            to="/collection/all?sort=discount"
             className="flex items-center text-sm font-medium text-rose-600 hover:underline"
           >
             See all <ChevronRight className="w-4 h-4" />

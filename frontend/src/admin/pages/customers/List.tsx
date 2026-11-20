@@ -45,10 +45,6 @@ export default function AdminCustomersList() {
     [data]
   )
 
-  const onDelete = (id: number) => {
-    if (confirm('Delete this customer?')) del.mutate(id)
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">

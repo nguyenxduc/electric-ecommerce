@@ -2,11 +2,8 @@ import { useState } from 'react'
 import CartContent from '../cart/CartContent'
 import { useNavigate } from 'react-router-dom'
 
-// @ts-ignore
 import CartIcon from '../../../assets/cart-icon.svg'
-// @ts-ignore
 import EmptyCart from '../../../assets/empty-cart.png'
-// @ts-ignore
 import ProceedCart from '../../../assets/proceed-cart.svg'
 import { Cart, CartItem } from '../../types/cart'
 
@@ -146,7 +143,7 @@ const CartDrawer = ({ cartProducts }: CartProps) => {
       )}
       <button
         className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
-        onClick={e => setDrawerOpen(!drawerOpen)}
+        onClick={() => setDrawerOpen(!drawerOpen)}
       >
         <img src={CartIcon} alt="Cart" className="h-10 w-10" />
         {(cartProducts ? cartProducts?.total_items : 0) > 0 && (

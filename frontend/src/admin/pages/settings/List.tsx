@@ -3,7 +3,6 @@ import {
   Save,
   Trash2,
   Plus,
-  Settings2,
   Building2,
   Truck,
   Globe
@@ -17,9 +16,11 @@ import {
 } from '../../hooks/useSettings'
 import type {
   Setting,
+  SettingValue,
   UpsertSettingPayload
 } from '../../services/settingService'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 const CATEGORIES = [
   { value: 'bank', label: 'Bank Settings', icon: Building2 },
@@ -43,7 +44,7 @@ export default function SettingsList() {
 
   const settings = data?.settings || []
 
-  const handleSave = async (setting: Setting, newValue: any) => {
+  const handleSave = async (setting: Setting, newValue: SettingValue) => {
     try {
       const payload: Partial<UpsertSettingPayload> = {
         value: newValue,
@@ -60,8 +61,8 @@ export default function SettingsList() {
 
       toast.success('Setting updated successfully')
       setEditingKey(null)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update setting')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to update setting'))
     }
   }
 
@@ -70,8 +71,8 @@ export default function SettingsList() {
       await deleteMutation.mutateAsync(key)
       toast.success('Setting deleted successfully')
       setShowDeleteModal(null)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to delete setting')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to delete setting'))
     }
   }
 
@@ -80,12 +81,12 @@ export default function SettingsList() {
       await upsertMutation.mutateAsync(payload)
       toast.success('Setting created successfully')
       setShowAddModal(false)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to create setting')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to create setting'))
     }
   }
 
-  const parseValue = (value: string, dataType: string): any => {
+  const parseValue = (value: string, dataType: string): SettingValue => {
     if (dataType === 'number') return Number(value)
     if (dataType === 'boolean') return value === 'true'
     if (dataType === 'json') {
@@ -98,7 +99,7 @@ export default function SettingsList() {
     return value
   }
 
-  const formatValue = (value: any, dataType: string): string => {
+  const formatValue = (value: SettingValue, dataType: string): string => {
     if (dataType === 'json') return JSON.stringify(value, null, 2)
     return String(value)
   }
@@ -225,10 +226,10 @@ function SettingItem({
   isEditing: boolean
   onStartEdit: () => void
   onCancelEdit: () => void
-  onSave: (setting: Setting, value: any) => void
+  onSave: (setting: Setting, value: SettingValue) => void
   onDelete: () => void
-  parseValue: (value: string, dataType: string) => any
-  formatValue: (value: any, dataType: string) => string
+  parseValue: (value: string, dataType: string) => SettingValue
+  formatValue: (value: SettingValue, dataType: string) => string
 }) {
   const parsedValue = parseValue(setting.value, setting.data_type)
   const [editValue, setEditValue] = useState(
@@ -371,7 +372,7 @@ function AddSettingModal({
     }
 
     // Parse value based on data type
-    let parsedValue: any = formData.value
+    let parsedValue: SettingValue = formData.value
     if (formData.data_type === 'number') {
       parsedValue = Number(formData.value)
       if (isNaN(parsedValue)) {
@@ -584,12 +585,13 @@ function OperationsSection() {
         is_public: existing(def.key)?.is_public ?? false
       })
       setDraft(d => {
-        const { [def.key]: _, ...rest } = d
+        const rest = { ...d }
+        delete rest[def.key]
         return rest
       })
       toast.success(`${def.label} saved`)
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save setting')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to save setting'))
     }
   }
 

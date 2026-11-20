@@ -14,8 +14,39 @@ const RISK_CLS: Record<string, string> = {
   low: 'text-green-700'
 }
 
+type FraudDetails = {
+  ai?: { risk: string; summary?: string; next_step?: string }
+  buyer_note?: string
+}
+type SubjectInfo = {
+  order?: { id?: number; order_number?: string; user?: { email?: string } }
+  carrier?: string
+  tracking_code?: string
+  status?: string
+  cod_amount_vnd?: number | string
+  group_number?: string
+  total_amount?: number | string
+  payment_method?: string
+  user?: { email?: string }
+  comment?: string
+  rating?: number
+  product?: { name?: string }
+}
+type FraudFlag = {
+  id: number | string
+  type: string
+  score?: number
+  reasons?: string[]
+  details?: FraudDetails | null
+  subject: string
+  subject_id: number | string
+  subject_info?: SubjectInfo | null
+  created_at: string
+  status: string
+}
+
 // So lieu phat hien, ghi chu nguoi mua va nhan dinh AI (chi de tham khao, admin quyet dinh)
-function Details({ d }: { d: any }) {
+function Details({ d }: { d?: FraudDetails | null }) {
   if (!d?.ai && !d?.buyer_note) return null
   return (
     <div className="mt-2 max-w-sm space-y-1 text-xs">
@@ -36,7 +67,7 @@ const STATUS_CLS: Record<string, string> = {
   dismissed: 'bg-gray-100 text-gray-600'
 }
 
-function Subject({ f }: { f: any }) {
+function Subject({ f }: { f: FraudFlag }) {
   const i = f.subject_info
   if (!i)
     return (
@@ -173,7 +204,7 @@ export default function AdminFraudPage() {
               </tr>
             </thead>
             <tbody>
-              {(flags.data?.data ?? []).map((f: any) => (
+              {(flags.data?.data ?? []).map((f: FraudFlag) => (
                 <tr key={f.id} className="border-t align-top">
                   <td className="p-3">{f.type}</td>
                   <td className="p-3">{f.score}</td>

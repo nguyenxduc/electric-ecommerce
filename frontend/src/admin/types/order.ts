@@ -19,10 +19,20 @@ export type AdminOrderItem = {
   created_at?: string
   updated_at?: string
   // Danh sach don cua shop include product (id, name, img)
-  product?: { id: number; name: string; img?: string[] | null } | null
+  product?: {
+    id: number
+    name: string
+    img?: string[] | null
+    image_url?: string | null
+  } | null
+  variant?: { name?: string | null } | null
+  variant_name?: string | null
 }
 
 export type ShippingAddress = {
+  name?: string
+  phone?: string
+  address?: string
   street?: string
   city?: string
   state?: string
@@ -43,6 +53,9 @@ export type AdminOrder = {
   updated_at?: string
   order_items: AdminOrderItem[]
   user?: { id: number; name: string; email?: string }
+  receiver_name?: string | null
+  receiver_phone?: string | null
+  shop?: { id?: number; name?: string } | null
 }
 
 export type OrderResponse = AdminOrder

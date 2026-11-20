@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { useFilterKey, useUpdateFilterKey } from '../../hooks/useFilterKeys'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 const DATA_TYPES = [
   { value: 'string', label: 'String' },
@@ -57,14 +58,14 @@ export default function EditFilterKey() {
       })
       toast.success('Filter key updated successfully')
       navigate('/admin/filter-keys')
-    } catch (error: any) {
+    } catch (error) {
       toast.error(
-        error?.response?.data?.message || 'Failed to update filter key'
+        apiErrorMessage(error, 'Failed to update filter key')
       )
     }
   }
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 

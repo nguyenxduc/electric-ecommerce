@@ -93,7 +93,7 @@ export const getAllChats = async (
   status?: string,
   scope: 'admin' | 'seller' = 'admin'
 ): Promise<ChatsResponse> => {
-  const params: any = { page, limit }
+  const params: Record<string, unknown> = { page, limit }
   if (status) params.status = status
   const url = scope === 'seller' ? '/chat/shop/mine' : '/chat/admin/all'
   const { data } = await axiosClient.get<ChatsResponse>(url, { params })

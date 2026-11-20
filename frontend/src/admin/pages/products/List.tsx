@@ -98,7 +98,7 @@ export default function AdminProductsList() {
                   </td>
                   <td className="p-2">{p.id}</td>
                   <td className="p-2">{p.name}</td>
-                  <td className="p-2">{(p as any).shop?.name || '—'}</td>
+                  <td className="p-2">{p.shop?.name || '—'}</td>
                   <td className="p-2">${p.price}</td>
                   <td className="p-2">
                     {Array.isArray(p.available_colors) &&

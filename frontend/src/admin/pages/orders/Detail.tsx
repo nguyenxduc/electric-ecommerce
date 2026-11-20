@@ -13,6 +13,8 @@ import {
 } from '../../../seller/services/sellerService'
 import { useAdminOrder, useUpdateAdminOrderStatus } from '../../hooks'
 import { fmtDateTime } from '../../utils/date'
+import { OrderStatus } from '../../types'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -22,8 +24,7 @@ function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
-const errMsg = (e: any) =>
-  e?.response?.data?.error || e?.response?.data?.message || 'Action failed'
+const errMsg = (e: unknown) => apiErrorMessage(e, 'Action failed')
 
 function ShipmentPanel({ orderId, status }: { orderId: number; status: string }) {
   const qc = useQueryClient()
@@ -39,7 +40,7 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
   const run = useMutation({
     mutationFn: (fn: () => Promise<unknown>) => fn(),
     onSuccess: refresh,
-    onError: (e: any) => toast.error(errMsg(e))
+    onError: e => toast.error(errMsg(e))
   })
 
   const canCreate = !sh && (status === 'pending' || status === 'processing')
@@ -181,9 +182,9 @@ export default function AdminOrderDetail() {
   const order = data?.data
   if (!order) return null
 
-  const addressObj = (order as any).shipping_address || {}
-  const receiverName = (order as any).receiver_name || addressObj.name || '—'
-  const receiverPhone = (order as any).receiver_phone || addressObj.phone || '—'
+  const addressObj = order.shipping_address || {}
+  const receiverName = order.receiver_name || addressObj.name || '—'
+  const receiverPhone = order.receiver_phone || addressObj.phone || '—'
   const addressText =
     typeof addressObj === 'string'
       ? addressObj
@@ -224,7 +225,7 @@ export default function AdminOrderDetail() {
           className="border rounded px-2 py-1"
           value={order.status}
           onChange={e => {
-            const next = e.target.value as any
+            const next = e.target.value as OrderStatus
             update.mutate(
               { status: next },
               {
@@ -279,7 +280,7 @@ export default function AdminOrderDetail() {
           </thead>
           <tbody>
             {order.order_items.map(it => {
-              const anyIt = it as any
+              const anyIt = it
               const name = anyIt.product?.name || `#${it.product_id}`
               const img =
                 (Array.isArray(anyIt.product?.img) &&

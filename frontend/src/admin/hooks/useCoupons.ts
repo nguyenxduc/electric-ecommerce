@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import adminCouponService from '../services/couponService'
 import {
-  AdminCoupon,
   CouponListResponse,
   CouponResponse,
   CreateCouponRequest,

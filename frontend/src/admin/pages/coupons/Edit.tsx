@@ -54,11 +54,11 @@ export default function AdminCouponEdit() {
           form.min_order !== undefined ? Number(form.min_order) : undefined,
         usage_limit:
           form.usage_limit !== undefined ? Number(form.usage_limit) : undefined,
-        expires_at: (form.expires_at as any) ?? undefined
+        expires_at: form.expires_at ?? undefined
       }
       await updateMut.mutateAsync(payload)
       navigate('/admin/coupons')
-    } catch (err) {
+    } catch {
       // noop; could add toast
     }
   }
@@ -103,7 +103,7 @@ export default function AdminCouponEdit() {
               name="discount_value"
               type="number"
               step="0.01"
-              value={(form.discount_value as any) || ''}
+              value={form.discount_value || ''}
               onChange={onChange}
               className="w-full border rounded px-3 py-2 text-sm"
               required
@@ -117,7 +117,7 @@ export default function AdminCouponEdit() {
               name="min_order"
               type="number"
               step="0.01"
-              value={(form.min_order as any) || ''}
+              value={form.min_order || ''}
               onChange={onChange}
               className="w-full border rounded px-3 py-2 text-sm"
             />
@@ -129,7 +129,7 @@ export default function AdminCouponEdit() {
             <input
               name="usage_limit"
               type="number"
-              value={(form.usage_limit as any) || ''}
+              value={form.usage_limit || ''}
               onChange={onChange}
               className="w-full border rounded px-3 py-2 text-sm"
             />

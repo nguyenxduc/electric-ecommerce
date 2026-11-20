@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import {
   Store,
   Clock,
@@ -43,8 +44,8 @@ const SellerTab = () => {
       toast.success('Application submitted! We will review it shortly.')
       qc.invalidateQueries({ queryKey: ['my-shop'] })
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to submit application')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to submit application'))
   })
 
   // Rejected applicants (still role "user", no seller-dashboard access)
@@ -56,8 +57,8 @@ const SellerTab = () => {
       setResubmitOpen(false)
       qc.invalidateQueries({ queryKey: ['my-shop'] })
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.error || 'Failed to resubmit')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to resubmit'))
   })
 
   if (isLoading) {

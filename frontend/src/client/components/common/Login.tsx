@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import {
   useLogin,
   useRegister,
@@ -30,6 +31,7 @@ interface AuthModalProps {
 
 const MailIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
+    {...props}
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -49,6 +51,7 @@ const MailIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const LockIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
+    {...props}
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -72,6 +75,7 @@ const LockIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
+    {...props}
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -119,6 +123,7 @@ const EyeOffIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const ProfileIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
+    {...props}
     width="24"
     height="24"
     viewBox="0 0 24 24"
@@ -141,9 +146,6 @@ const Login = ({
   onClose,
   onLogin,
   onRegister,
-  onForgotPassword,
-  onLoginWithGoogle,
-  onLoginWithFacebook,
   brand = 'Tech Heim',
   onSuccess
 }: AuthModalProps) => {
@@ -202,15 +204,17 @@ const Login = ({
       onClose()
       loginMutation.reset()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loginMutation doi object moi render, chi can reset khi isSuccess
   }, [loginMutation.isSuccess, queryClient, refetchUser, onSuccess, onClose])
 
   // Handle login error
   useEffect(() => {
     if (loginMutation.isError) {
-      const msg =
-        (loginMutation.error as any)?.response?.data?.error ||
+      const msg = apiErrorMessage(
+        loginMutation.error,
         loginMutation.error?.message ||
-        'Login failed. Please check your credentials.'
+          'Login failed. Please check your credentials.'
+      )
       if (msg.toLowerCase().includes('not verified')) {
         toast.error('Email not verified. Enter code to activate.')
         setVerifyEmail(email)
@@ -234,6 +238,7 @@ const Login = ({
       setAgreeCondition(false)
       registerMutation.reset()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- registerMutation doi object moi render, chi can reset khi isSuccess
   }, [registerMutation.isSuccess, email])
 
   // Handle register error
@@ -291,8 +296,8 @@ const Login = ({
             toast.success('Verification successful, please log in')
             setMode('login')
           },
-          onError: (err: any) => {
-            toast.error(err?.response?.data?.error || 'Verification failed')
+          onError: (err: unknown) => {
+            toast.error(apiErrorMessage(err, 'Verification failed'))
           }
         }
       )
@@ -316,8 +321,8 @@ const Login = ({
             setResetCode('')
             setNewPassword('')
           },
-          onError: (err: any) => {
-            toast.error(err?.response?.data?.error || 'Password change failed')
+          onError: (err: unknown) => {
+            toast.error(apiErrorMessage(err, 'Password change failed'))
           }
         }
       )
@@ -502,10 +507,9 @@ const Login = ({
                         resendVerifyMutation.mutate(verifyEmail, {
                           onSuccess: () =>
                             toast.success('Verification code resent'),
-                          onError: (err: any) =>
+                          onError: (err: unknown) =>
                             toast.error(
-                              err?.response?.data?.error ||
-                                'Failed to send code'
+                              apiErrorMessage(err, 'Failed to send code')
                             )
                         })
                       }}
@@ -552,9 +556,9 @@ const Login = ({
                       forgotMutation.mutate(resetEmail, {
                         onSuccess: () =>
                           toast.success('Password reset code sent'),
-                        onError: (err: any) =>
+                        onError: (err: unknown) =>
                           toast.error(
-                            err?.response?.data?.error || 'Failed to send code'
+                            apiErrorMessage(err, 'Failed to send code')
                           )
                       })
                     }}

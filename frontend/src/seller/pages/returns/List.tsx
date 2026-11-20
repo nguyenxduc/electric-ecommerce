@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import { PackageX, Check, X } from 'lucide-react'
 import {
   getShopReturns,
@@ -17,7 +19,19 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function SellerReturnsList() {
   const qc = useQueryClient()
-  const [statusTab, setStatusTab] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '')
+  // Tab trang thai song o URL (?status=): link tu To-do loc san, refresh giu dung tab
+  const [searchParams, setSearchParams] = useSearchParams()
+  const statusTab = searchParams.get('status') || ''
+  const setStatusTab = (v?: string) =>
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev)
+        if (v) next.set('status', v)
+        else next.delete('status')
+        return next
+      },
+      { replace: true }
+    )
   const [rejectTarget, setRejectTarget] = useState<ShopReturnRequest | null>(
     null
   )
@@ -51,8 +65,8 @@ export default function SellerReturnsList() {
       )
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to resolve request')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to resolve request'))
   })
 
   return (

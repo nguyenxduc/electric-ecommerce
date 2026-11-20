@@ -6,6 +6,7 @@ import { useFilterKeys, useDeleteFilterKey } from '../../hooks/useFilterKeys'
 import ConfirmModal from '../../components/ConfirmModal'
 import AdminPagination from '../../components/common/AdminPagination'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 export default function FilterKeysList() {
   const [limit] = useState(10)
@@ -36,9 +37,9 @@ export default function FilterKeysList() {
       await deleteFilterKey.mutateAsync(showDeleteModal.id)
       toast.success('Filter key deleted successfully')
       setShowDeleteModal(null)
-    } catch (error: any) {
+    } catch (error) {
       toast.error(
-        error?.response?.data?.message || 'Failed to delete filter key'
+        apiErrorMessage(error, 'Failed to delete filter key')
       )
     }
   }

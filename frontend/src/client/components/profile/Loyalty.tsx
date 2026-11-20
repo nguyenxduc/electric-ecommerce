@@ -8,6 +8,7 @@ import {
   Award
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import {
   useLoyaltySummary,
   useRedeemPoints,
@@ -133,8 +134,8 @@ export default function Loyalty() {
       } else {
         toast.success(`Đổi ${pts} điểm thành công!`)
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Failed to redeem points')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to redeem points'))
     }
   }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Star, MessageSquare, Send, Edit2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiErrorMessage, apiErrorResponse } from '../../../lib/apiError'
 import { useProductReviews, useCreateReview, useUpdateReview, useDeleteReview } from '../../hooks/useReviews'
 import { useValidateToken } from '../../hooks/useAuth'
 import ConfirmModal from '../common/ConfirmModal'
@@ -10,9 +11,12 @@ interface ReviewProps {
   productId: number
 }
 
-const extractReviewErrorMessage = (error: any, fallback: string) => {
-  const moderationReason = error?.response?.data?.moderation?.reason
-  const message = error?.response?.data?.message
+const extractReviewErrorMessage = (error: unknown, fallback: string) => {
+  const data = apiErrorResponse(error).data as
+    | { moderation?: { reason?: unknown }; message?: unknown }
+    | undefined
+  const moderationReason = data?.moderation?.reason
+  const message = data?.message
   if (typeof moderationReason === 'string' && moderationReason.trim()) return moderationReason
   if (typeof message === 'string' && message.trim()) return message
   return fallback
@@ -65,7 +69,7 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
             setComment('')
             setCommentError('')
           },
-          onError: (error: any) => {
+          onError: (error: unknown) => {
             const message = extractReviewErrorMessage(error, 'Failed to update review')
             setCommentError(message)
           }
@@ -86,7 +90,7 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
             setComment('')
             setCommentError('')
           },
-          onError: (error: any) => {
+          onError: (error: unknown) => {
             const message = extractReviewErrorMessage(error, 'Failed to submit review')
             setCommentError(message)
           }
@@ -109,8 +113,8 @@ const ReviewComponent = ({ productId }: ReviewProps) => {
         toast.success('Review deleted successfully')
         setDeleteConfirm(null)
       },
-      onError: (error: any) => {
-        toast.error(error?.response?.data?.message || 'Failed to delete review')
+      onError: (error: unknown) => {
+        toast.error(apiErrorMessage(error, 'Failed to delete review'))
       }
     })
   }

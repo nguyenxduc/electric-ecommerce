@@ -8,7 +8,7 @@ export type AuditLog = {
   resource_id?: string | number | null
   ip?: string | null
   user_agent?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
   created_at: string
 }
 

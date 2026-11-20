@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { apiErrorMessage, apiErrorResponse } from '../../../lib/apiError'
 import { useValidateToken } from '../../hooks/useAuth'
 import { sendPhoneOtp, verifyPhoneOtp } from '../../services/orderService'
-
-const errMsg = (e: any, fallback: string) =>
-  e?.response?.data?.error || e?.response?.data?.message || fallback
 
 const PhoneVerification = ({ onVerified }: { onVerified?: () => void }) => {
   const qc = useQueryClient()
@@ -40,10 +38,11 @@ const PhoneVerification = ({ onVerified }: { onVerified?: () => void }) => {
       setDevCode(res.data?.dev_code ?? null)
       setCooldown(60)
       toast.success(res.message || 'Verification code sent')
-    } catch (e: any) {
-      const retry = e?.response?.data?.retry_after
-      if (e?.response?.status === 429 && retry) setCooldown(Number(retry))
-      toast.error(errMsg(e, 'Failed to send code'))
+    } catch (e) {
+      const { status, data } = apiErrorResponse(e)
+      const retry = data?.retry_after
+      if (status === 429 && retry) setCooldown(Number(retry))
+      toast.error(apiErrorMessage(e, 'Failed to send code'))
     } finally {
       setBusy(false)
     }
@@ -60,8 +59,8 @@ const PhoneVerification = ({ onVerified }: { onVerified?: () => void }) => {
       setDevCode(null)
       await qc.invalidateQueries({ queryKey: ['me'] })
       onVerified?.()
-    } catch (e: any) {
-      toast.error(errMsg(e, 'Verification failed'))
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Verification failed'))
     } finally {
       setBusy(false)
     }

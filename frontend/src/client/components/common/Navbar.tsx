@@ -9,9 +9,7 @@ import NotificationBell from './NotificationBell'
 import CartDrawer from '../layout/CartDrawer'
 import ConfirmModal from './ConfirmModal'
 
-// @ts-ignore
 import Logo from '../../../assets/logo.svg'
-// @ts-ignore
 import ProfileIcon from '../../../assets/profile-icon.svg'
 import { useValidateToken } from '../../hooks/useAuth'
 import { useCart } from '../../hooks/useCart'

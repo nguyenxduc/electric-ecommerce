@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react'
 import { useChangePassword } from '../../hooks/useAuth'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import PhoneVerification from './PhoneVerification'
 
 const Security = () => {
@@ -43,8 +44,8 @@ const Security = () => {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to change password')
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Failed to change password'))
     }
   }
 

@@ -48,7 +48,7 @@ export const adminFilterService = {
     )
   },
   sync(category_id?: number) {
-    return axiosClient.post<{ success: boolean; message: string; data: any }>(
+    return axiosClient.post<{ success: boolean; message: string; data: unknown }>(
       '/filter/sync',
       null,
       {

@@ -1,5 +1,3 @@
-import { SuccessResponse } from './common'
-
 export type AdminReview = {
   id: number
   user_id: number

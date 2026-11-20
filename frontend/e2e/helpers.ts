@@ -9,7 +9,7 @@ const STATE_FILE = path.join(process.cwd(), 'e2e', '.state.json')
 // Don hang tao o test 1 duoc cac spec sau dung lai
 export const saveState = (s: Record<string, unknown>) =>
   fs.writeFileSync(STATE_FILE, JSON.stringify({ ...loadState(), ...s }))
-export const loadState = (): Record<string, any> => {
+export const loadState = (): Record<string, unknown> => {
   try {
     return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))
   } catch {

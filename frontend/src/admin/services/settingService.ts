@@ -17,9 +17,11 @@ export type SettingResponse = {
   settings: Setting[]
 }
 
+export type SettingValue = string | number | boolean | object
+
 export type UpsertSettingPayload = {
   key: string
-  value: string | number | boolean | object
+  value: SettingValue
   description?: string
   category?: string
   data_type?: 'string' | 'number' | 'boolean' | 'json'
@@ -32,8 +34,8 @@ export const fetchAllSettings = async (category?: string): Promise<SettingRespon
   return data
 }
 
-export const fetchSettingByKey = async (key: string): Promise<{ parsedValue: any } & Setting> => {
-  const { data } = await axiosClient.get<{ parsedValue: any } & Setting>(`/settings/${key}`)
+export const fetchSettingByKey = async (key: string): Promise<{ parsedValue: unknown } & Setting> => {
+  const { data } = await axiosClient.get<{ parsedValue: unknown } & Setting>(`/settings/${key}`)
   return data
 }
 

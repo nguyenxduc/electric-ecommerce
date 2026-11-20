@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import { formatUsd } from '../../utils/formatMoney'
 import {
   fetchInvoice,
@@ -61,7 +62,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
       setReported(true)
       toast.success('Thanks, our team will review this delivery')
     },
-    onError: (e: any) => toast.error(e?.response?.data?.error || 'Failed to send report')
+    onError: (e: unknown) => toast.error(apiErrorMessage(e, 'Failed to send report'))
   })
 
   return (

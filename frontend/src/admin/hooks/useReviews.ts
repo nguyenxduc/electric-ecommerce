@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import adminReviewService from '../services/reviewService'
 import {
-  AdminReview,
   CreateReviewRequest,
   ListProductReviewsResponse,
   ReviewMutationResponse
@@ -52,7 +51,7 @@ export function useUpdateAdminReview(product_id: number, id: number) {
   })
 }
 
-export function useDeleteAdminReview(product_id: number) {
+export function useDeleteAdminReview() {
   const qc = useQueryClient()
   return useMutation<{ data: unknown }, Error, number>({
     mutationFn: id => adminReviewService.delete(id),

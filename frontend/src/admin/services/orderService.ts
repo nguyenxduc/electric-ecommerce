@@ -1,6 +1,5 @@
 import axiosClient from '../../lib/axios'
 import {
-  AdminOrder,
   CancelOrderResponse,
   CreateOrderRequest,
   CreateOrderResponse,

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { apiErrorMessage, apiErrorResponse } from '../../lib/apiError'
 import {
   Truck,
   CreditCard,
@@ -217,18 +218,18 @@ const Checkout = () => {
   }, [quoteKey, address, province, district, ward])
 
   // Shared error handling for order creation (fraud/OTP 403 codes)
-  const handleOrderError = (err: any, fallback: string) => {
-    if (err?.message === 'NOT_AUTHENTICATED') {
+  const handleOrderError = (err: unknown, fallback: string) => {
+    if (err instanceof Error && err.message === 'NOT_AUTHENTICATED') {
       toast.error('Please login to place an order')
       return
     }
-    const data = err?.response?.data
-    if (err?.response?.status === 403 && data?.code === 'PHONE_VERIFICATION_REQUIRED') {
+    const { status, data } = apiErrorResponse(err)
+    if (status === 403 && data?.code === 'PHONE_VERIFICATION_REQUIRED') {
       setNeedPhoneVerify(true)
-      toast.error(data.message || 'Please verify your phone number to continue')
+      toast.error((data.message as string) || 'Please verify your phone number to continue')
       return
     }
-    toast.error(data?.message || data?.error || fallback)
+    toast.error(apiErrorMessage(err, fallback))
   }
 
   const createOrderFromCart = async (paymentMethod: string, clearCart = true) => {
@@ -347,7 +348,7 @@ const Checkout = () => {
             result.orders.map(o => o.order_number).join(',')
           )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
         )
-      } catch (err: any) {
+      } catch (err) {
         handleOrderError(err, 'Failed to create order')
       } finally {
         isSubmittingRef.current = false
@@ -422,7 +423,7 @@ const Checkout = () => {
       // Fallback: show QR if no payUrl/deeplink is returned.
       setQrData(momoData)
       setShowQRModal(true)
-    } catch (err: any) {
+    } catch (err) {
       await rollbackPendingOrders()
       handleOrderError(err, 'Failed to create MoMo payment')
     } finally {
@@ -462,7 +463,7 @@ const Checkout = () => {
           result.orders.map(o => o.order_number).join(',')
         )}&amount=${result.finalAmount ?? displayTotal}&subtotal=${result.subtotal ?? totals.grandTotal}&tierDiscount=${result.tierDiscount ?? tierDiscountAmount}&voucherDiscount=${result.discount ?? 0}`
       )
-    } catch (err: any) {
+    } catch (err) {
       handleOrderError(err, 'Failed to create order')
     } finally {
       isSubmittingRef.current = false
@@ -541,10 +542,8 @@ const Checkout = () => {
     try {
       const res = await getMyCoupons()
       setMyVouchers(res.coupons || [])
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message || 'Failed to load your vouchers'
-      )
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to load your vouchers'))
     } finally {
       setVoucherLoading(false)
     }
@@ -558,8 +557,8 @@ const Checkout = () => {
       if (applyCouponPreview(res, voucher.code)) {
         setShowVoucherModal(false)
       }
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Voucher cannot be applied')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Voucher cannot be applied'))
     } finally {
       setCouponLoading(false)
     }

@@ -5,11 +5,10 @@ import {
   AddSalesRequest,
   AddSalesResponse,
   AdminProduct,
-  CreateProductRequest,
   ProductListQuery,
   ProductListResponse,
-  ProductResponse,
-  UpdateProductRequest
+  ProductFormPayload,
+  ProductResponse
 } from '../types'
 
 export const adminProductService = {
@@ -25,9 +24,10 @@ export const adminProductService = {
   getById(id: number) {
     return axiosClient.get<ProductResponse>(`/products/${id}`)
   },
-  create(payload: CreateProductRequest & { images?: File[]; shop_id?: number }) {
+  create(payload: ProductFormPayload) {
     const form = new FormData()
-    const data = (payload as any).product || payload
+    const data = ((payload as { product?: Record<string, unknown> }).product ||
+      payload) as Record<string, unknown>
     if (data?.shop_id !== undefined && data?.shop_id !== null && data?.shop_id !== '')
       form.append('shop_id', String(data.shop_id))
     if (data?.name) form.append('name', String(data.name))
@@ -57,9 +57,10 @@ export const adminProductService = {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
-  update(id: number, payload: UpdateProductRequest & { images?: File[] }) {
+  update(id: number, payload: ProductFormPayload) {
     const form = new FormData()
-    const data = (payload as any).product || payload
+    const data = ((payload as { product?: Record<string, unknown> }).product ||
+      payload) as Record<string, unknown>
     if (data?.name !== undefined) form.append('name', String(data.name))
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)

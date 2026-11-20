@@ -5,7 +5,7 @@ import {
   fetchCategoryBySlug,
   fetchSubCategoriesByCategory
 } from '../services/categoryService'
-import type { Categories } from '../types/category'
+import type { Categories, Category } from '../types/category'
 
 export const useCategories = () =>
   useQuery<Categories>({
@@ -15,7 +15,7 @@ export const useCategories = () =>
   })
 
 export const useCategoryById = (id: number) =>
-  useQuery<any>({
+  useQuery<Category>({
     queryKey: ['category', id],
     queryFn: () => fetchCategoryById(id),
     enabled: !!id,
@@ -23,7 +23,7 @@ export const useCategoryById = (id: number) =>
   })
 
 export const useCategoryBySlug = (slug: string) =>
-  useQuery<any>({
+  useQuery<Category>({
     queryKey: ['category', 'slug', slug],
     queryFn: () => fetchCategoryBySlug(slug),
     enabled: !!slug && slug !== 'all',
@@ -31,7 +31,7 @@ export const useCategoryBySlug = (slug: string) =>
   })
 
 export const useSubCategoriesByCategory = (categoryId: number) =>
-  useQuery<any>({
+  useQuery<unknown>({
     queryKey: ['subCategoriesOfCategory', categoryId],
     queryFn: () => fetchSubCategoriesByCategory(categoryId),
     enabled: !!categoryId,

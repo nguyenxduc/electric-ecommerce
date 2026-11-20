@@ -4,6 +4,7 @@ import { useAllChats, useChatById, useSendMessage, useUpdateChatStatus, useMarkM
 import { useValidateToken } from '../../../client/hooks/useAuth'
 import { toast } from 'sonner'
 import { io, Socket } from 'socket.io-client'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 // scope 'admin' = platform support inbox; 'seller' = own shop's buyer chats
 export default function AdminChatList({
@@ -40,7 +41,7 @@ export default function AdminChatList({
     const token = localStorage.getItem('accessToken')
     if (!token) return
 
-    const apiUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000'
+    const apiUrl = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3000'
     const socketUrl = apiUrl.replace('/api', '')
     const newSocket = io(socketUrl, {
       auth: { token },
@@ -118,8 +119,8 @@ export default function AdminChatList({
         })
       }
       setMessage('')
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to send message')
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Failed to send message'))
     }
   }
 
@@ -135,8 +136,8 @@ export default function AdminChatList({
       await updateStatusMutation.mutateAsync({ chatId, status })
       toast.success('Chat status updated')
       refetchChats()
-    } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to update status')
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Failed to update status'))
     }
   }
 

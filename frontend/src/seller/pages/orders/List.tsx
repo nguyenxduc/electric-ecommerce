@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   useMyShopOrders,
@@ -13,8 +13,19 @@ import { formatUsd } from '../../../client/utils/formatMoney'
 export default function SellerOrdersList() {
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
-  // ?status= de link tu khoi To-do o dashboard loc san
-  const [status, setStatus] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get('status') || undefined)
+  // Tab trang thai song o URL (?status=): link tu To-do loc san, refresh giu dung tab
+  const [searchParams, setSearchParams] = useSearchParams()
+  const status = searchParams.get('status') || undefined
+  const setStatus = (v?: string) =>
+    setSearchParams(
+      prev => {
+        const next = new URLSearchParams(prev)
+        if (v) next.set('status', v)
+        else next.delete('status')
+        return next
+      },
+      { replace: true }
+    )
   const [q, setQ] = useState('')
   const { data, isLoading, error } = useMyShopOrders({
     page,

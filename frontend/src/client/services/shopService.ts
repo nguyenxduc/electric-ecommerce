@@ -1,4 +1,5 @@
 import axiosClient from '../../lib/axios'
+import { apiErrorResponse } from '../../lib/apiError'
 
 export type Shop = {
   id: number
@@ -72,8 +73,8 @@ export const getMyShop = async (): Promise<Shop | null> => {
   try {
     const res = await axiosClient.get('/shops/me')
     return res.data.data
-  } catch (err: any) {
-    if (err?.response?.status === 404) return null
+  } catch (err: unknown) {
+    if (apiErrorResponse(err).status === 404) return null
     throw err
   }
 }

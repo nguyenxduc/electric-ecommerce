@@ -6,7 +6,26 @@ import AdminPagination from '../../components/common/AdminPagination'
 import { downloadTaxCsv, errMsg, fetchInvoices, fetchTaxReport, openInvoiceHtml } from '../../services/opsService'
 import { fmtDate } from '../../utils/date'
 
-const num = (n: any) => Number(n ?? 0).toLocaleString('en-US')
+const num = (n: unknown) => Number(n ?? 0).toLocaleString('en-US')
+type TaxRow = {
+  shop_id: number
+  shop_name: string
+  tax_code?: string | null
+  entity_type?: string | null
+  orders: number | string
+  base: number | string
+  vat: number | string
+  pit: number | string
+}
+type InvoiceRow = {
+  id: number
+  invoice_number?: string
+  seller?: { name?: string }
+  buyer?: { company_name?: string; name?: string }
+  total: number | string
+  status?: string
+  issued_at?: string | null
+}
 const inp = 'border rounded px-3 py-2 text-sm'
 
 export default function AdminTaxPage() {
@@ -39,9 +58,9 @@ export default function AdminTaxPage() {
       })
   })
 
-  const rows: any[] = report.data?.rows ?? []
-  const sum = (k: string) => rows.reduce((s, r) => s + Number(r[k] || 0), 0)
-  const list: any[] = invoices.data?.invoices ?? []
+  const rows: TaxRow[] = report.data?.rows ?? []
+  const sum = (k: 'orders' | 'base' | 'vat' | 'pit') => rows.reduce((s, r) => s + Number(r[k] || 0), 0)
+  const list: InvoiceRow[] = invoices.data?.invoices ?? []
   const pg = invoices.data?.pagination
   const run = (fn: () => Promise<unknown>, fail: string) => fn().catch(e => toast.error(errMsg(e, fail)))
   const filter =

@@ -30,6 +30,8 @@ export type DynamicFilters = {
   options: Record<string, { key: string; label: string; options: string[] }> // key: filter key, value: filter metadata
 }
 
+type FilterItem = { key?: string; label?: string; options?: string[] }
+
 const Collection = () => {
   const { collection } = useParams<{ collection: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -66,7 +68,7 @@ const Collection = () => {
 
   // Map filter data from API to dynamic format
   const filterOptions = useMemo(() => {
-    let filterArray: any[] = []
+    let filterArray: FilterItem[] = []
 
     if (filtersData) {
       if (filtersData.success && Array.isArray(filtersData.data)) {
@@ -84,7 +86,7 @@ const Collection = () => {
       { key: string; label: string; options: string[] }
     > = {}
 
-    filterArray.forEach((item: any) => {
+    filterArray.forEach(item => {
       if (!item || typeof item !== 'object') return
 
       const key = item.key || ''
@@ -190,7 +192,8 @@ const Collection = () => {
     { value: 'featured', label: 'featured' },
     { value: 'price-asc', label: 'Price: ascending' },
     { value: 'price-desc', label: 'Price: descending' },
-    { value: 'newest', label: 'New Arrivals' }
+    { value: 'newest', label: 'New Arrivals' },
+    { value: 'discount', label: 'Biggest discount' }
   ]
 
   const mappedSort = useMemo(() => {
@@ -201,6 +204,8 @@ const Collection = () => {
         return 'price-desc'
       case 'newest':
         return 'newest'
+      case 'discount':
+        return 'discount'
       default:
         return 'popular'
     }
@@ -241,7 +246,7 @@ const Collection = () => {
   const { data: searchResults, isLoading: isSearching } = useSearchProducts(
     searchQuery,
     {
-      sort: mappedSort as any,
+      sort: mappedSort,
       page: currentPage,
       limit: COLLECTION_PAGE_SIZE,
       category_id:

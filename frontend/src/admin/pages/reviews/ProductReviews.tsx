@@ -11,7 +11,7 @@ export default function AdminProductReviews() {
     page: 1,
     limit: 10
   })
-  const del = useDeleteAdminReview(pid)
+  const del = useDeleteAdminReview()
   const [editId, setEditId] = useState<number | null>(null)
   const [editRating, setEditRating] = useState<number>(5)
   const [editComment, setEditComment] = useState<string>('')

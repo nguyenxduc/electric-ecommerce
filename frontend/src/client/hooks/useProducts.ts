@@ -133,7 +133,7 @@ export type SearchOptions = {
   price_min?: number
   price_max?: number
   rating_min?: number
-  sort?: 'price-asc' | 'price-desc' | 'rating' | 'popular' | 'newest'
+  sort?: 'price-asc' | 'price-desc' | 'rating' | 'popular' | 'newest' | 'discount'
   page?: number
   limit?: number
 }

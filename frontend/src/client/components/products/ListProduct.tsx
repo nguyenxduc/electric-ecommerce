@@ -24,10 +24,6 @@ const ListProduct = ({
 }: ListProductProps) => {
   const navigate = useNavigate()
 
-  function onClick(id: number) {
-    navigate(`/product/${id}`)
-  }
-
   function ViewAll() {
     navigate('/collection/all')
   }

@@ -57,7 +57,7 @@ const Cart = () => {
   } | null>(null)
 
   const cart = cartData?.cart
-  const items = cart?.items || []
+  const items = useMemo(() => cart?.items || [], [cart?.items])
 
   // Group items by shop - checkout will create one order per shop
   const groupedItems = useMemo(() => groupCartItemsByShop(items), [items])

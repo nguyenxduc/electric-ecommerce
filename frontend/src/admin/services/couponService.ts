@@ -1,6 +1,5 @@
 import axiosClient from '../../lib/axios'
 import {
-  AdminCoupon,
   CouponListResponse,
   CouponResponse,
   CreateCouponRequest,

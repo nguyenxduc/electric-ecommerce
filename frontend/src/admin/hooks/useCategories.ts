@@ -2,15 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import adminCategoryService from '../services/categoryService'
 import {
   AdminCategory,
-  AdminSubCategory,
   CategoryListResponse,
   CategoryResponse,
   CreateCategoryRequest,
-  CreateSubCategoryRequest,
-  SubCategoryListResponse,
-  SubCategoryResponse,
-  UpdateCategoryRequest,
-  UpdateSubCategoryRequest
+  UpdateCategoryRequest
 } from '../types'
 
 const categoryKeys = {
@@ -41,7 +36,11 @@ export function useAdminCategory(id: number) {
 
 export function useCreateAdminCategory() {
   const qc = useQueryClient()
-  return useMutation<{ data: AdminCategory }, Error, CreateCategoryRequest>({
+  return useMutation<
+    { data: AdminCategory },
+    Error,
+    CreateCategoryRequest & { image?: File }
+  >({
     mutationFn: payload => adminCategoryService.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: categoryKeys.all })
@@ -51,7 +50,11 @@ export function useCreateAdminCategory() {
 
 export function useUpdateAdminCategory(id: number) {
   const qc = useQueryClient()
-  return useMutation<{ data: AdminCategory }, Error, UpdateCategoryRequest>({
+  return useMutation<
+    { data: AdminCategory },
+    Error,
+    UpdateCategoryRequest & { image?: File }
+  >({
     mutationFn: payload => adminCategoryService.update(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: categoryKeys.detail(id) })

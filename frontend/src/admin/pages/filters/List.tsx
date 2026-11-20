@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import AdminPagination from '../../components/common/AdminPagination'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
+import { FilterOption } from '../../types'
 
 export default function AdminFiltersList() {
   const [limit] = useState(10)
@@ -49,8 +50,8 @@ export default function AdminFiltersList() {
   const categories = Array.isArray(categoriesData?.data?.categories)
     ? categoriesData.data.categories
     : []
-  const filterKeys = Array.isArray((filterKeysData as any)?.data)
-    ? (filterKeysData as any).data
+  const filterKeys = Array.isArray(filterKeysData?.data)
+    ? filterKeysData.data
     : []
 
   const pages = useMemo(
@@ -73,7 +74,7 @@ export default function AdminFiltersList() {
   }
 
   // Get all available filter keys from the database instead of just from current results
-  const availableKeys = filterKeys.map((fk: any) => ({
+  const availableKeys = filterKeys.map(fk => ({
     key: fk.key,
     label: fk.label
   }))
@@ -82,8 +83,8 @@ export default function AdminFiltersList() {
     try {
       await sync.mutateAsync(undefined)
       toast.success('Filter options synced successfully')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to sync filter options')
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to sync filter options')
     }
   }
 
@@ -91,8 +92,8 @@ export default function AdminFiltersList() {
     try {
       await del.mutateAsync(id)
       toast.success('Filter option deleted')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete filter option')
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to delete filter option')
     }
   }
 
@@ -245,7 +246,7 @@ function FilterRow({
   onEdit,
   onDelete
 }: {
-  option: any
+  option: FilterOption
   onEdit: () => void
   onDelete: () => void
 }) {

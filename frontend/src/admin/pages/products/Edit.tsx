@@ -7,12 +7,14 @@ import {
   useUpdateAdminProduct,
   useAdminCategories
 } from '../../hooks'
-import VariantsEditor, {
+import VariantsEditor from './VariantsEditor'
+import {
   VariantRow,
   variantsFromProduct,
   variantsToPayload,
   variantsTotal
-} from './VariantsEditor'
+} from './variantsUtil'
+import { SpecEntry } from '../../types'
 
 export default function AdminProductEdit({
   basePath = '/admin/products'
@@ -22,7 +24,7 @@ export default function AdminProductEdit({
   const { id } = useParams()
   const isNew = id === 'new'
   const pid = isNew ? undefined : Number(id)
-  const { data, isLoading } = useAdminProduct(pid as number)
+  const { data } = useAdminProduct(pid as number)
   const create = useCreateAdminProduct()
   const update = useUpdateAdminProduct(pid as number)
   const nav = useNavigate()
@@ -33,16 +35,14 @@ export default function AdminProductEdit({
   const [price, setPrice] = useState<number>(0)
   const [weightGrams, setWeightGrams] = useState<number>(500)
   const [discountPercent, setDiscountPercent] = useState<number>(0)
-  const [quantity, setQuantity] = useState<number>(0)
+  const [, setQuantity] = useState<number>(0)
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [subCategoryId, setSubCategoryId] = useState<number | ''>('')
   const [colors, setColors] = useState<
     { name: string; code: string; quantity?: number }[]
   >([])
-  const [specs, setSpecs] = useState<{ label: string; value: any }[]>([])
-  const [specsDetail, setSpecsDetail] = useState<
-    { label: string; value: any }[]
-  >([])
+  const [specs, setSpecs] = useState<SpecEntry[]>([])
+  const [specsDetail, setSpecsDetail] = useState<SpecEntry[]>([])
   const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -62,7 +62,7 @@ export default function AdminProductEdit({
       const p = data.data
       setName(p.name)
       setPrice(Number(p.price))
-      setWeightGrams(Number((p as any).weight_grams) || 500)
+      setWeightGrams(Number(p.weight_grams) || 500)
       setDiscountPercent(
         p.price
           ? Math.round((Number(p.discount || 0) / Number(p.price)) * 100)
@@ -77,12 +77,12 @@ export default function AdminProductEdit({
           : Array.isArray(p.color)
           ? p.color
           : []
-      ) as any
+      )
       setColors(colorArr)
-      setVariants(variantsFromProduct((p as any).variants))
-      setSpecs(Array.isArray(p.specs) ? (p.specs as any) : [])
+      setVariants(variantsFromProduct(p.variants))
+      setSpecs(Array.isArray(p.specs) ? p.specs : [])
       setSpecsDetail(
-        Array.isArray(p.specs_detail) ? (p.specs_detail as any) : []
+        Array.isArray(p.specs_detail) ? p.specs_detail : []
       )
       // Set existing images from the product data
       setExistingImages(Array.isArray(p.img) ? p.img : [])
@@ -143,7 +143,7 @@ export default function AdminProductEdit({
     const variantsPayload = variantsToPayload(variants)
     try {
       if (isNew) {
-        await (create as any).mutateAsync({
+        await create.mutateAsync({
           name,
           price: Number(price),
           quantity: totalQty,
@@ -161,7 +161,7 @@ export default function AdminProductEdit({
       } else {
         const discountAmount =
           (Number(price) * Number(discountPercent || 0)) / 100
-        await (update as any).mutateAsync({
+        await update.mutateAsync({
           name,
           price: Number(price),
           discount: Number(discountAmount.toFixed(2)),
@@ -196,7 +196,7 @@ export default function AdminProductEdit({
       } else {
         nav(basePath)
       }
-    } catch (err) {
+    } catch {
       toast.error('Failed to save product')
     }
   }
@@ -214,7 +214,7 @@ export default function AdminProductEdit({
             <button className="px-3 py-2 border rounded">Save to draft</button>
           )}
           <button
-            onClick={onSubmit as any}
+            onClick={onSubmit}
             className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
             disabled={create.isPending || update.isPending}
           >
@@ -250,7 +250,7 @@ export default function AdminProductEdit({
                   }
                 >
                   <option value="">Select category</option>
-                  {catData?.data?.categories?.map((c: any) => (
+                  {catData?.data?.categories?.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

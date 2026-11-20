@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAdminCategory, useUpdateAdminCategory } from '../../hooks'
+import { AdminCategory } from '../../types'
 
 export default function AdminCategoryEdit() {
   const { id } = useParams()
@@ -15,9 +16,9 @@ export default function AdminCategoryEdit() {
   const [imageFile, setImageFile] = useState<File | undefined>(undefined)
 
   useEffect(() => {
-    const c = (data?.data as any)?.data
+    const c = (data?.data as { data?: AdminCategory } | undefined)?.data
     // depending on service response shape; fallback to data?.data
-    const cat: any = c || (data as any)?.data
+    const cat = c || data?.data
     if (cat) {
       setName(cat.name || '')
       setImageUrl(cat.image_url || '')
@@ -27,7 +28,7 @@ export default function AdminCategoryEdit() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await (update as any).mutateAsync({
+    await update.mutateAsync({
       category: { name, image_url: imageUrl, description },
       image: imageFile
     })
@@ -39,7 +40,7 @@ export default function AdminCategoryEdit() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Edit Category</h1>
         <button
-          onClick={onSubmit as any}
+          onClick={onSubmit}
           className="px-3 py-2 bg-green-600 text-white rounded"
         >
           Save

@@ -1,11 +1,11 @@
 import { toast } from 'sonner'
 import axiosClient from '../../lib/axios'
+import { apiErrorMessage } from '../../lib/apiError'
 
 export const fmtVnd = (n: number | string | null | undefined) =>
   `${Number(n ?? 0).toLocaleString('en-US')} VND`
 
-export const errMsg = (e: any, fallback: string) =>
-  e?.response?.data?.error || e?.response?.data?.message || fallback
+export const errMsg = (e: unknown, fallback: string) => apiErrorMessage(e, fallback)
 
 export const fetchCodPending = async (carrier?: string) =>
   (await axiosClient.get('/shipments/cod/pending', { params: { carrier: carrier || undefined } })).data.data
@@ -20,14 +20,14 @@ export const fetchCodSettlements = async (carrier?: string) =>
   (await axiosClient.get('/shipments/cod/settlements', { params: { carrier: carrier || undefined, limit: 50 } })).data.data
 
 export const fetchFraudStats = async () => (await axiosClient.get('/fraud/stats')).data.data
-export const fetchFraudFlags = async (params: Record<string, any>) =>
+export const fetchFraudFlags = async (params: Record<string, unknown>) =>
   (await axiosClient.get('/fraud/flags', { params })).data
 export const resolveFraudFlag = async (id: number | string, status: 'confirmed' | 'dismissed') =>
   (await axiosClient.patch(`/fraud/flags/${id}`, { status })).data
 
 export const fetchTaxReport = async (period: string) =>
   (await axiosClient.get('/tax/report', { params: { period } })).data.data
-export const fetchInvoices = async (params: Record<string, any>) =>
+export const fetchInvoices = async (params: Record<string, unknown>) =>
   (await axiosClient.get('/invoices', { params })).data.data
 
 export const downloadTaxCsv = async (period: string) => {

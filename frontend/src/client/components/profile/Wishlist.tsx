@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Heart, Trash2, ShoppingCart, Package } from 'lucide-react'
+import { Heart, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -7,7 +7,6 @@ import {
   useRemoveFromWishlist,
   useClearWishlist
 } from '../../hooks/useWishlist'
-import { useAddToCart } from '../../hooks/useCart'
 import ConfirmModal from '../common/ConfirmModal'
 import { makeProductSlug } from '../../utils/productSlug'
 
@@ -16,7 +15,6 @@ export default function Wishlist() {
   const { data: wishlistData, isLoading } = useWishlist()
   const removeMutation = useRemoveFromWishlist()
   const clearMutation = useClearWishlist()
-  const addToCartMutation = useAddToCart()
   const [pendingRemove, setPendingRemove] = useState<{
     id: number
     name: string

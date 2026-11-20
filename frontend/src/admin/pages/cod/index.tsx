@@ -11,8 +11,29 @@ import {
 } from '../../services/opsService'
 import { fmtDateTime } from '../../utils/date'
 
+type CodShipment = {
+  id: number
+  tracking_code?: string
+  carrier: string
+  order?: { order_number?: string } | null
+  order_number?: string
+  order_id?: number
+  cod_amount_vnd?: number | string | null
+  cod_collected_at?: string | null
+}
+type CodSettlement = {
+  id: number
+  carrier?: string
+  reference?: string | null
+  _count?: { shipments?: number }
+  expected_amount_vnd?: number | string
+  received_amount_vnd?: number | string
+  difference_vnd?: number | string
+  note?: string | null
+  created_at?: string
+}
+
 const CARRIERS = ['', 'ghn', 'ghtk', 'mock']
-const fmtDate = (d?: string | null) => (d ? fmtDateTime(d) : '-')
 const diffCls = (d: number) => (d !== 0 ? 'text-red-600 font-semibold' : 'text-green-600')
 
 export default function AdminCodPage() {
@@ -22,7 +43,7 @@ export default function AdminCodPage() {
   const [received, setReceived] = useState('')
   const [reference, setReference] = useState('')
   const [note, setNote] = useState('')
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<CodSettlement | null>(null)
 
   const pending = useQuery({
     queryKey: ['admin', 'cod', 'pending', carrier],
@@ -32,11 +53,12 @@ export default function AdminCodPage() {
     queryKey: ['admin', 'cod', 'settlements', carrier],
     queryFn: () => fetchCodSettlements(carrier)
   })
-  const rows: any[] = pending.data?.shipments ?? []
+  const rows: CodShipment[] = pending.data?.shipments ?? []
   const picked = rows.filter(r => selected.includes(r.id))
   // Bo id da bien mat sau khi refetch de khong gui nham
   useEffect(() => {
     if (pending.data && picked.length !== selected.length) setSelected(picked.map(p => p.id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- picked tinh lai moi render, da co picked.length
   }, [pending.data, picked.length, selected.length])
   const total = picked.reduce((s, r) => s + Number(r.cod_amount_vnd || 0), 0)
   const oneCarrier = new Set(picked.map(p => p.carrier)).size <= 1
@@ -195,7 +217,7 @@ export default function AdminCodPage() {
             </tr>
           </thead>
           <tbody>
-            {(history.data ?? []).map((s: any) => (
+            {(history.data ?? []).map((s: CodSettlement) => (
               <tr key={s.id} className="border-t">
                 <td className="p-3">{s.id}</td>
                 <td className="p-3 uppercase">{s.carrier}</td>

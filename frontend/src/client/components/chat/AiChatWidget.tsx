@@ -34,7 +34,7 @@ function AiChatWidgetInner() {
   const [ratedMap, setRatedMap] = useState<Record<string, number>>({})
 
   const { data: chatsData, isLoading: chatsLoading } = useAiChats(isOpen)
-  const chats = chatsData?.data?.chats || []
+  const chats = useMemo(() => chatsData?.data?.chats || [], [chatsData])
 
   const selectedChatId = useMemo(() => {
     if (chats.length === 0) return undefined
@@ -51,7 +51,7 @@ function AiChatWidgetInner() {
     selectedChatId,
     { pausePoll: false }
   )
-  const messages = messagesData?.data?.messages || []
+  const messages = useMemo(() => messagesData?.data?.messages || [], [messagesData])
   const normalizeText = (value: string) => value.trim().toLowerCase()
 
   const activeOptimisticMessages = optimisticMessages.filter(

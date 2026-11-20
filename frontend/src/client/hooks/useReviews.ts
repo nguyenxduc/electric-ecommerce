@@ -60,7 +60,7 @@ export const useDeleteReview = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: deleteReview,
-    onSuccess: (_, reviewId) => {
+    onSuccess: () => {
       // We need productId to invalidate, but we don't have it here
       // So we'll invalidate all review queries
       qc.invalidateQueries({ queryKey: ['reviews'] })

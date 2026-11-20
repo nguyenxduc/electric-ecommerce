@@ -6,11 +6,10 @@ import {
   AddSalesRequest,
   AddSalesResponse,
   AdminProduct,
-  CreateProductRequest,
   ProductListQuery,
   ProductListResponse,
-  ProductResponse,
-  UpdateProductRequest
+  ProductFormPayload,
+  ProductResponse
 } from '../types'
 
 const productKeys = {
@@ -46,7 +45,7 @@ export function useAdminProduct(id: number) {
 
 export function useCreateAdminProduct() {
   const qc = useQueryClient()
-  return useMutation<{ data: AdminProduct }, Error, CreateProductRequest>({
+  return useMutation<{ data: AdminProduct }, Error, ProductFormPayload>({
     mutationFn: payload => adminProductService.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.all })
@@ -56,7 +55,7 @@ export function useCreateAdminProduct() {
 
 export function useUpdateAdminProduct(id: number) {
   const qc = useQueryClient()
-  return useMutation<{ data: AdminProduct }, Error, UpdateProductRequest>({
+  return useMutation<{ data: AdminProduct }, Error, ProductFormPayload>({
     mutationFn: payload => adminProductService.update(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.detail(id) })

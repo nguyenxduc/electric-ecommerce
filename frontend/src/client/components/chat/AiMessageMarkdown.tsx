@@ -240,7 +240,8 @@ export default function AiMessageMarkdown({ text, variant }: Props) {
     : 'text-blue-600 underline break-all hover:text-blue-800'
 
   const components: Components = {
-    a: ({ node: _n, className, children, href, ...rest }) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- tach node de khong spread xuong <a>
+    a: ({ node: _node, className, children, href, ...rest }) => {
       const normalized = href ? sanitizeUrlToken(href) : ''
       const isExternal = normalized.startsWith('http')
       return (

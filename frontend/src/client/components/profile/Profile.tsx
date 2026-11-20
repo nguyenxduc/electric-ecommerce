@@ -198,8 +198,8 @@ export default function Profile() {
       setFullName(newFullName)
       setShowNameModal(false)
       toast.success('Name updated successfully')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update name')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update name')
     }
   }
 
@@ -209,8 +209,8 @@ export default function Profile() {
       setPhone(phoneEdit)
       setShowPhoneModal(false)
       toast.success('Phone number updated successfully')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update phone number')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update phone number')
     }
   }
 
@@ -220,8 +220,8 @@ export default function Profile() {
       setAddress(addressEdit)
       setShowAddressModal(false)
       toast.success('Address updated successfully')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update address')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update address')
     }
   }
 

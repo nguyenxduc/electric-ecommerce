@@ -1,15 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useCreateAdminProduct, useAdminCategories } from '../../hooks'
 import { useValidateToken } from '../../../client/hooks/useAuth'
+import { SpecEntry } from '../../types'
 import adminShopService from '../../services/shopService'
-import VariantsEditor, {
-  VariantRow,
-  variantsFromProduct,
-  variantsToPayload,
-  variantsTotal
-} from './VariantsEditor'
+import VariantsEditor from './VariantsEditor'
+import { VariantRow, variantsToPayload, variantsTotal } from './variantsUtil'
 
 export default function AdminProductCreate({
   basePath = '/admin/products'
@@ -35,14 +32,12 @@ export default function AdminProductCreate({
   const [price, setPrice] = useState<number>(0)
   const [weightGrams, setWeightGrams] = useState<number>(500)
   const [categoryId, setCategoryId] = useState<number | ''>('')
-  const [subCategoryId, setSubCategoryId] = useState<number | ''>('')
+  const [subCategoryId] = useState<number | ''>('')
   const [colors, setColors] = useState<
     { name: string; code: string; quantity?: number }[]
   >([])
-  const [specs, setSpecs] = useState<{ label: string; value: any }[]>([])
-  const [specsDetail, setSpecsDetail] = useState<
-    { label: string; value: any }[]
-  >([])
+  const [specs, setSpecs] = useState<SpecEntry[]>([])
+  const [specsDetail, setSpecsDetail] = useState<SpecEntry[]>([])
   const [variants, setVariants] = useState<VariantRow[]>([])
   const [images, setImages] = useState<File[]>([])
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
@@ -73,7 +68,7 @@ export default function AdminProductCreate({
     const totalQty = variants.length
       ? variantsTotal(variants)
       : colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
-    await (create as any).mutateAsync({
+    await create.mutateAsync({
       name,
       price: Number(price),
       quantity: totalQty,
@@ -96,7 +91,7 @@ export default function AdminProductCreate({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Add Product</h1>
         <button
-          onClick={onSubmit as any}
+          onClick={onSubmit}
           className="px-3 py-2 bg-green-600 text-white rounded"
         >
           Publish Product
@@ -145,7 +140,7 @@ export default function AdminProductCreate({
                   }
                 >
                   <option value="">Select category</option>
-                  {catData?.data?.categories?.map((c: any) => (
+                  {catData?.data?.categories?.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>

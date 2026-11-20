@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { useAdminCustomers, useUpdateAdminCustomerPoints } from '../../hooks'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
+import { AdminCustomer } from '../../types'
+import { apiErrorMessage } from '../../../lib/apiError'
 
 export default function AdminCustomerTiersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -39,7 +41,7 @@ export default function AdminCustomerTiersPage() {
     setSearchParams(params)
   }
 
-  const currentTier = (user: any): string => {
+  const currentTier = (user: AdminCustomer): string => {
     if (user.segment) return user.segment
     const pts = user.loyalty_points ?? 0
     if (pts >= 5000) return 'PLATINUM'
@@ -130,9 +132,9 @@ export default function AdminCustomerTiersPage() {
                                 payload: { loyalty_points: selectedPoints }
                               })
                               toast.success(`Points updated for ${user.name || user.email}`)
-                            } catch (err: any) {
+                            } catch (err) {
                               toast.error(
-                                err?.response?.data?.message || 'Failed to update points'
+                                apiErrorMessage(err, 'Failed to update points')
                               )
                             }
                           }}

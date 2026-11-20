@@ -59,7 +59,7 @@ function ChatWidgetInner({
     if (!token) return
 
     const apiUrl =
-      (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3000'
+      import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
     const socketUrl = apiUrl.replace('/api', '')
     const newSocket = io(socketUrl, {
       auth: { token },

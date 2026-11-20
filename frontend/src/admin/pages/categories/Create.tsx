@@ -13,7 +13,7 @@ export default function AdminCategoryCreate() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await (create as any).mutateAsync({
+    await create.mutateAsync({
       category: { name, image_url: imageUrl, description },
       image: imageFile
     })
@@ -25,7 +25,7 @@ export default function AdminCategoryCreate() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">New Category</h1>
         <button
-          onClick={onSubmit as any}
+          onClick={onSubmit}
           className="px-3 py-2 bg-green-600 text-white rounded"
         >
           Save

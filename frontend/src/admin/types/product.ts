@@ -1,7 +1,10 @@
-import { Pagination, SuccessResponse } from './common'
+import { SuccessResponse } from './common'
 import { AdminCategory } from './category'
 
-export type SpecEntry = { label: string; value: any }
+export type SpecEntry = { label: string; value: unknown }
+
+// Payload phang tu form tao/sua san pham (service tu dong goi thanh FormData)
+export type ProductFormPayload = Record<string, unknown> & { images?: File[] }
 
 export type ProductColor = { name: string; code: string; quantity?: number }
 
@@ -20,6 +23,7 @@ export type AdminProduct = {
   price: number
   discount?: number
   quantity?: number
+  weight_grams?: number
   sold?: number
   rating?: number
   number_of_ratings?: number
@@ -35,6 +39,7 @@ export type AdminProduct = {
   variants?: ProductVariant[]
   category?: Pick<AdminCategory, 'id' | 'name'>
   sub_category?: { id: number; name: string }
+  shop?: { id?: number; name?: string } | null
 }
 
 export type CreateProductRequest = {

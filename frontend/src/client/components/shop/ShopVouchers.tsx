@@ -35,8 +35,15 @@ const ShopVouchers = ({ slug, className = '' }: { slug: string; className?: stri
             </div>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(v.code)
-                toast.success(`Copied code ${v.code} - apply it at checkout`)
+                // clipboard chi co tren HTTPS/localhost; mo qua IP LAN thi bao ma de go tay
+                if (!navigator.clipboard) {
+                  toast.info(`Voucher code: ${v.code} - enter it at checkout`)
+                  return
+                }
+                navigator.clipboard.writeText(v.code).then(
+                  () => toast.success(`Copied code ${v.code} - apply it at checkout`),
+                  () => toast.info(`Voucher code: ${v.code} - enter it at checkout`)
+                )
               }}
               className="px-3 py-1.5 bg-rose-500 text-white text-xs font-semibold rounded flex items-center gap-1 hover:bg-rose-600"
             >

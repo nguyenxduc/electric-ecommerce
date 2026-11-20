@@ -15,7 +15,6 @@ import {
 import type { ImageSearchData } from '../../types/product'
 import { makeProductSlug } from '../../utils/productSlug'
 
-// @ts-ignore
 import SearchIcon from '../../../assets/search-icon.svg'
 
 type ModalProps = {
@@ -60,7 +59,7 @@ function Modal({
   const [imageData, setImageData] = useState<ImageSearchData | null>(null)
   const overviewRequestIdRef = useRef(0)
 
-  const results = data?.products || []
+  const results = useMemo(() => data?.products || [], [data])
 
   const formattedResults = useMemo(
     () =>

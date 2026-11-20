@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { apiErrorResponse } from '../../lib/apiError'
 import axiosClient from '../../lib/axios'
 
 // ---- Shop vouchers ----
@@ -146,8 +147,8 @@ export const getOrderInvoice = async (orderId: number): Promise<Invoice | null> 
   try {
     const { data } = await axiosClient.get(`/invoices/orders/${orderId}`)
     return data.data || null
-  } catch (e: any) {
-    if (e?.response?.status === 404) return null
+  } catch (e) {
+    if (apiErrorResponse(e).status === 404) return null
     throw e
   }
 }

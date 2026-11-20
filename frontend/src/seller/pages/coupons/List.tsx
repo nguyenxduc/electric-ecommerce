@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
 import { TicketPercent, Trash2, Plus } from 'lucide-react'
 import {
   getMyShopCoupons,
@@ -51,8 +52,8 @@ export default function SellerCouponsList() {
       setMinOrder('')
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to create voucher')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to create voucher'))
   })
 
   const deleteMut = useMutation({
@@ -61,8 +62,8 @@ export default function SellerCouponsList() {
       toast.success('Voucher deleted')
       invalidate()
     },
-    onError: (err: any) =>
-      toast.error(err?.response?.data?.message || 'Failed to delete voucher')
+    onError: (err: unknown) =>
+      toast.error(apiErrorMessage(err, 'Failed to delete voucher'))
   })
 
   return (

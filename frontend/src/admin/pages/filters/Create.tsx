@@ -46,8 +46,8 @@ export default function AdminFilterCreate() {
       })
       toast.success('Filter option created successfully')
       nav('/admin/filters')
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to create filter option')
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to create filter option')
     }
   }
 

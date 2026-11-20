@@ -6,16 +6,18 @@ import OrderCard from './OrderCard'
 import { useUserOrders } from '../../hooks/useUserOrders'
 import { cancelMyOrder, requestReturn } from '../../services/orderService'
 import { toast } from 'sonner'
+import { apiErrorMessage } from '../../../lib/apiError'
+
+type OrderTab = 'current' | 'delivered' | 'canceled' | 'returned'
 
 const Order = () => {
   const ordersQuery = useUserOrders()
   const orders = ordersQuery.data
   const isLoading = ordersQuery.isLoading
+  type MappedOrder = (typeof mappedOrders)[number]
   const [view, setView] = useState<'list' | 'detail' | 'empty'>('list')
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
-  const [orderTab, setOrderTab] = useState<
-    'current' | 'delivered' | 'canceled' | 'returned'
-  >('current')
+  const [selectedOrder, setSelectedOrder] = useState<MappedOrder | null>(null)
+  const [orderTab, setOrderTab] = useState<OrderTab>('current')
   const [cancelling, setCancelling] = useState(false)
   const [returnOpen, setReturnOpen] = useState(false)
   const [returnReason, setReturnReason] = useState('')
@@ -35,7 +37,7 @@ const Order = () => {
       delivered: o.status === 'delivered' ? 'Delivered' : undefined,
       sentTo: o.shipping_address?.name || 'You',
       address: o.shipping_address?.address,
-      status: o.status as any,
+      status: o.status,
       paymentType: o.payment_method || undefined,
       transactionId: o.id ? `#${o.id}` : '',
       amountPaid: Number(o.total_amount || 0),
@@ -44,7 +46,7 @@ const Order = () => {
         quantity: oi.quantity,
         price: oi.unit_price,
         variant: oi.variant_id
-          ? (oi as any).variant?.name ||
+          ? (oi as { variant?: { name?: string } }).variant?.name ||
             oi.product?.variants?.find(v => v.id === oi.variant_id)?.name ||
             `Variant #${oi.variant_id}`
           : undefined,
@@ -73,7 +75,7 @@ const Order = () => {
     return []
   }, [mappedOrders, orderTab])
 
-  const handleOrderClick = (order: any) => {
+  const handleOrderClick = (order: MappedOrder) => {
     setSelectedOrder(order)
     setView('detail')
   }
@@ -87,8 +89,8 @@ const Order = () => {
       setView('list')
       setSelectedOrder(null)
       ordersQuery.refetch()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to cancel order')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to cancel order'))
     } finally {
       setCancelling(false)
     }
@@ -108,10 +110,8 @@ const Order = () => {
       setView('list')
       setSelectedOrder(null)
       ordersQuery.refetch()
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.message || 'Failed to send return request'
-      )
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to send return request'))
     } finally {
       setReturnSubmitting(false)
     }
@@ -247,7 +247,7 @@ const Order = () => {
                   <button
                     key={tab.key}
                     onClick={() => {
-                      setOrderTab(tab.key as any)
+                      setOrderTab(tab.key as OrderTab)
                       setView(tab.count === 0 ? 'empty' : 'list')
                     }}
                     className={`pb-3 px-1 relative ${

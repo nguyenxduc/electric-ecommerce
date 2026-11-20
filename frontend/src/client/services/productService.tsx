@@ -55,7 +55,7 @@ export const fetchCollectionProducts = async (
   page: number,
   limit: number
 ): Promise<ListProductRes> => {
-  const params: Record<string, any> = { sort, page, limit }
+  const params: Record<string, unknown> = { sort, page, limit }
   if (filter) {
     // filter string may look like "key=value&key2=value2"
     new URLSearchParams(filter).forEach((v, k) => (params[k] = v))
@@ -114,7 +114,7 @@ type SearchParams = {
   price_min?: number
   price_max?: number
   rating_min?: number
-  sort?: 'price-asc' | 'price-desc' | 'rating' | 'popular' | 'newest'
+  sort?: 'price-asc' | 'price-desc' | 'rating' | 'popular' | 'newest' | 'discount'
   page?: number
   limit?: number
 }

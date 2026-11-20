@@ -135,7 +135,7 @@ export default function AdminOrdersList() {
                       </span>
                     </div>
                   </td>
-                  <td className="p-2">{(o as any).shop?.name || '—'}</td>
+                  <td className="p-2">{o.shop?.name || '—'}</td>
                   <td className="p-2">{o.order_items?.length || 0}</td>
                   <td className="p-2">
                     {o.created_at

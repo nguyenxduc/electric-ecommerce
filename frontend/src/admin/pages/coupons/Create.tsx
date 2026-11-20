@@ -47,15 +47,15 @@ export default function AdminCouponCreate() {
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">Discount Value</label>
-            <input name="discount_value" type="number" step="0.01" value={(form.discount_value as any) || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" required />
+            <input name="discount_value" type="number" step="0.01" value={form.discount_value || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" required />
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">Min Order</label>
-            <input name="min_order" type="number" step="0.01" value={(form.min_order as any) || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" />
+            <input name="min_order" type="number" step="0.01" value={form.min_order || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">Usage Limit</label>
-            <input name="usage_limit" type="number" value={(form.usage_limit as any) || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" />
+            <input name="usage_limit" type="number" value={form.usage_limit || ''} onChange={onChange} className="w-full border rounded px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">Expires At</label>
