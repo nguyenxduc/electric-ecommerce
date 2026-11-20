@@ -132,14 +132,14 @@ const Footer = () => {
           />
         </div>
       </div>
-      <div className="bg-blue-950 flex flex-row justify-between text-white font-thin text-sm mt-5 py-4 pl-14">
+      <div className="bg-blue-950 flex flex-col sm:flex-row gap-3 sm:justify-between text-white font-thin text-sm mt-5 py-4 px-6 sm:pl-14 sm:pr-0">
         <div className="inline-flex gap-3">
           <img src={CompanyIcon} alt="company-icon" className="w-5 h-5" />
-          <p>
+          <p className="whitespace-nowrap">
             {copyrightYear} {companyName}.
           </p>
         </div>
-        <div className="inline-flex space-x-6 mr-[100px]">
+        <div className="inline-flex flex-wrap gap-x-6 gap-y-1 sm:mr-[100px]">
           <p>cookie settings</p>
           <p>Privacy Policy</p>
           <p>Terms and Conditions</p>

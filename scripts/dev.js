@@ -1,14 +1,8 @@
 import { spawn } from "node:child_process";
 
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-const children = [
-  spawn(npm, ["--prefix", "backend", "run", "dev"], {
-    stdio: "inherit",
-  }),
-  spawn(npm, ["--prefix", "frontend", "run", "dev"], {
-    stdio: "inherit",
-  }),
-];
+// Chạy qua shell: Node >=18.20.2 cấm spawn npm.cmd trực tiếp trên Windows (EINVAL).
+const run = (app) => spawn(`npm --prefix ${app} run dev`, { stdio: "inherit", shell: true });
+const children = [run("backend"), run("frontend")];
 
 let stopping = false;
 

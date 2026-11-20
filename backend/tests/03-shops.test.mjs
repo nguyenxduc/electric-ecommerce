@@ -26,15 +26,33 @@ test('admin can preview a pending shop', async () => {
 })
 
 test('shop application lifecycle: apply -> reject -> resubmit -> approve', async () => {
-  // apply
+  // MST sai dinh dang bi chan truoc khi tao shop
+  const badTax = await req('/shops/apply', {
+    method: 'POST',
+    token: applicant,
+    body: { name: 'Charlie Corner', tax_code: '123' }
+  })
+  assert.equal(badTax.status, 400)
+
+  // apply (kem dia chi lay hang + thue nhu wizard dang ky)
   const applied = await req('/shops/apply', {
     method: 'POST',
     token: applicant,
-    body: { name: 'Charlie Corner', description: 'Test application' }
+    body: {
+      name: 'Charlie Corner',
+      description: 'Test application',
+      pickup_province: 'Ha Noi',
+      pickup_address: '1 Trang Tien',
+      tax_entity_type: 'company',
+      tax_code: '0101234567'
+    }
   })
   assert.equal(applied.status, 201, JSON.stringify(applied.json).slice(0, 150))
   const shopId = applied.json?.data?.id
   assert.equal(applied.json?.data?.status, 'pending')
+  assert.equal(applied.json?.data?.pickup_province, 'Ha Noi')
+  assert.equal(applied.json?.data?.tax_entity_type, 'company')
+  assert.equal(applied.json?.data?.tax_code, '0101234567')
 
   // a second application from the same user is rejected
   const dup = await req('/shops/apply', {

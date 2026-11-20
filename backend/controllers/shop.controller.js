@@ -38,17 +38,33 @@ const maybeUploadImages = async (req) => {
   return urls;
 };
 
+// "" xoa gia tri; undefined = khong doi
+const text = (v, max) => (v === undefined ? undefined : String(v ?? "").trim().slice(0, max) || null);
+
 // POST /api/shops/apply — any logged-in user applies to open a shop
 export const applyForShop = asyncHandler(async (req, res) => {
   const userId = BigInt(req.user.id);
-  const { name, description, contact_email, contact_phone, address } =
-    req.body || {};
+  const {
+    name,
+    description,
+    contact_email,
+    contact_phone,
+    address,
+    pickup_province,
+    pickup_district,
+    pickup_ward,
+    pickup_address,
+    tax_code,
+    tax_entity_type,
+  } = req.body || {};
 
   if (!name || !String(name).trim()) {
     return res
       .status(400)
       .json({ success: false, error: "Shop name is required" });
   }
+  const taxError = validateTax(tax_code, tax_entity_type);
+  if (taxError) return res.status(400).json({ success: false, error: taxError });
 
   const existing = await prisma.shop.findUnique({
     where: { owner_id: userId },
@@ -73,6 +89,12 @@ export const applyForShop = asyncHandler(async (req, res) => {
       contact_email: contact_email || req.user.email || null,
       contact_phone: contact_phone || req.user.phone || null,
       address: address || req.user.address || null,
+      pickup_province: text(pickup_province, 100),
+      pickup_district: text(pickup_district, 100),
+      pickup_ward: text(pickup_ward, 100),
+      pickup_address: text(pickup_address, 255),
+      tax_code: text(tax_code, 20),
+      tax_entity_type,
       status: SHOP_STATUS.PENDING,
       ...imageUrls,
     },
@@ -153,9 +175,6 @@ export const updateMyShop = asyncHandler(async (req, res) => {
   if (shop.status === SHOP_STATUS.ACTIVE && taxChanged) {
     return res.status(403).json({ success: false, error: "Tax info changes require admin review" });
   }
-  // "" xoa gia tri; undefined = khong doi
-  const text = (v, max) => (v === undefined ? undefined : String(v ?? "").trim().slice(0, max) || null);
-
   let slug;
   if (name && String(name).trim() && String(name).trim() !== shop.name) {
     slug = await ensureUniqueSlug(prisma.shop, createSlug(name), shop.id);

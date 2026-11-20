@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -8,14 +9,22 @@ import {
   BadgeCheck,
   CircleSlash,
   Ban,
-  ArrowRight
+  ArrowRight,
+  Users,
+  LayoutDashboard,
+  ShieldCheck,
+  Check
 } from 'lucide-react'
 import {
   getMyShop,
   applyForShop,
   updateMyShop
 } from '../../services/shopService'
+import type { Shop, ShopApplication } from '../../services/shopService'
 import { useValidateToken } from '../../hooks/useAuth'
+import SellerApplyWizard from './SellerApplyWizard'
+
+const card = 'bg-white rounded-2xl border border-gray-100 shadow-sm'
 
 const SellerTab = () => {
   const qc = useQueryClient()
@@ -25,31 +34,11 @@ const SellerTab = () => {
     queryFn: getMyShop,
     retry: false
   })
-
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [contactEmail, setContactEmail] = useState('')
-  const [contactPhone, setContactPhone] = useState('')
-  const [address, setAddress] = useState('')
-
-  // Prefill contact fields once the profile loads (it arrives async)
-  useEffect(() => {
-    const u = userData?.user
-    if (!u) return
-    setContactEmail(prev => prev || u.email || '')
-    setContactPhone(prev => prev || u.phone || '')
-    setAddress(prev => prev || u.address || '')
-  }, [userData?.user])
+  const [started, setStarted] = useState(false)
+  const [resubmitOpen, setResubmitOpen] = useState(false)
 
   const applyMut = useMutation({
-    mutationFn: () =>
-      applyForShop({
-        name,
-        description,
-        contact_email: contactEmail,
-        contact_phone: contactPhone,
-        address
-      }),
+    mutationFn: (payload: ShopApplication) => applyForShop(payload),
     onSuccess: () => {
       toast.success('Application submitted! We will review it shortly.')
       qc.invalidateQueries({ queryKey: ['my-shop'] })
@@ -60,15 +49,8 @@ const SellerTab = () => {
 
   // Rejected applicants (still role "user", no seller-dashboard access)
   // resubmit right here: updating a rejected shop flips it back to pending.
-  const [resubmitOpen, setResubmitOpen] = useState(false)
-  const [editName, setEditName] = useState('')
-  const [editDescription, setEditDescription] = useState('')
   const resubmitMut = useMutation({
-    mutationFn: () =>
-      updateMyShop({
-        name: editName,
-        description: editDescription
-      }),
+    mutationFn: (payload: ShopApplication) => updateMyShop(payload),
     onSuccess: () => {
       toast.success('Application resubmitted for review')
       setResubmitOpen(false)
@@ -80,246 +62,267 @@ const SellerTab = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+      <div className={`${card} p-8`}>
         <div className="h-40 bg-gray-100 rounded-xl animate-pulse" />
       </div>
     )
   }
 
-  // No shop yet — application form
+  const defaults = {
+    email: userData?.user?.email,
+    phone: userData?.user?.phone
+  }
+
+  if (!shop && !started) return <SellerIntro onStart={() => setStarted(true)} />
+
   if (!shop) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-            <Store className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold">Open your shop</h2>
-            <p className="text-sm text-gray-500">
-              Apply to sell on the marketplace. An admin reviews every
-              application before the shop goes live.
-            </p>
-          </div>
-        </div>
-
-        <form
-          className="mt-6 space-y-4 max-w-lg"
-          onSubmit={e => {
-            e.preventDefault()
-            if (!name.trim()) {
-              toast.error('Shop name is required')
-              return
-            }
-            applyMut.mutate()
-          }}
-        >
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Shop name *
-            </label>
-            <input
-              className="w-full border rounded-lg px-3 py-2"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="e.g. Tech Corner"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              What will you sell?
-            </label>
-            <textarea
-              className="w-full border rounded-lg px-3 py-2 min-h-[90px]"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Short description of your shop"
-            />
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Contact email
-              </label>
-              <input
-                type="email"
-                className="w-full border rounded-lg px-3 py-2"
-                value={contactEmail}
-                onChange={e => setContactEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Contact phone
-              </label>
-              <input
-                className="w-full border rounded-lg px-3 py-2"
-                value={contactPhone}
-                onChange={e => setContactPhone(e.target.value)}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Address</label>
-            <input
-              className="w-full border rounded-lg px-3 py-2"
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={applyMut.isPending}
-            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-          >
-            {applyMut.isPending ? 'Submitting...' : 'Submit application'}
-          </button>
-        </form>
+      <div className={`${card} p-6 sm:p-8`}>
+        <Header title="Register as a seller" subtitle="Complete 4 short steps to open your shop." />
+        <SellerApplyWizard
+          defaults={defaults}
+          submitLabel="Submit application"
+          submitting={applyMut.isPending}
+          onSubmit={p => applyMut.mutate(p)}
+          onCancel={() => setStarted(false)}
+        />
       </div>
     )
   }
 
-  // Existing shop — status views
+  if (shop.status === 'rejected' && resubmitOpen) {
+    return (
+      <div className={`${card} p-6 sm:p-8`}>
+        <Header title="Update your application" subtitle="Fix the issues below and resubmit for review." />
+        <SellerApplyWizard
+          initial={shop}
+          defaults={defaults}
+          submitLabel="Resubmit application"
+          submitting={resubmitMut.isPending}
+          onSubmit={p => resubmitMut.mutate(p)}
+          onCancel={() => setResubmitOpen(false)}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-          <Store className="w-5 h-5 text-blue-600" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold">{shop.name}</h2>
+    <div className={`${card} p-6 sm:p-8 space-y-6`}>
+      <div className="flex items-center gap-4">
+        {shop.logo_url ? (
+          <img src={shop.logo_url} alt="" className="w-14 h-14 rounded-xl object-cover border" />
+        ) : (
+          <div className="w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center">
+            <Store className="w-7 h-7 text-blue-600" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold truncate">{shop.name}</h2>
           <p className="text-sm text-gray-500">/shop/{shop.slug}</p>
         </div>
       </div>
 
+      {shop.status !== 'suspended' && <ApplicationTimeline shop={shop} />}
+
       {shop.status === 'pending' && (
-        <div className="border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-xl px-4 py-3 flex items-start gap-3">
-          <Clock className="w-5 h-5 mt-0.5" />
-          <div>
-            <p className="font-medium">Application pending review</p>
-            <p className="text-sm mt-1">
-              We are reviewing your shop application. You will get a
-              notification once it is approved.
-            </p>
-          </div>
-        </div>
+        <Notice tone="yellow" icon={<Clock className="w-5 h-5 mt-0.5" />} title="Application under review">
+          An admin is checking your shop details, usually within 1-2 business
+          days. You will get a notification once it is decided.
+        </Notice>
       )}
 
       {shop.status === 'active' && (
         <>
-          <div className="border border-green-200 bg-green-50 text-green-800 rounded-xl px-4 py-3 flex items-start gap-3">
-            <BadgeCheck className="w-5 h-5 mt-0.5" />
-            <div>
-              <p className="font-medium">Your shop is live!</p>
-              <p className="text-sm mt-1">
-                Manage products, orders and your shop profile from the Seller
-                Dashboard.
-              </p>
-            </div>
+          <Notice tone="green" icon={<BadgeCheck className="w-5 h-5 mt-0.5" />} title="Your shop is live!">
+            Manage products, orders and your shop profile from the Seller
+            Dashboard.
+          </Notice>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to="/seller"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Go to Seller Dashboard <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link
+              to={`/shop/${shop.slug}`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              View shop page
+            </Link>
           </div>
-          <Link
-            to="/seller"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Go to Seller Dashboard <ArrowRight className="w-4 h-4" />
-          </Link>
         </>
       )}
 
       {shop.status === 'rejected' && (
         <>
-          <div className="border border-red-200 bg-red-50 text-red-800 rounded-xl px-4 py-3 flex items-start gap-3">
-            <CircleSlash className="w-5 h-5 mt-0.5" />
-            <div>
-              <p className="font-medium">Application rejected</p>
-              <p className="text-sm mt-1">
-                {shop.rejection_reason
-                  ? `Reason: ${shop.rejection_reason}`
-                  : 'No reason was provided.'}{' '}
-                Update your shop details below and resubmit.
-              </p>
-            </div>
-          </div>
-          {!resubmitOpen ? (
-            <button
-              onClick={() => {
-                setEditName(shop.name)
-                setEditDescription(shop.description || '')
-                setResubmitOpen(true)
-              }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Update & resubmit <ArrowRight className="w-4 h-4" />
-            </button>
-          ) : (
-            <form
-              className="space-y-3 max-w-lg border rounded-xl p-4"
-              onSubmit={e => {
-                e.preventDefault()
-                if (!editName.trim()) {
-                  toast.error('Shop name is required')
-                  return
-                }
-                resubmitMut.mutate()
-              }}
-            >
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Shop name *
-                </label>
-                <input
-                  className="w-full border rounded-lg px-3 py-2"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Description
-                </label>
-                <textarea
-                  className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
-                  value={editDescription}
-                  onChange={e => setEditDescription(e.target.value)}
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setResubmitOpen(false)}
-                  className="px-4 py-2 text-sm border rounded-lg"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={resubmitMut.isPending}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60"
-                >
-                  {resubmitMut.isPending ? 'Resubmitting...' : 'Resubmit'}
-                </button>
-              </div>
-            </form>
-          )}
+          <Notice tone="red" icon={<CircleSlash className="w-5 h-5 mt-0.5" />} title="Application rejected">
+            {shop.rejection_reason
+              ? `Reason: ${shop.rejection_reason}`
+              : 'No reason was provided.'}{' '}
+            Update your shop details and resubmit.
+          </Notice>
+          <button
+            onClick={() => setResubmitOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Update & resubmit <ArrowRight className="w-4 h-4" />
+          </button>
         </>
       )}
 
       {shop.status === 'suspended' && (
-        <div className="border border-orange-200 bg-orange-50 text-orange-800 rounded-xl px-4 py-3 flex items-start gap-3">
-          <Ban className="w-5 h-5 mt-0.5" />
-          <div>
-            <p className="font-medium">Shop suspended</p>
-            <p className="text-sm mt-1">
-              {shop.rejection_reason
-                ? `Reason: ${shop.rejection_reason}`
-                : 'Your shop has been suspended.'}{' '}
-              Its products are hidden from buyers. Contact support for details.
-            </p>
-          </div>
-        </div>
+        <Notice tone="orange" icon={<Ban className="w-5 h-5 mt-0.5" />} title="Shop suspended">
+          {shop.rejection_reason
+            ? `Reason: ${shop.rejection_reason}`
+            : 'Your shop has been suspended.'}{' '}
+          Its products are hidden from buyers. Contact support for details.
+        </Notice>
       )}
     </div>
   )
 }
+
+const Header = ({ title, subtitle }: { title: string; subtitle: string }) => (
+  <div className="mb-6">
+    <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+    <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+  </div>
+)
+
+const BENEFITS = [
+  {
+    icon: Users,
+    title: 'Reach every shopper',
+    desc: 'Your products appear in search, recommendations and the AI shopping assistant.'
+  },
+  {
+    icon: LayoutDashboard,
+    title: 'One seller dashboard',
+    desc: 'Products, orders, shipping, vouchers and invoices managed in one place.'
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Trusted marketplace',
+    desc: 'Every shop is reviewed, so buyers shop with confidence.'
+  }
+]
+
+const SellerIntro = ({ onStart }: { onStart: () => void }) => (
+  <div className={`${card} overflow-hidden`}>
+    <div className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white px-6 sm:px-10 py-10">
+      <span className="inline-flex items-center gap-2 text-xs font-medium bg-white/15 rounded-full px-3 py-1">
+        <Store className="w-3.5 h-3.5" /> Seller Center
+      </span>
+      <h2 className="text-2xl sm:text-3xl font-bold mt-4">Start selling on the marketplace</h2>
+      <p className="text-blue-100 mt-2 max-w-xl">
+        Open your shop in a few minutes. Fill in your shop, pickup and tax
+        details, and we will review your application.
+      </p>
+      <button
+        onClick={onStart}
+        className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50"
+      >
+        Register now <ArrowRight className="w-4 h-4" />
+      </button>
+    </div>
+
+    <div className="px-6 sm:px-10 py-8 grid sm:grid-cols-3 gap-6">
+      {BENEFITS.map(b => (
+        <div key={b.title}>
+          <span className="inline-flex w-10 h-10 rounded-xl bg-blue-50 text-blue-600 items-center justify-center">
+            <b.icon className="w-5 h-5" />
+          </span>
+          <h3 className="font-semibold text-gray-900 mt-3">{b.title}</h3>
+          <p className="text-sm text-gray-500 mt-1">{b.desc}</p>
+        </div>
+      ))}
+    </div>
+
+    <div className="px-6 sm:px-10 pb-10">
+      <h3 className="font-semibold text-gray-900 mb-4">How it works</h3>
+      <ol className="grid sm:grid-cols-4 gap-4">
+        {[
+          'Enter shop information',
+          'Set up pickup address',
+          'Add tax information',
+          'Get approved and start selling'
+        ].map((t, i) => (
+          <li key={t} className="flex items-center gap-3 rounded-xl bg-gray-50 px-4 py-3">
+            <span className="w-7 h-7 shrink-0 rounded-full bg-blue-600 text-white text-sm font-semibold flex items-center justify-center">
+              {i + 1}
+            </span>
+            <span className="text-sm text-gray-700">{t}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+)
+
+// Hanh trinh ho so: Gui -> Duyet -> Hoat dong; buoc 2 do neu bi tu choi
+const ApplicationTimeline = ({ shop }: { shop: Shop }) => {
+  const rejected = shop.status === 'rejected'
+  const reached = shop.status === 'active' ? 3 : 2
+  const steps = [
+    { label: 'Submitted', sub: new Date(shop.created_at).toLocaleDateString() },
+    { label: rejected ? 'Rejected' : 'Under review', sub: rejected ? 'Action needed' : shop.status === 'active' ? 'Approved' : 'In progress' },
+    { label: 'Shop live', sub: shop.status === 'active' ? 'Selling' : '' }
+  ]
+  return (
+    <ol className="flex items-start">
+      {steps.map((s, i) => {
+        const done = i < reached - 1 || (i === reached - 1 && shop.status === 'active')
+        const current = i === reached - 1 && !done
+        const color = rejected && i === 1
+          ? 'bg-red-500 border-red-500 text-white'
+          : done
+            ? 'bg-green-600 border-green-600 text-white'
+            : current
+              ? 'bg-white border-yellow-500 text-yellow-600'
+              : 'bg-white border-gray-200 text-gray-400'
+        return (
+          <li key={s.label} className="flex-1 flex flex-col items-center relative">
+            {i > 0 && (
+              <span className={`absolute top-4 right-1/2 w-full h-0.5 ${i < reached ? 'bg-green-600' : 'bg-gray-200'}`} />
+            )}
+            <span className={`relative z-10 w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-semibold ${color}`}>
+              {done ? <Check className="w-4 h-4" /> : i + 1}
+            </span>
+            <span className="mt-2 text-sm font-medium text-gray-900">{s.label}</span>
+            {s.sub && <span className="text-xs text-gray-500">{s.sub}</span>}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+const TONES = {
+  yellow: 'border-yellow-200 bg-yellow-50 text-yellow-800',
+  green: 'border-green-200 bg-green-50 text-green-800',
+  red: 'border-red-200 bg-red-50 text-red-800',
+  orange: 'border-orange-200 bg-orange-50 text-orange-800'
+}
+
+const Notice = ({
+  tone,
+  icon,
+  title,
+  children
+}: {
+  tone: keyof typeof TONES
+  icon: ReactNode
+  title: string
+  children: ReactNode
+}) => (
+  <div className={`border rounded-xl px-4 py-3 flex items-start gap-3 ${TONES[tone]}`}>
+    {icon}
+    <div>
+      <p className="font-medium">{title}</p>
+      <p className="text-sm mt-1">{children}</p>
+    </div>
+  </div>
+)
 
 export default SellerTab

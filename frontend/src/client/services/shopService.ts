@@ -14,6 +14,12 @@ export type Shop = {
   address: string | null
   shipping_fee_override?: number | string | null
   free_shipping_threshold_override?: number | string | null
+  pickup_province?: string | null
+  pickup_district?: string | null
+  pickup_ward?: string | null
+  pickup_address?: string | null
+  tax_code?: string | null
+  tax_entity_type?: 'household' | 'company'
   created_at: string
   is_owner?: boolean
   rating?: number | null
@@ -29,6 +35,12 @@ export type ShopApplication = {
   address?: string
   shipping_fee_override?: number | string | null
   free_shipping_threshold_override?: number | string | null
+  pickup_province?: string
+  pickup_district?: string
+  pickup_ward?: string
+  pickup_address?: string
+  tax_code?: string
+  tax_entity_type?: 'household' | 'company'
 }
 
 // Public shop profile (active shops; owners/admins can preview any status)
