@@ -1,5 +1,6 @@
 import Hero from '../components/layout/Hero'
 import Categories from '../components/products/Categories'
+import FeaturedShops from '../components/layout/FeaturedShops'
 import ListProduct from '../components/products/ListProduct'
 import { useHomeRecommendations, useNewProducts, usePopularProducts } from '../hooks/useProducts'
 import { recommendationStrategyLabel } from '../utils/recommendationLabel'
@@ -27,7 +28,8 @@ const Home = () => {
     <div>
       <Hero />
       <Categories />
-      <div className="px-12">
+      <FeaturedShops />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
         <ListProduct
           title="Recommended for you"
           sectionLabel={recommendationStrategyLabel(recommendationData?.data?.strategy)}
@@ -35,11 +37,11 @@ const Home = () => {
           isLoading={loadingRecommendation}
         />
       </div>
-      <div className="px-12">
-        <ListProduct title="New Product" products={newProduct || null} isLoading={loadingNew} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
+        <ListProduct title="New Arrivals" products={newProduct || null} isLoading={loadingNew} />
       </div>
-      <div className="px-12">
-        <ListProduct title="Best Seller" products={popularProduct || null} isLoading={loadingPopular} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
+        <ListProduct title="Best Sellers" products={popularProduct || null} isLoading={loadingPopular} />
       </div>
     </div>
   )

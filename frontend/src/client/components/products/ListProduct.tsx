@@ -36,14 +36,14 @@ const ListProduct = ({
 
   return (
     <section className="mb-10 mt-5">
-      <div className="mx-2 mb-4 flex items-center justify-between border-b border-b-black py-2">
-        <div className="mb-4">
-          <h2 className="text-3xl font-semibold">{title}</h2>
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
           {sectionLabel && (
             <p className="mt-1 text-sm text-gray-500">{sectionLabel}</p>
           )}
         </div>
-        <button onClick={ViewAll} className="text-sm text-blue-600 hover:underline">
+        <button onClick={ViewAll} className="shrink-0 text-sm font-medium text-blue-600 hover:underline">
           View All
         </button>
       </div>

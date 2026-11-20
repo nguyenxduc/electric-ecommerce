@@ -201,7 +201,7 @@ const Cart = () => {
                   Browse products from verified shops and add them here.
                 </p>
                 <Link
-                  to="/product"
+                  to="/collection/all"
                   className="inline-block mt-6 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                 >
                   Continue shopping

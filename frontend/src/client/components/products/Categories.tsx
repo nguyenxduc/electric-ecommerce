@@ -1,32 +1,32 @@
+import { Link } from 'react-router-dom'
 import { useCategories } from '../../hooks/useCategories'
-import { useNavigate } from 'react-router-dom'
 
 const Categories = () => {
   const { data: categoriesList = [] } = useCategories()
 
-  const navigate = useNavigate()
-
-  function goTo(slug: string) {
-    navigate(`/collection/${slug}`)
-  }
-
   return (
-    <div className="none lg:flex flex-row gap-[30px] items-center justify-center p-10">
-      {categoriesList.map(category => (
-        <div
-          onClick={() => goTo(category.slug)}
-          key={category.id}
-          className="flex flex-col items-center shadow rounded-lg px-4 py-4 cursor-pointer"
-        >
-          <img
-            src={category.image_url}
-            alt={category.name}
-            className="w-32 h-32 object-contain mb-2 hover:scale-125 transition-transform duration-300"
-          />
-          <span className="text-sm font-normal">{category.name}</span>
-        </div>
-      ))}
-    </div>
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-10">
+      <h2 className="text-2xl font-semibold text-gray-900 mb-4">Shop by category</h2>
+      <ul className="grid grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
+        {categoriesList.map(category => (
+          <li key={category.id}>
+            <Link
+              to={`/collection/${category.slug}`}
+              className="group flex flex-col items-center h-full bg-white rounded-xl border border-gray-100 px-2 py-3 sm:py-4 hover:border-blue-200 hover:shadow-sm transition"
+            >
+              <img
+                src={category.image_url}
+                alt=""
+                className="w-12 h-12 sm:w-20 sm:h-20 object-contain group-hover:scale-110 transition-transform duration-300"
+              />
+              <span className="mt-2 text-xs sm:text-sm text-gray-700 text-center line-clamp-1">
+                {category.name}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

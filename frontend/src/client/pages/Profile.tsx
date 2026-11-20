@@ -77,7 +77,11 @@ type User = {
 }
 
 function Profile() {
-  const [tabActive, setTabActive] = React.useState<ProfileTabKey>('profile')
+  // ?tab=seller cho phep link thang toi mot tab (vd. "Sell on ..." o trang chu); khong cho mo tab logout
+  const [tabActive, setTabActive] = React.useState<ProfileTabKey>(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return NAV.some(n => n.key === t && t !== 'logout') ? (t as ProfileTabKey) : 'profile'
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [errorModal, setErrorModal] = useState<{
     title: string

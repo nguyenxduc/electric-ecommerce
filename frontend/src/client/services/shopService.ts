@@ -49,6 +49,12 @@ export const getShopBySlug = async (slug: string): Promise<Shop> => {
   return res.data.data
 }
 
+// Public list of active shops
+export const listShops = async (params?: { page?: number; limit?: number; search?: string }): Promise<Shop[]> => {
+  const res = await axiosClient.get('/shops', { params })
+  return res.data.data.shops
+}
+
 // Public product listing of a shop (same shape as the main product listing)
 export const getShopProducts = async (
   slug: string,
