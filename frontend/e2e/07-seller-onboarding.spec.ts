@@ -37,3 +37,17 @@ test('buyer: seller registration wizard validates each step', async ({ page }) =
   await page.getByRole('checkbox').check()
   await expect(submit).toBeEnabled()
 })
+
+// Admin xem du ho so dang ky truoc khi duyet
+test('admin: review a pending shop application', async ({ page }) => {
+  await loginAs(page, 'admin@example.com')
+  await page.goto('/admin/shops')
+  const row = page.getByRole('row', { name: /New Corner Store/ })
+  await row.getByRole('button', { name: 'Review' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Application of New Corner Store' })
+  await expect(dialog.getByText('Pickup address')).toBeVisible()
+  await expect(dialog.getByText('Business type')).toBeVisible()
+  await expect(dialog.getByRole('button', { name: 'Approve' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Close' }).click()
+  await expect(dialog).toBeHidden()
+})

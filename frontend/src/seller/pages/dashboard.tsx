@@ -17,12 +17,15 @@ const StatCard = ({
   title,
   value,
   delta,
+  upIsBad,
   icon: Icon,
   iconClass
 }: {
   title: string
   value: string
   delta?: string
+  // pending/cancelled tang la xau -> dao mau
+  upIsBad?: boolean
   icon: React.ComponentType<{ className?: string }>
   iconClass: string
 }) => (
@@ -30,14 +33,23 @@ const StatCard = ({
     <div>
       <p className="text-sm text-gray-500">{title}</p>
       <p className="text-2xl font-semibold mt-1">{value}</p>
-      {delta && (
-        <p
-          className={`text-xs mt-1 ${
-            delta.startsWith('+') ? 'text-green-600' : 'text-red-600'
-          }`}
-        >
-          {delta} vs previous 7 days
-        </p>
+      {delta === 'new' ? (
+        // Backend tra "new" khi 7 ngay truoc bang 0: khong co gi de so sanh
+        <p className="text-xs mt-1 text-gray-400">No data for the previous 7 days</p>
+      ) : (
+        delta && (
+          <p
+            className={`text-xs mt-1 ${
+              !/^[+-]/.test(delta)
+                ? 'text-gray-400'
+                : delta.startsWith('+') !== !!upIsBad
+                  ? 'text-green-600'
+                  : 'text-red-600'
+            }`}
+          >
+            {delta} vs previous 7 days
+          </p>
+        )
       )}
     </div>
     <div className={`p-2 rounded-lg ${iconClass}`}>
@@ -93,6 +105,7 @@ export default function SellerDashboard() {
           title="Pending Orders"
           value={stats?.pending.formatted || '0'}
           delta={stats?.pending.delta}
+          upIsBad
           icon={Clock}
           iconClass="bg-yellow-100 text-yellow-600"
         />
@@ -100,6 +113,7 @@ export default function SellerDashboard() {
           title="Cancelled Orders"
           value={stats?.cancelled.formatted || '0'}
           delta={stats?.cancelled.delta}
+          upIsBad
           icon={XCircle}
           iconClass="bg-red-100 text-red-600"
         />

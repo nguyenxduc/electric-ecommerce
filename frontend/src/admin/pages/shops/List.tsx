@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { BadgeCheck, Ban, CircleSlash, Receipt, Store } from 'lucide-react'
+import { BadgeCheck, Ban, CircleSlash, FileText, Receipt, Store, X } from 'lucide-react'
 import adminShopService, { AdminShop } from '../../services/shopService'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
@@ -38,6 +38,7 @@ export default function AdminShopsList() {
   const [taxShop, setTaxShop] = useState<AdminShop | null>(null)
   const [taxCode, setTaxCode] = useState('')
   const [taxType, setTaxType] = useState('household')
+  const [reviewShop, setReviewShop] = useState<AdminShop | null>(null)
 
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -229,6 +230,13 @@ export default function AdminShopsList() {
                     </td>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
+                        <button
+                          title="Review application"
+                          className="text-gray-700 flex items-center gap-1"
+                          onClick={() => setReviewShop(shop)}
+                        >
+                          <FileText className="w-4 h-4" /> Review
+                        </button>
                         {shop.status !== 'active' && (
                           <button
                             title="Approve"
@@ -300,6 +308,21 @@ export default function AdminShopsList() {
           setApproveShopTarget(null)
         }}
       />
+
+      {reviewShop && (
+        <ShopReviewModal
+          shop={reviewShop}
+          onClose={() => setReviewShop(null)}
+          onApprove={() => {
+            setApproveShopTarget(reviewShop)
+            setReviewShop(null)
+          }}
+          onReject={() => {
+            setReasonAction({ type: 'reject', shop: reviewShop })
+            setReviewShop(null)
+          }}
+        />
+      )}
 
       {taxShop && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -377,6 +400,94 @@ export default function AdminShopsList() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Ho so dang ky ban hang (wizard o trang Profile) de admin duyet co can cu
+function ShopReviewModal({
+  shop,
+  onClose,
+  onApprove,
+  onReject
+}: {
+  shop: AdminShop
+  onClose: () => void
+  onApprove: () => void
+  onReject: () => void
+}) {
+  const pickup = [shop.pickup_address, shop.pickup_ward, shop.pickup_district, shop.pickup_province]
+    .filter(Boolean)
+    .join(', ')
+  const sections: [string, [string, string | null | undefined][]][] = [
+    ['Shop', [
+      ['Name', shop.name],
+      ['Description', shop.description],
+      ['Public address', shop.address]
+    ]],
+    ['Contact', [
+      ['Owner', [shop.owner?.name, shop.owner?.email].filter(Boolean).join(' · ')],
+      ['Email', shop.contact_email],
+      ['Phone', shop.contact_phone]
+    ]],
+    ['Pickup address', [['Address', pickup]]],
+    ['Tax', [
+      ['Business type', shop.tax_entity_type === 'company' ? 'Company' : 'Household / individual'],
+      ['Tax code', shop.tax_code]
+    ]]
+  ]
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label={`Application of ${shop.name}`}
+        className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 p-5 border-b">
+          <div>
+            <h3 className="text-lg font-semibold">{shop.name}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Applied {fmtDate(shop.created_at)} · status {shop.status}
+            </p>
+          </div>
+          <button aria-label="Close" onClick={onClose} className="p-1 text-gray-500 hover:text-gray-800">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          {shop.rejection_reason && (
+            <p className="text-sm text-red-700 bg-red-50 rounded px-3 py-2">
+              Previous reason: {shop.rejection_reason}
+            </p>
+          )}
+          {sections.map(([title, rows]) => (
+            <div key={title}>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{title}</h4>
+              <dl className="space-y-1.5">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="grid grid-cols-3 gap-3 text-sm">
+                    <dt className="text-gray-500">{k}</dt>
+                    <dd className={`col-span-2 break-words ${v ? 'text-gray-900' : 'text-gray-400'}`}>
+                      {v || 'Not provided'}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+        {shop.status === 'pending' && (
+          <div className="flex justify-end gap-2 p-5 border-t">
+            <button className="px-4 py-2 text-sm border border-red-200 text-red-600 rounded hover:bg-red-50" onClick={onReject}>
+              Reject
+            </button>
+            <button className="px-4 py-2 text-sm text-white rounded bg-green-600 hover:bg-green-700" onClick={onApprove}>
+              Approve
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -13,6 +13,10 @@ export type AdminShop = {
   contact_email: string | null
   contact_phone: string | null
   address: string | null
+  pickup_province?: string | null
+  pickup_district?: string | null
+  pickup_ward?: string | null
+  pickup_address?: string | null
   tax_code?: string | null
   tax_entity_type?: 'household' | 'company'
   approved_at: string | null
