@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import {
   useMyShopOrders,
-  useMyShopOrderStats
+  useMyShopOrderStats,
+  useUpdateShopOrderStatus
 } from '../../../admin/hooks/useOrders'
 import SkeletonTable from '../../../admin/components/common/SkeletonTable'
 import AdminPagination from '../../../admin/components/common/AdminPagination'
@@ -11,7 +13,8 @@ import { formatUsd } from '../../../client/utils/formatMoney'
 export default function SellerOrdersList() {
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
-  const [status, setStatus] = useState<string | undefined>(undefined)
+  // ?status= de link tu khoi To-do o dashboard loc san
+  const [status, setStatus] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get('status') || undefined)
   const [q, setQ] = useState('')
   const { data, isLoading, error } = useMyShopOrders({
     page,
@@ -20,6 +23,16 @@ export default function SellerOrdersList() {
     q: q || undefined
   })
   const { data: statsData, isLoading: statsLoading } = useMyShopOrderStats()
+  const statusMut = useUpdateShopOrderStatus()
+  const confirmOrder = (id: number) =>
+    statusMut.mutate(
+      { id, status: 'processing' },
+      {
+        onSuccess: () => toast.success('Order confirmed - ready to ship'),
+        onError: (e: Error & { response?: { data?: { message?: string } } }) =>
+          toast.error(e.response?.data?.message || 'Failed to confirm order')
+      }
+    )
   const pages = useMemo(
     () => Math.max(1, data?.data.pagination.total_pages || 1),
     [data]
@@ -94,16 +107,17 @@ export default function SellerOrdersList() {
                 <th className="text-left p-2">No.</th>
                 <th className="text-left p-2">Order</th>
                 <th className="text-left p-2">Buyer</th>
-                <th className="text-left p-2">Items</th>
+                <th className="text-left p-2">Products</th>
                 <th className="text-left p-2">Date</th>
                 <th className="text-left p-2">Amount</th>
                 <th className="text-left p-2">Status</th>
+                <th className="text-right p-2">Action</th>
               </tr>
             </thead>
             <tbody>
               {data?.data.orders.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-gray-500">
+                  <td colSpan={8} className="p-6 text-center text-gray-500">
                     No orders yet.
                   </td>
                 </tr>
@@ -122,7 +136,30 @@ export default function SellerOrdersList() {
                     </Link>
                   </td>
                   <td className="p-2">{o.user?.name || '—'}</td>
-                  <td className="p-2">{o.order_items?.length || 0}</td>
+                  <td className="p-2">
+                    {/* Anh + ten san pham dau tien, nhu danh sach don cua Seller Center */}
+                    {o.order_items?.[0] ? (
+                      <div className="flex items-center gap-2 min-w-[180px]">
+                        {o.order_items[0].product?.img?.[0] && (
+                          <img
+                            src={o.order_items[0].product.img[0]}
+                            alt=""
+                            className="w-9 h-9 rounded border object-contain bg-white shrink-0"
+                          />
+                        )}
+                        <span className="min-w-0">
+                          <span className="block truncate max-w-[180px]">
+                            {o.order_items[0].product?.name || 'Product'}
+                          </span>
+                          {o.order_items.length > 1 && (
+                            <span className="text-xs text-gray-500">+{o.order_items.length - 1} more</span>
+                          )}
+                        </span>
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="p-2">
                     {o.created_at
                       ? new Date(o.created_at).toLocaleDateString()
@@ -138,6 +175,24 @@ export default function SellerOrdersList() {
                     >
                       {o.status}
                     </Link>
+                  </td>
+                  <td className="p-2 text-right whitespace-nowrap">
+                    {o.status === 'pending' ? (
+                      <button
+                        onClick={() => confirmOrder(o.id)}
+                        disabled={statusMut.isPending}
+                        className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Confirm
+                      </button>
+                    ) : (
+                      <Link
+                        to={`/seller/orders/${o.id}`}
+                        className="px-3 py-1 text-xs font-medium rounded border hover:bg-gray-50"
+                      >
+                        {o.status === 'processing' ? 'Arrange shipment' : 'View'}
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

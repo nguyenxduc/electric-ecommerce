@@ -116,13 +116,23 @@ export default function SellerProductsList() {
                   <td className="p-2">{p.name}</td>
                   <td className="p-2">${p.price}</td>
                   <td className="p-2">
-                    {Array.isArray(p.available_colors) &&
-                    p.available_colors.length > 0
-                      ? p.available_colors.reduce(
-                          (sum, c) => sum + Number(c.quantity || 0),
-                          0
-                        )
-                      : p.quantity ?? 0}
+                    {(() => {
+                      const stock =
+                        Array.isArray(p.available_colors) && p.available_colors.length > 0
+                          ? p.available_colors.reduce((sum, c) => sum + Number(c.quantity || 0), 0)
+                          : p.quantity ?? 0
+                      // Cung nguong LOW_STOCK_THRESHOLD (5) voi o "Low stock" tren dashboard
+                      return stock <= 5 ? (
+                        <span className="inline-flex items-center gap-1 font-medium text-red-600">
+                          {stock}
+                          <span className="text-[10px] uppercase bg-red-50 border border-red-200 rounded px-1">
+                            {stock === 0 ? 'Out' : 'Low'}
+                          </span>
+                        </span>
+                      ) : (
+                        stock
+                      )
+                    })()}
                   </td>
                   <td className="p-2">{(p as any).sold ?? 0}</td>
                   <td className="p-2">

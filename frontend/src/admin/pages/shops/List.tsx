@@ -29,7 +29,7 @@ type ReasonAction = { type: 'reject' | 'suspend'; shop: AdminShop } | null
 export default function AdminShopsList() {
   const [limit] = useState(10)
   const { page, q: query, setPage, setQ: setQuery } = useListQueryParams()
-  const [statusTab, setStatusTab] = useState<string>('')
+  const [statusTab, setStatusTab] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '')
   const [approveShopTarget, setApproveShopTarget] = useState<AdminShop | null>(
     null
   )

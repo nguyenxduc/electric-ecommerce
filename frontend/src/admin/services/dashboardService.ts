@@ -140,3 +140,20 @@ export const getShopTopProducts = async (limit?: number): Promise<TopProductsRes
   return data
 }
 
+
+// Khoi "To-do" dau dashboard: so viec can xu ly
+export type ShopTodo = {
+  to_confirm: number
+  to_ship: number
+  shipping: number
+  returns_pending: number
+  unread_messages: number
+  low_stock: number
+}
+export type AdminTodo = { shops_pending: number; unread_support: number; fraud_open: number }
+
+export const getShopTodo = async (): Promise<ShopTodo> =>
+  (await axiosClient.get('/dashboard/shop/todo')).data.data
+
+export const getAdminTodo = async (): Promise<AdminTodo> =>
+  (await axiosClient.get('/dashboard/todo')).data.data

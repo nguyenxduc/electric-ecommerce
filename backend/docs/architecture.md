@@ -399,6 +399,20 @@ tim kiem, goi y AI va khong the them vao gio. Rang buoc nay ap o **tang truy
 van du lieu** (`buyerVisibilityWhere` trong `lib/productQuery.js`) chu khong va
 o tung man hinh — nen khong co duong nao lot.
 
+Ho so mo shop (`POST /shops/apply`) gom thong tin shop, dia chi lay hang
+(`pickup_*`) va thue (`tax_entity_type`, `tax_code`). `validateTax` trong
+`shop.controller.js` bat buoc doanh nghiep co MST o ca ba duong: nop ho so,
+chu shop sua (`PATCH /shops/me`) va admin sua (`PATCH /shops/:id/tax`).
+Admin xem toan bo ho so truoc khi duyet; trang shop cong khai chi lo quan/tinh.
+
+### Khoi "To-do" tren dashboard
+
+`services/todo.service.js` dem viec can xu ly, dung cho
+`GET /dashboard/shop/todo` (seller: don cho xac nhan/giao/dang giao, yeu cau
+tra hang, tin nhan chua doc, san pham con <= `LOW_STOCK_THRESHOLD`) va
+`GET /dashboard/todo` (admin: shop cho duyet, chat ho tro chua doc, co gian lan
+dang mo). Moi o tren giao dien link toi danh sach da loc san qua `?status=`.
+
 ---
 
 ## 7. Phan quyen ba lop

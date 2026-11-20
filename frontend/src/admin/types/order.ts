@@ -18,6 +18,8 @@ export type AdminOrderItem = {
   color?: string | null
   created_at?: string
   updated_at?: string
+  // Danh sach don cua shop include product (id, name, img)
+  product?: { id: number; name: string; img?: string[] | null } | null
 }
 
 export type ShippingAddress = {

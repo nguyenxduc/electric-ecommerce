@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import adminOrderService from '../services/orderService'
 import {
-  AdminOrder,
   CancelOrderResponse,
   CreateOrderRequest,
   CreateOrderResponse,
@@ -99,5 +98,17 @@ export function useMyShopOrderStats() {
   return useQuery<{ data: OrderStatsResponse }, Error>({
     queryKey: [...orderKeys.all, 'mine', 'stats'],
     queryFn: () => adminOrderService.shopStats()
+  })
+}
+
+// Doi trang thai ngay tren danh sach (vd. "Confirm" don pending), id truyen luc goi
+export function useUpdateShopOrderStatus() {
+  const qc = useQueryClient()
+  return useMutation<{ data: UpdateOrderStatusResponse }, Error, { id: number } & UpdateOrderStatusRequest>({
+    mutationFn: ({ id, ...payload }) => adminOrderService.updateStatus(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: orderKeys.all })
+      qc.invalidateQueries({ queryKey: ['seller', 'dashboard'] })
+    }
   })
 }

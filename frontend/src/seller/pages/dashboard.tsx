@@ -12,6 +12,8 @@ import {
   getShopDashboardStats,
   getShopTopProducts
 } from '../../admin/services/dashboardService'
+import { useShopTodo } from '../../admin/hooks'
+import TodoPanel from '../../admin/components/common/TodoPanel'
 
 const StatCard = ({
   title,
@@ -70,6 +72,8 @@ export default function SellerDashboard() {
     staleTime: 60 * 1000
   })
 
+  const { data: todo, isLoading: todoLoading } = useShopTodo()
+
   const stats = statsData?.data
 
   if (isLoading) {
@@ -85,6 +89,26 @@ export default function SellerDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">Dashboard</h1>
+
+      <TodoPanel
+        loading={todoLoading}
+        action={
+          <Link
+            to="/seller/products/new"
+            className="text-sm px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
+            + Add product
+          </Link>
+        }
+        items={[
+          { label: 'To confirm', count: todo?.to_confirm, to: '/seller/orders?status=pending' },
+          { label: 'To ship', count: todo?.to_ship, to: '/seller/orders?status=processing' },
+          { label: 'In transit', count: todo?.shipping, to: '/seller/orders?status=shipped' },
+          { label: 'Return requests', count: todo?.returns_pending, to: '/seller/returns?status=pending' },
+          { label: 'Unread messages', count: todo?.unread_messages, to: '/seller/chat' },
+          { label: 'Low stock', count: todo?.low_stock, to: '/seller/products', hint: '5 or fewer left' }
+        ]}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard

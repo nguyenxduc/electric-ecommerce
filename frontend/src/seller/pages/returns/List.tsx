@@ -17,7 +17,7 @@ const STATUS_BADGE: Record<string, string> = {
 
 export default function SellerReturnsList() {
   const qc = useQueryClient()
-  const [statusTab, setStatusTab] = useState<string>('')
+  const [statusTab, setStatusTab] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '')
   const [rejectTarget, setRejectTarget] = useState<ShopReturnRequest | null>(
     null
   )

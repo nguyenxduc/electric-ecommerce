@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { getDashboardStats, getTopProducts, getBehaviorAnalytics, type DashboardStatsResponse, type TopProductsResponse, type BehaviorAnalyticsResponse } from '../services/dashboardService'
+import { getDashboardStats, getTopProducts, getBehaviorAnalytics, getAdminTodo, getShopTodo, type DashboardStatsResponse, type TopProductsResponse, type BehaviorAnalyticsResponse } from '../services/dashboardService'
+
+export const useAdminTodo = () =>
+  useQuery({ queryKey: ['admin', 'dashboard', 'todo'], queryFn: getAdminTodo, staleTime: 30 * 1000 })
+
+export const useShopTodo = () =>
+  useQuery({ queryKey: ['seller', 'dashboard', 'todo'], queryFn: getShopTodo, staleTime: 30 * 1000 })
 
 export const useDashboardStats = () => {
   return useQuery<DashboardStatsResponse, Error>({

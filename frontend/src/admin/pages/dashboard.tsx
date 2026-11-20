@@ -1,11 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { useDashboardStats, useTopProducts, useBehaviorAnalytics } from '../hooks'
+import { useDashboardStats, useTopProducts, useBehaviorAnalytics, useAdminTodo } from '../hooks'
+import TodoPanel from '../components/common/TodoPanel'
 
 export default function AdminDashboard() {
   const { data: statsData, isLoading: statsLoading } = useDashboardStats()
   const { data: topProductsData, isLoading: topProductsLoading } = useTopProducts(4)
   const { data: behaviorData, isLoading: behaviorLoading } = useBehaviorAnalytics(30)
+  const { data: todo, isLoading: todoLoading } = useAdminTodo()
 
   const stats = statsData?.data
   const topProducts = topProductsData?.data || []
@@ -23,6 +25,15 @@ export default function AdminDashboard() {
   return (
     <div className="grid gap-6">
       <h1 className="text-xl font-semibold">Dashboard</h1>
+
+      <TodoPanel
+        loading={todoLoading}
+        items={[
+          { label: 'Shop applications', count: todo?.shops_pending, to: '/admin/shops?status=pending' },
+          { label: 'Unread support messages', count: todo?.unread_support, to: '/admin/chat' },
+          { label: 'Open fraud flags', count: todo?.fraud_open, to: '/admin/fraud' }
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <KpiCard

@@ -2,6 +2,7 @@ import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
 import { getSettingNumber } from "../lib/settings.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { getShopTodo, getAdminTodo } from "../services/todo.service.js";
 
 // Get dashboard statistics.
 // shopId (optional) scopes orders/products to one shop (seller dashboard).
@@ -468,3 +469,16 @@ function formatNumber(num) {
   return num.toString();
 }
 
+
+// GET /api/dashboard/shop/todo - so viec seller can xu ly (don cho xac nhan/giao, tra hang, chat, ton kho)
+export const getShopTodoCounts = asyncHandler(async (req, res) => {
+  if (!req.shop) {
+    return res.status(400).json({ success: false, error: "No shop attached to this account" });
+  }
+  res.json({ success: true, data: await getShopTodo(req.shop.id, BigInt(req.user.id)) });
+});
+
+// GET /api/dashboard/todo - viec admin can xu ly (duyet shop, chat ho tro, gian lan)
+export const getAdminTodoCounts = asyncHandler(async (_req, res) => {
+  res.json({ success: true, data: await getAdminTodo() });
+});
