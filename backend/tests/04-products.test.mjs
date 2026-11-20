@@ -118,3 +118,10 @@ test('shop product listing paginates and sorts', async () => {
   assert.ok(sorted, `prices not ascending: ${prices}`)
   assert.ok(asc?.pagination?.total_count >= prices.length)
 })
+
+test('sort=discount lists the biggest savings first (home "Top deals")', async () => {
+  const res = (await req('/products?limit=8&sort=discount')).json
+  const discounts = (res?.products || []).map(p => Number(p.discount))
+  assert.ok(discounts.length > 0)
+  assert.ok(discounts.every((v, i) => i === 0 || discounts[i - 1] >= v), `not descending: ${discounts}`)
+})

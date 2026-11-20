@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, ShoppingCart, Zap, Minus, Plus, Truck, ShieldCheck, BadgeCheck } from 'lucide-react'
 import { toast } from 'sonner'
@@ -88,12 +88,18 @@ const Payment = ({
     : selectedColorObj?.quantity ?? quantity
   const canBuy = hasVariants ? !!selectedVariant && selectedQty > 0 : quantity > 0
   const [qty, setQty] = useState(1)
+  // Thanh mua hang dinh day tren mobile: bao cho cac nut chat noi nhuong cho
+  useEffect(() => {
+    document.body.classList.add('has-bottom-bar')
+    return () => document.body.classList.remove('has-bottom-bar')
+  }, [])
   // Doi bien the co ton thap hon thi tu ha so luong
   const buyQty = Math.max(1, Math.min(qty, selectedQty || 1))
 
   const handleAddToCart = () => {
     if (hasVariants && !selectedVariant) {
       toast.error('Please select a variant')
+      document.getElementById('variant-picker')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
     if (selectedQty <= 0) {
@@ -139,6 +145,7 @@ const Payment = ({
   const handleBuyNow = async () => {
     if (hasVariants && !selectedVariant) {
       toast.error('Please select a variant')
+      document.getElementById('variant-picker')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
     if (selectedQty <= 0) {
@@ -352,6 +359,29 @@ const Payment = ({
             <span>Secure checkout, order tracked until delivery</span>
           </li>
         </ul>
+      </div>
+
+      {/* Mobile: thanh mua dinh day nhu cac app san */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        <div className="min-w-0">
+          <p className="text-lg font-bold text-rose-600 leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
+          <p className="text-xs text-gray-500">Qty {buyQty}</p>
+        </div>
+        <button
+          onClick={handleAddToCart}
+          disabled={(!canBuy && !(hasVariants && !selectedVariant)) || addToCartMutation.isPending}
+          aria-label="Add to cart"
+          className="ml-auto flex items-center justify-center w-12 h-11 rounded-lg border-2 border-blue-600 text-blue-600 disabled:opacity-50"
+        >
+          <ShoppingCart className="w-5 h-5" />
+        </button>
+        <button
+          onClick={handleBuyNow}
+          disabled={(!canBuy && !(hasVariants && !selectedVariant)) || addToCartMutation.isPending}
+          className="h-11 px-6 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50"
+        >
+          Buy now
+        </button>
       </div>
     </div>
   )

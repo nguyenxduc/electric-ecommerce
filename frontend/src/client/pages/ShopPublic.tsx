@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import {
   Store,
   MapPin,
@@ -9,17 +8,15 @@ import {
   Star,
   ChevronLeft,
   MessageCircle,
-  Ticket,
-  Copy
 } from 'lucide-react'
 import {
   getShopBySlug,
-  getShopProducts,
-  getShopVouchers
+  getShopProducts
 } from '../services/shopService'
 import ProductGrid from '../components/collection/ProductGrid'
 import Pagination from '../components/collection/Pagination'
 import { ShopChatPanel } from '../components/chat/ChatWidget'
+import ShopVouchers from '../components/shop/ShopVouchers'
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
@@ -52,11 +49,6 @@ const ShopPublic = () => {
     enabled: !!slug && !!shop && shop.status === 'active'
   })
 
-  const { data: vouchers = [] } = useQuery({
-    queryKey: ['shop-vouchers', slug],
-    queryFn: () => getShopVouchers(slug!),
-    enabled: !!slug && !!shop && shop.status === 'active'
-  })
 
   if (shopLoading) {
     return (
@@ -167,44 +159,8 @@ const ShopPublic = () => {
         </div>
       </div>
 
-      {/* Shop vouchers */}
-      {vouchers.length > 0 && (
-        <div className="bg-white rounded-xl border p-4">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <Ticket className="w-4 h-4 text-red-500" /> Shop Vouchers
-          </h2>
-          <div className="flex flex-wrap gap-3">
-            {vouchers.map(v => (
-              <div
-                key={v.id}
-                className="flex items-center gap-3 border border-dashed border-red-300 bg-red-50/50 rounded-lg px-4 py-2"
-              >
-                <div>
-                  <p className="text-sm font-bold text-red-600">
-                    {v.discount_type === 'percent'
-                      ? `${Number(v.discount_value)}% OFF`
-                      : `$${Number(v.discount_value)} OFF`}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    {v.min_order ? `Min order $${Number(v.min_order)}` : 'No minimum'}
-                    {v.expires_at
-                      ? ` · until ${new Date(v.expires_at).toLocaleDateString()}`
-                      : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(v.code)
-                    toast.success(`Copied code ${v.code} - apply it at checkout`)
-                  }}
-                  className="px-3 py-1.5 bg-red-500 text-white text-xs font-semibold rounded flex items-center gap-1 hover:bg-red-600"
-                >
-                  <Copy className="w-3 h-3" /> {v.code}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+      {shop.status === 'active' && (
+        <ShopVouchers slug={shop.slug} className="bg-white rounded-xl border p-4" />
       )}
 
       {/* Products */}

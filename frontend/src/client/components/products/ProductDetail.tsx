@@ -14,6 +14,8 @@ import ReviewComponent from './Review'
 import { getProductColors } from '../../utils/productColors'
 import VariantPicker from './VariantPicker'
 import ShopCard from './ShopCard'
+import MoreFromShop from './MoreFromShop'
+import ShopVouchers from '../shop/ShopVouchers'
 
 interface ProductDetailProps {
   product: Product
@@ -68,7 +70,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
   }, [product?.id])
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 pt-8 pb-24 lg:pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 lg:p-10">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
@@ -135,6 +137,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 )}
               </div>
 
+              {product.shop && <ShopVouchers slug={product.shop.slug} />}
+
               {/* Color Selection */}
               {colors && colors.length > 0 && (
                 <div>
@@ -160,12 +164,14 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
               )}
 
               {variants.length > 0 && (
+                <div id="variant-picker" className="scroll-mt-24">
                 <VariantPicker
                   key={product.id}
                   variants={variants}
                   selectedId={selectedVariantId}
                   onSelect={setSelectedVariantId}
                 />
+                </div>
               )}
 
               {/* Specifications */}
@@ -220,6 +226,9 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
         </div>
 
         {product.shop && <ShopCard slug={product.shop.slug} />}
+        {product.shop && (
+          <MoreFromShop slug={product.shop.slug} shopName={product.shop.name} excludeId={product.id} />
+        )}
 
         {/* Tabs Section */}
         <div className="mt-12">

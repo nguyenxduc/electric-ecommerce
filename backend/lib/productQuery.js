@@ -66,6 +66,8 @@ export const SORT_ORDER_BY = {
   rating: { rating: "desc" },
   popular: { sold: "desc" },
   newest: { created_at: "desc" },
+  // Tiet kiem nhieu nhat (so tien); % giam la gia tri tinh nen Prisma khong sap duoc
+  discount: { discount: "desc" },
 };
 
 export const resolveOrderBy = (sort) =>

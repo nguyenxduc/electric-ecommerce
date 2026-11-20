@@ -20,6 +20,14 @@ export const fetchNewProducts = async (): Promise<ListProductRes> => {
   return data
 }
 
+// Top deals: chi san pham dang giam, tiet kiem nhieu nhat truoc
+export const fetchTopDeals = async (): Promise<ListProductRes> => {
+  const { data } = await axiosClient.get<ListProductRes>('/products', {
+    params: { sort: 'discount', discount: 'true', page: 1, limit: 12 }
+  })
+  return data
+}
+
 export const fetchPopularProducts = async (): Promise<ListProductRes> => {
   const { data } = await axiosClient.get<ListProductRes>('/products', {
     params: { sort: 'popular', page: 1, limit: 40 }

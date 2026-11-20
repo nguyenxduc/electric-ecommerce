@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   fetchNewProducts,
   fetchPopularProducts,
+  fetchTopDeals,
   fetchCollectionProducts,
   fetchProductById,
   fetchProductsByIds,
@@ -25,6 +26,13 @@ export const useNewProducts = () =>
   useQuery<ListProductRes>({
     queryKey: ['newProducts'],
     queryFn: fetchNewProducts,
+    staleTime: 5 * 60 * 1000
+  })
+
+export const useTopDeals = () =>
+  useQuery<ListProductRes>({
+    queryKey: ['topDeals'],
+    queryFn: fetchTopDeals,
     staleTime: 5 * 60 * 1000
   })
 

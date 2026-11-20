@@ -1,6 +1,7 @@
 import Hero from '../components/layout/Hero'
 import Categories from '../components/products/Categories'
 import FeaturedShops from '../components/layout/FeaturedShops'
+import TopDeals from '../components/layout/TopDeals'
 import ListProduct from '../components/products/ListProduct'
 import { useHomeRecommendations, useNewProducts, usePopularProducts } from '../hooks/useProducts'
 import { recommendationStrategyLabel } from '../utils/recommendationLabel'
@@ -28,6 +29,7 @@ const Home = () => {
     <div>
       <Hero />
       <Categories />
+      <TopDeals />
       <FeaturedShops />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
         <ListProduct

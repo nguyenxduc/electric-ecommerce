@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { Star } from 'lucide-react'
+import { Star, Store } from 'lucide-react'
 import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
 import ProductImage from '../products/ProductImage'
-import { descriptionPreview } from '../../utils/descriptionPreview'
 
 interface ProductCardProps {
   product: Product
@@ -13,6 +12,10 @@ interface ProductCardProps {
   compareDisabledReason?: string
   onCompareToggle?: (product: Product) => void
 }
+
+// 1234 -> "1.2K": so da ban dang gon nhu cac san
+const compact = (n: number) =>
+  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}K` : String(n)
 
 const asNumber = (value: unknown, fallback = 0) => {
   const n = Number(value)
@@ -46,7 +49,7 @@ const ProductCard = ({
 
   return (
     <div
-      className="relative bg-white border rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer"
+      className="group relative flex flex-col bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md hover:border-gray-200 transition cursor-pointer"
       onClick={() => {
         trackBehavior('click', product.id, { source: 'product_card' })
         navigate(`/product/${slug || product.id}`)
@@ -60,7 +63,7 @@ const ProductCard = ({
             event.stopPropagation()
             onCompareToggle(product)
           }}
-          className={`absolute top-3 right-3 z-20 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus:outline-none ${
+          className={`absolute top-2 right-2 z-20 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none ${
             compareSelected
               ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
               : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
@@ -77,48 +80,49 @@ const ProductCard = ({
         </button>
       )}
 
-      <div className="relative mb-4">
-        {hasDiscount && (
-          <div className="absolute top-2 left-2 bg-orange-200 text-orange-800 text-xs font-semibold px-2 py-1 rounded z-10">
-            -{discountPercentage}%
+      <div className="relative aspect-square bg-gray-50">
+        {product.img && product.img.length > 0 ? (
+          <ProductImage
+            src={product.img[0]}
+            alt={product.name}
+            className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+            No image
           </div>
         )}
-        <div className="w-full h-48 bg-gray-50 rounded-lg overflow-hidden">
-          {product.img && product.img.length > 0 ? (
-            <ProductImage
-              src={product.img[0]}
-              alt={product.name}
-              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-              No image
-            </div>
+      </div>
+
+      <div className="flex flex-col flex-1 p-3">
+        <h3 className="text-sm text-gray-800 leading-snug line-clamp-2 min-h-[2.5rem]">
+          {product.name}
+        </h3>
+        <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
+          <span className="text-lg font-bold text-rose-600">
+            ${(finalPrice > 0 ? finalPrice : price).toFixed(2)}
+          </span>
+          {hasDiscount && (
+            <span className="text-xs font-semibold text-rose-600 bg-rose-50 rounded px-1">
+              -{discountPercentage}%
+            </span>
           )}
         </div>
-      </div>
-      <h3 className="text-sm text-gray-700 mb-2 truncate">{product.name}</h3>
-      {product.description && (
-        <p className="text-xs text-gray-500 mb-2 line-clamp-2 leading-relaxed">
-          {descriptionPreview(product.description, 100)}
-        </p>
-      )}
-      <div className="flex items-center gap-2 mb-2">
         {hasDiscount && (
-          <span className="text-xs text-gray-400 line-through">
-            ${price.toFixed(2)}
-          </span>
+          <span className="text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
         )}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-lg font-semibold">
-          $
-          {(finalPrice > 0 ? finalPrice : price).toFixed(2)}
-        </span>
-        <div className="flex items-center gap-1">
-          <Star className="w-4 h-4 fill-blue-600 text-blue-600" />
-          <span className="text-sm font-semibold">{rating.toFixed(1)}</span>
+        <div className="mt-auto pt-2 flex items-center gap-1 text-xs text-gray-500">
+          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <span className="font-medium text-gray-700">{rating.toFixed(1)}</span>
+          <span className="text-gray-300">|</span>
+          <span>{compact(asNumber(product.sold))} sold</span>
         </div>
+        {product.shop?.name && (
+          <div className="mt-1 flex items-center gap-1 text-xs text-gray-400 truncate">
+            <Store className="w-3 h-3 shrink-0" />
+            <span className="truncate">{product.shop.name}</span>
+          </div>
+        )}
       </div>
     </div>
   )
