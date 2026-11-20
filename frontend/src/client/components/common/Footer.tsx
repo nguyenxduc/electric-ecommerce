@@ -13,12 +13,6 @@ import { IoLogoInstagram } from 'react-icons/io'
 import { RiTwitterXLine } from 'react-icons/ri'
 
 // @ts-ignore
-import PayPayIcon from '../../../assets/paypal-icon.svg'
-// @ts-ignore
-import VisaIcon from '../../../assets/visa-icon.svg'
-// @ts-ignore
-import MasterCardIcon from '../../../assets/master-card.svg'
-// @ts-ignore
 import CompanyIcon from '../../../assets/company-icon.svg'
 
 const Footer = () => {
@@ -121,16 +115,11 @@ const Footer = () => {
           </div>
         </div>
       </div>
-      <div className="gap-3 pl-12">
-        <div className="inline-flex">
-          <img src={PayPayIcon} alt="paypal-icon" className="h-8 mt-8 mx-2" />
-          <img src={VisaIcon} alt="visa-icon" className="h-8 mt-8 mx-2" />
-          <img
-            src={MasterCardIcon}
-            alt="mastercard-icon"
-            className="h-8 mt-8 mx-2"
-          />
-        </div>
+      {/* Chi liet ke phuong thuc san thuc su ho tro (xem Checkout) */}
+      <div className="flex flex-wrap items-center gap-2 px-6 sm:pl-14 mt-8 text-sm">
+        <span className="text-blue-200 mr-1">We accept</span>
+        <span className="bg-white text-blue-950 font-semibold rounded px-3 py-1">Cash on delivery</span>
+        <span className="bg-[#a50064] text-white font-semibold rounded px-3 py-1">MoMo</span>
       </div>
       <div className="bg-blue-950 flex flex-col sm:flex-row gap-3 sm:justify-between text-white font-thin text-sm mt-5 py-4 px-6 sm:pl-14 sm:pr-0">
         <div className="inline-flex gap-3">

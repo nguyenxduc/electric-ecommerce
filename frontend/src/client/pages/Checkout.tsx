@@ -3,7 +3,6 @@ import {
   Truck,
   CreditCard,
   Home,
-  Phone,
   User,
   CheckCircle,
   X,
@@ -13,7 +12,8 @@ import {
   Store
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useCart, useClearCart } from '../hooks/useCart'
+import { useCart, useClearCart, useRemoveCartItem } from '../hooks/useCart'
+import { getExcluded, setExcluded, selectedItems, summarizeItems } from '../utils/cartSelection'
 import { useValidateToken } from '../hooks/useAuth'
 import { usePublicSettings } from '../hooks/useSettings'
 
@@ -39,6 +39,16 @@ import { formatUsd } from '../utils/formatMoney'
 import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
 
+const fieldCls =
+  'w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+
+const CheckoutField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <label className="block">
+    <span className="block text-sm font-medium text-gray-700 mb-1.5">{label}</span>
+    {children}
+  </label>
+)
+
 const Checkout = () => {
   const navigate = useNavigate()
   const { data: cartData, isLoading } = useCart()
@@ -46,8 +56,11 @@ const Checkout = () => {
   const { data: settingsData } = usePublicSettings('shipping')
 
   const cart = cartData?.cart
-  // Dong het hang (variant bi xoa) khong duoc gui len server
-  const items = (cart?.items || []).filter(i => !i.unavailable)
+  // Dong het hang (variant bi xoa) khong duoc gui len server; chi lay dong
+  // nguoi mua chon o gio, bo chon het thi coi nhu chon ca gio.
+  const available = (cart?.items || []).filter(i => !i.unavailable)
+  const picked = selectedItems(available, getExcluded())
+  const items = picked.length ? picked : available
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
@@ -89,6 +102,7 @@ const Checkout = () => {
   const [myVouchers, setMyVouchers] = useState<MyVoucher[]>([])
   const [voucherLoading, setVoucherLoading] = useState(false)
   const clearCartMutation = useClearCart()
+  const removeItemMutation = useRemoveCartItem()
   const loyaltyPoints = userData?.user?.loyalty_points ?? 0
   const userSegment = userData?.user?.segment ?? null
   const tierDiscountRate =
@@ -140,9 +154,7 @@ const Checkout = () => {
   }, [items, settingsData, quote])
 
   const totals = useMemo(() => {
-    const subtotal = cart?.total_original_price || 0
-    const discount = cart?.total_discount || 0
-    const orderTotal = cart?.total_price || 0
+    const { subtotal, discount, total: orderTotal } = summarizeItems(items)
     const shipmentCost = round2(
       shopGroups.reduce((sum, g) => sum + g.shipping, 0)
     )
@@ -157,7 +169,7 @@ const Checkout = () => {
       grandTotal,
       isFreeShipping
     }
-  }, [cart, shopGroups])
+  }, [items, shopGroups])
 
   // Autofill receiver info from logged-in user
   useEffect(() => {
@@ -261,9 +273,18 @@ const Checkout = () => {
     return result
   }
 
+  // Mua ca gio thi xoa gio; mua mot phan thi chi go cac dong da dat
   const clearCartAfterOrder = async () => {
+    const ordered = items
     try {
-      await clearCartMutation.mutateAsync()
+      if (ordered.length === available.length) {
+        await clearCartMutation.mutateAsync()
+      } else {
+        for (const it of ordered) {
+          await removeItemMutation.mutateAsync({ productId: it.product_id, cartItemId: it.id })
+        }
+      }
+      setExcluded(new Set())
     } catch (err) {
       console.error('Failed to clear cart:', err)
     }
@@ -604,21 +625,25 @@ const Checkout = () => {
               <User className="w-5 h-5" /> Contact
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
-              <input
-                className="border rounded-lg px-4 py-3"
-                placeholder="Full name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-              />
-              <div className="flex items-center gap-2 border rounded-lg px-4 py-3">
-                <Phone className="w-4 h-4 text-gray-500" />
+              <CheckoutField label="Receiver name">
                 <input
-                  className="flex-1 outline-none"
+                  className={fieldCls}
+                  placeholder="Full name"
+                  autoComplete="name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </CheckoutField>
+              <CheckoutField label="Phone number">
+                <input
+                  type="tel"
+                  className={fieldCls}
                   placeholder="Phone number"
+                  autoComplete="tel"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                 />
-              </div>
+              </CheckoutField>
             </div>
           </div>
 
@@ -627,31 +652,25 @@ const Checkout = () => {
               <Home className="w-5 h-5" /> Shipping address
             </h2>
             <div className="grid gap-4 md:grid-cols-3 mb-4">
-              <input
-                className="border rounded-lg px-4 py-3"
-                placeholder="Province / City"
-                value={province}
-                onChange={e => setProvince(e.target.value)}
-              />
-              <input
-                className="border rounded-lg px-4 py-3"
-                placeholder="District"
-                value={district}
-                onChange={e => setDistrict(e.target.value)}
-              />
-              <input
-                className="border rounded-lg px-4 py-3"
-                placeholder="Ward"
-                value={ward}
-                onChange={e => setWard(e.target.value)}
-              />
+              <CheckoutField label="Province / City">
+                <input className={fieldCls} placeholder="Province / City" value={province} onChange={e => setProvince(e.target.value)} />
+              </CheckoutField>
+              <CheckoutField label="District">
+                <input className={fieldCls} placeholder="District" value={district} onChange={e => setDistrict(e.target.value)} />
+              </CheckoutField>
+              <CheckoutField label="Ward">
+                <input className={fieldCls} placeholder="Ward" value={ward} onChange={e => setWard(e.target.value)} />
+              </CheckoutField>
             </div>
-            <textarea
-              className="w-full border rounded-lg px-4 py-3 min-h-[120px]"
-              placeholder="Street, city, district..."
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-            />
+            <CheckoutField label="Street address">
+              <textarea
+                className={`${fieldCls} min-h-[96px]`}
+                placeholder="Street, city, district..."
+                autoComplete="street-address"
+                value={address}
+                onChange={e => setAddress(e.target.value)}
+              />
+            </CheckoutField>
           </div>
 
           {needPhoneVerify && (

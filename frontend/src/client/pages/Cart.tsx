@@ -20,6 +20,31 @@ import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
 import { makeProductSlug } from '../utils/productSlug'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
+import {
+  getExcluded,
+  setExcluded,
+  selectedItems,
+  summarizeItems
+} from '../utils/cartSelection'
+
+const Check = ({
+  checked,
+  onChange,
+  label
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+}) => (
+  <input
+    type="checkbox"
+    aria-label={label}
+    checked={checked}
+    onChange={e => onChange(e.target.checked)}
+    className="w-4 h-4 accent-blue-600 cursor-pointer shrink-0"
+  />
+)
+
 const Cart = () => {
   const navigate = useNavigate()
   const { data: cartData, isLoading } = useCart()
@@ -36,6 +61,18 @@ const Cart = () => {
 
   // Group items by shop - checkout will create one order per shop
   const groupedItems = useMemo(() => groupCartItemsByShop(items), [items])
+
+  // Chon dong nao dem di thanh toan (luu o sessionStorage de Checkout doc lai)
+  const [excluded, setExcludedState] = useState(getExcluded)
+  const toggle = (ids: number[], on: boolean) => {
+    const next = new Set(excluded)
+    ids.forEach(id => (on ? next.delete(id) : next.add(id)))
+    setExcluded(next)
+    setExcludedState(next)
+  }
+  const available = items.filter(i => !i.unavailable)
+  const chosen = selectedItems(items, excluded)
+  const allChosen = available.length > 0 && chosen.length === available.length
 
   const handleInc = (
     productId: number,
@@ -99,9 +136,9 @@ const Cart = () => {
     )
   }
 
-  const subtotal = cart?.total_original_price || 0
-  const discount = cart?.total_discount || 0
-  const grandTotal = cart?.total_price || 0
+  const { subtotal, discount, total: grandTotal } = summarizeItems(chosen)
+  const chosenCount = chosen.reduce((n, i) => n + i.quantity, 0)
+  const chosenShops = groupCartItemsByShop(chosen).length
 
   const isEmpty = !isLoading && items.length === 0
   const skeletonItems = useMemo(() => Array.from({ length: 3 }), [])
@@ -208,15 +245,33 @@ const Cart = () => {
                 </Link>
               </div>
             ) : (
-              groupedItems.map(group => {
-                const shopTotal = group.items
-                  .filter(i => !i.unavailable)
-                  .reduce((sum, i) => sum + i.final_price * i.quantity, 0)
+              <>
+              {available.length > 0 && (
+                <label className="flex items-center gap-3 bg-white rounded-xl border border-gray-100 px-4 sm:px-6 py-3 text-sm font-medium text-gray-700 cursor-pointer">
+                  <Check
+                    label="Select all items"
+                    checked={allChosen}
+                    onChange={on => toggle(available.map(i => i.id), on)}
+                  />
+                  Select all ({available.length})
+                </label>
+              )}
+              {groupedItems.map(group => {
+                const groupAvailable = group.items.filter(i => !i.unavailable)
+                const groupChosen = selectedItems(group.items, excluded)
+                const shopTotal = summarizeItems(groupChosen).total
                 return (
                   <section key={group.key} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                     {/* Moi shop la mot don rieng khi checkout */}
                     <header className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b border-gray-100">
-                      <span className="flex items-center gap-2 font-semibold text-gray-900 min-w-0">
+                      <span className="flex items-center gap-3 font-semibold text-gray-900 min-w-0">
+                        {groupAvailable.length > 0 && (
+                          <Check
+                            label={`Select all from ${group.shopName}`}
+                            checked={groupChosen.length === groupAvailable.length}
+                            onChange={on => toggle(groupAvailable.map(i => i.id), on)}
+                          />
+                        )}
                         <Store className="w-4 h-4 text-blue-600 shrink-0" />
                         <span className="truncate">{group.shopName}</span>
                       </span>
@@ -251,7 +306,14 @@ const Cart = () => {
                           )
                         }
                         return (
-                          <li key={item.id} className="px-4 sm:px-6 py-4 flex gap-4">
+                          <li key={item.id} className="px-4 sm:px-6 py-4 flex items-start gap-3 sm:gap-4">
+                            <span className="pt-8 sm:pt-10">
+                              <Check
+                                label={`Select ${item.name}`}
+                                checked={!excluded.has(item.id)}
+                                onChange={on => toggle([item.id], on)}
+                              />
+                            </span>
                             <Link
                               to={`/product/${productSlug}`}
                               className="w-20 h-20 sm:w-24 sm:h-24 shrink-0 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center overflow-hidden"
@@ -344,7 +406,8 @@ const Cart = () => {
                     </footer>
                   </section>
                 )
-              })
+              })}
+              </>
             )}
           </div>
 
@@ -394,15 +457,20 @@ const Cart = () => {
 
                 <button
                   onClick={() => navigate('/checkout')}
-                  disabled={items.every(i => i.unavailable)}
+                  disabled={chosen.length === 0}
                   className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Proceed to checkout
+                  Proceed to checkout ({chosenCount})
                   <Truck className="w-5 h-5" />
                 </button>
-                {groupedItems.length > 1 && (
+                {chosenShops > 1 && (
                   <p className="mt-3 text-xs text-gray-500 text-center">
-                    Items from {groupedItems.length} shops ship as {groupedItems.length} separate orders.
+                    Items from {chosenShops} shops ship as {chosenShops} separate orders.
+                  </p>
+                )}
+                {chosen.length < available.length && (
+                  <p className="mt-2 text-xs text-gray-500 text-center">
+                    Unselected items stay in your cart.
                   </p>
                 )}
                 <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-gray-500">
