@@ -77,6 +77,8 @@ model Product {
   updated_at      DateTime                 @updatedAt
   deleted_at      DateTime?
   description     String?
+  // An/hien tren san: false thi nguoi mua khong thay (xem buyerVisibilityWhere).
+  is_active       Boolean                  @default(true)
   // Khoi luong mot don vi, dung de bao gia van chuyen theo can nang.
   weight_grams    Int                      @default(500)
   // Cột full-text do trigger trong DB tự cập nhật, Prisma không ghi vào cột này.

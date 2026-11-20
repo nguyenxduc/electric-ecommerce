@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import adminShopService from '../../services/shopService'
 import { useAdminOrders, useAdminOrderStats } from '../../hooks'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
@@ -10,12 +12,33 @@ export default function AdminOrdersList() {
   const [limit] = useState(10)
   const [status, setStatus] = useState<string | undefined>(undefined)
   const [q, setQ] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [shopId, setShopId] = useState('')
   const { data, isLoading, error } = useAdminOrders({
     page,
     limit,
     status,
-    q: q || undefined
+    q: q || undefined,
+    from: from || undefined,
+    to: to || undefined,
+    shop_id: shopId ? Number(shopId) : undefined
   })
+  // Danh sach shop cho bo loc
+  const { data: shopsData } = useQuery({
+    queryKey: ['admin', 'shops', 'filter-options'],
+    queryFn: () => adminShopService.list({ limit: 100 })
+  })
+  const shops = shopsData?.data.data.shops ?? []
+  const filtered = !!(q || status || from || to || shopId)
+  const clearFilters = () => {
+    setQ('')
+    setStatus(undefined)
+    setFrom('')
+    setTo('')
+    setShopId('')
+    setPage(1)
+  }
   const { data: statsData, isLoading: statsLoading } = useAdminOrderStats()
   const pages = useMemo(
     () => Math.max(1, data?.data.pagination.total_pages || 1),
@@ -59,11 +82,14 @@ export default function AdminOrdersList() {
 
       <div className="bg-white rounded border">
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b">
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto max-w-full">
             {[
               { label: 'All order', value: undefined },
-              { label: 'Completed', value: 'delivered' },
               { label: 'Pending', value: 'pending' },
+              { label: 'Processing', value: 'processing' },
+              { label: 'Shipped', value: 'shipped' },
+              { label: 'Completed', value: 'delivered' },
+              { label: 'Returned', value: 'returned' },
               { label: 'Canceled', value: 'cancelled' }
             ].map(t => (
               <button
@@ -84,16 +110,69 @@ export default function AdminOrdersList() {
           </div>
           <div className="flex w-full sm:w-auto items-center gap-2">
             <input
-              className="border rounded px-3 py-1.5 text-sm w-full sm:w-56"
-              placeholder="Search order report"
+              className="border rounded px-3 py-1.5 text-sm w-full sm:w-72"
+              placeholder="Search order no., buyer, phone, tracking"
               value={q}
-              onChange={e => setQ(e.target.value)}
+              onChange={e => {
+                setQ(e.target.value)
+                setPage(1)
+              }}
               onKeyDown={e => e.key === 'Enter' && setPage(1)}
             />
             <button className="p-2 border rounded" onClick={() => setPage(1)} aria-label="Search">
               ⟳
             </button>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b text-sm">
+          <label className="flex items-center gap-1">
+            From
+            <input
+              type="date"
+              aria-label="From date"
+              className="border rounded px-2 py-1"
+              value={from}
+              onChange={e => {
+                setFrom(e.target.value)
+                setPage(1)
+              }}
+            />
+          </label>
+          <label className="flex items-center gap-1">
+            To
+            <input
+              type="date"
+              aria-label="To date"
+              className="border rounded px-2 py-1"
+              value={to}
+              onChange={e => {
+                setTo(e.target.value)
+                setPage(1)
+              }}
+            />
+          </label>
+          <select
+            aria-label="Shop"
+            className="border rounded px-2 py-1 max-w-full"
+            value={shopId}
+            onChange={e => {
+              setShopId(e.target.value)
+              setPage(1)
+            }}
+          >
+            <option value="">All shops</option>
+            {shops.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {filtered && (
+            <button className="px-2 py-1 rounded border hover:bg-gray-50" onClick={clearFilters}>
+              Clear filters
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -117,6 +196,13 @@ export default function AdminOrdersList() {
               </tr>
             </thead>
             <tbody>
+              {data?.data.orders.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="p-6 text-center text-gray-500">
+                    {filtered ? 'No orders match your search.' : 'No orders yet.'}
+                  </td>
+                </tr>
+              )}
               {data?.data.orders.map((o, idx) => (
                 <tr key={o.id} className="border-t">
                   <td className="p-2">{idx + 1}</td>
@@ -204,6 +290,8 @@ function statusClass(status: string) {
       return 'px-2 py-1 rounded bg-green-100 text-green-700'
     case 'pending':
       return 'px-2 py-1 rounded bg-yellow-100 text-yellow-700'
+    case 'processing':
+      return 'px-2 py-1 rounded bg-purple-100 text-purple-700'
     case 'shipped':
       return 'px-2 py-1 rounded bg-blue-100 text-blue-700'
     case 'cancelled':

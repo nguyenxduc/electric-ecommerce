@@ -9,6 +9,8 @@ export type WishlistItem = {
     discount: string
     img: string[]
     rating: string | null
+    quantity: number
+    _count?: { variants: number; product_colors: number }
   }
   created_at: string
 }

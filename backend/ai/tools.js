@@ -97,7 +97,7 @@ export const createShoppingTools = (prisma) => {
     async ({ product_id }) => {
       const id = BigInt(product_id);
       const product = await prisma.product.findFirst({
-        where: { id, deleted_at: null, shop: { status: "active", deleted_at: null } },
+        where: { id, deleted_at: null, is_active: true, shop: { status: "active", deleted_at: null } },
         select: {
           id: true,
           name: true,

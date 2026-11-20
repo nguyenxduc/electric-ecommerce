@@ -50,6 +50,36 @@ export default function SellerOrdersList() {
   )
 
   const stats = statsData?.data
+  const orders = data?.data.orders ?? []
+  const filtered = !!q || !!status
+  const clearFilters = () => {
+    setQ('')
+    setStatus(undefined)
+    setPage(1)
+  }
+  const orderLabel = (o: (typeof orders)[number]) =>
+    o.order_number ? `#${o.order_number}` : `#${String(o.id).padStart(6, '0')}`
+  // Nut chinh theo trang thai, dung chung cho bang (desktop) va the (mobile)
+  const primaryAction = (o: (typeof orders)[number]) =>
+    o.status === 'pending' && o.payment_method && o.payment_method !== 'cod' ? (
+      // Don online cho tra tien: callback thanh toan tu chuyen sang To ship
+      <span className="text-xs text-amber-600">Awaiting payment</span>
+    ) : o.status === 'pending' ? (
+      <button
+        onClick={() => confirmOrder(o.id)}
+        disabled={statusMut.isPending}
+        className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+      >
+        Confirm
+      </button>
+    ) : (
+      <Link
+        to={`/seller/orders/${o.id}`}
+        className="px-3 py-1 text-xs font-medium rounded border hover:bg-gray-50"
+      >
+        {o.status === 'processing' ? 'Arrange shipment' : 'View'}
+      </Link>
+    )
 
   return (
     <div className="space-y-4">
@@ -71,7 +101,7 @@ export default function SellerOrdersList() {
 
       <div className="bg-white rounded border">
         <div className="flex flex-wrap items-center justify-between gap-3 p-3 border-b">
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto max-w-full">
             {[
               { label: 'All orders', value: undefined },
               { label: 'Pending', value: 'pending' },
@@ -97,10 +127,13 @@ export default function SellerOrdersList() {
             ))}
           </div>
           <input
-            className="border rounded px-3 py-1.5 text-sm w-full sm:w-56"
-            placeholder="Search by order number"
+            className="border rounded px-3 py-1.5 text-sm w-full sm:w-72"
+            placeholder="Search order no., buyer, phone, tracking"
             value={q}
-            onChange={e => setQ(e.target.value)}
+            onChange={e => {
+              setQ(e.target.value)
+              setPage(1)
+            }}
             onKeyDown={e => e.key === 'Enter' && setPage(1)}
           />
         </div>
@@ -111,8 +144,68 @@ export default function SellerOrdersList() {
           <div className="p-6 text-red-700 bg-red-50 border-b border-red-200">
             Failed to load orders. Please retry.
           </div>
+        ) : orders.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">
+            {filtered ? (
+              <>
+                <p>No orders match your search.</p>
+                <button
+                  onClick={clearFilters}
+                  className="mt-3 px-3 py-1.5 text-sm rounded border hover:bg-gray-50"
+                >
+                  Clear search
+                </button>
+              </>
+            ) : (
+              'No orders yet.'
+            )}
+          </div>
         ) : (
-          <div className="overflow-x-auto"><table className="w-full text-sm">
+          <>
+          {/* Mobile: the don thay cho bang de khong phai cuon ngang */}
+          <ul className="md:hidden divide-y">
+            {orders.map(o => {
+              const first = o.order_items?.[0]
+              return (
+                <li key={o.id} className="p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Link
+                      to={`/seller/orders/${o.id}`}
+                      className="text-blue-600 font-medium truncate"
+                    >
+                      {orderLabel(o)}
+                    </Link>
+                    <span className={`text-xs shrink-0 ${statusClass(o.status)}`}>
+                      {o.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">{o.user?.name || '—'}</div>
+                  {first && (
+                    <div className="flex items-center gap-2 min-w-0">
+                      {first.product?.img?.[0] && (
+                        <img
+                          src={first.product.img[0]}
+                          alt=""
+                          className="w-10 h-10 rounded border object-contain bg-white shrink-0"
+                        />
+                      )}
+                      <span className="min-w-0 text-sm">
+                        <span className="block truncate">{first.product?.name || 'Product'}</span>
+                        {o.order_items.length > 1 && (
+                          <span className="text-xs text-gray-500">+{o.order_items.length - 1} more</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold">{formatUsd(o.total_amount)}</span>
+                    {primaryAction(o)}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-blue-50">
               <tr>
                 <th className="text-left p-2">No.</th>
@@ -126,14 +219,7 @@ export default function SellerOrdersList() {
               </tr>
             </thead>
             <tbody>
-              {data?.data.orders.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="p-6 text-center text-gray-500">
-                    No orders yet.
-                  </td>
-                </tr>
-              )}
-              {data?.data.orders.map((o, idx) => (
+              {orders.map((o, idx) => (
                 <tr key={o.id} className="border-t">
                   <td className="p-2">{(page - 1) * limit + idx + 1}</td>
                   <td className="p-2">
@@ -141,9 +227,7 @@ export default function SellerOrdersList() {
                       to={`/seller/orders/${o.id}`}
                       className="text-blue-600 hover:underline font-medium"
                     >
-                      {o.order_number
-                        ? `#${o.order_number}`
-                        : `#${String(o.id).padStart(6, '0')}`}
+                      {orderLabel(o)}
                     </Link>
                   </td>
                   <td className="p-2">{o.user?.name || '—'}</td>
@@ -188,30 +272,13 @@ export default function SellerOrdersList() {
                     </Link>
                   </td>
                   <td className="p-2 text-right whitespace-nowrap">
-                    {o.status === 'pending' && o.payment_method && o.payment_method !== 'cod' ? (
-                      // Don online cho tra tien: callback thanh toan tu chuyen sang To ship
-                      <span className="text-xs text-amber-600">Awaiting payment</span>
-                    ) : o.status === 'pending' ? (
-                      <button
-                        onClick={() => confirmOrder(o.id)}
-                        disabled={statusMut.isPending}
-                        className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Confirm
-                      </button>
-                    ) : (
-                      <Link
-                        to={`/seller/orders/${o.id}`}
-                        className="px-3 py-1 text-xs font-medium rounded border hover:bg-gray-50"
-                      >
-                        {o.status === 'processing' ? 'Arrange shipment' : 'View'}
-                      </Link>
-                    )}
+                    {primaryAction(o)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table></div>
+          </>
         )}
 
         <AdminPagination

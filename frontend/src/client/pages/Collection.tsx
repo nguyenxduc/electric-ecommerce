@@ -22,7 +22,7 @@ import {
   MIN_COMPARE_PRODUCTS,
 } from '../constants/compare'
 
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 
 // Dynamic filter type - key is the filter key from API, value is array of selected values
 export type DynamicFilters = {
@@ -542,8 +542,32 @@ const Collection = () => {
           {!(searchQuery ? isSearching : isCollectionLoading) && products && (
             <>
               {products.products.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  No products found
+                <div className="py-12 text-center text-gray-500">
+                  <p className="text-base font-medium text-gray-800">
+                    {searchQuery
+                      ? `No products found for "${searchQuery}"`
+                      : 'No products found'}
+                  </p>
+                  <p className="mt-1 text-sm">
+                    {searchQuery
+                      ? 'Check the spelling, try a shorter or more general keyword, or remove some filters.'
+                      : 'Try removing some filters.'}
+                  </p>
+                  <div className="mt-4 flex flex-wrap justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setSearchParams(new URLSearchParams())}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Clear search &amp; filters
+                    </button>
+                    <Link
+                      to="/collection/all?sort=popular"
+                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                      Browse popular products
+                    </Link>
+                  </div>
                 </div>
               ) : (
                 <>

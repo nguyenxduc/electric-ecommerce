@@ -179,9 +179,9 @@ function Profile() {
         onClose={() => setDeleteConfirmModal(false)}
         confirmClassName="bg-red-600 hover:bg-red-700"
       />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-10 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-10 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4 lg:gap-6">
         {/* Left Nav */}
-        <aside className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <aside className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-3 lg:p-4">
           <div className="flex items-center gap-3 px-2 pb-3 border-b border-gray-100">
             <div className="relative group">
               <img
@@ -230,23 +230,24 @@ function Profile() {
             </div>
           </div>
 
-          <nav className="mt-3 space-y-1">
+          {/* Duoi lg: thanh tab cuon ngang thay cho danh sach doc dai */}
+          <nav className="mt-3 flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
             {NAV.map(item => {
               if (item.key === 'logout') {
                 return (
                   <button
                     key={item.key}
                     onClick={handleLogoutClick}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                    className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
                       item.key === tabActive
-                        ? 'bg-red-50 text-red-700 border-l-2 border-red-600'
+                        ? 'bg-red-50 text-red-700 lg:border-l-2 border-red-600'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <img
                       src={Icon[item.icon as keyof typeof Icon]}
                       alt={item.icon}
-                      className="h-6 w-6"
+                      className="h-5 w-5 lg:h-6 lg:w-6"
                     />
                     <span className="text-sm font-light">{item.label}</span>
                   </button>
@@ -257,14 +258,14 @@ function Profile() {
                   <button
                     key={item.key}
                     onClick={() => setTabActive(item.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                    className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
                       item.key === tabActive
-                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                        ? 'bg-blue-50 text-blue-700 lg:border-l-2 border-blue-600'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <Star
-                      className={`h-6 w-6 ${
+                      className={`h-5 w-5 lg:h-6 lg:w-6 ${
                         item.key === tabActive
                           ? 'text-gray-700'
                           : 'text-gray-500'
@@ -279,14 +280,14 @@ function Profile() {
                   <button
                     key={item.key}
                     onClick={() => setTabActive(item.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                    className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
                       item.key === tabActive
-                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                        ? 'bg-blue-50 text-blue-700 lg:border-l-2 border-blue-600'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <Ticket
-                      className={`h-6 w-6 ${
+                      className={`h-5 w-5 lg:h-6 lg:w-6 ${
                         item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
                       }`}
                     />
@@ -299,14 +300,14 @@ function Profile() {
                   <button
                     key={item.key}
                     onClick={() => setTabActive(item.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                    className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
                       item.key === tabActive
-                        ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                        ? 'bg-blue-50 text-blue-700 lg:border-l-2 border-blue-600'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <Store
-                      className={`h-6 w-6 ${
+                      className={`h-5 w-5 lg:h-6 lg:w-6 ${
                         item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
                       }`}
                     />
@@ -318,16 +319,16 @@ function Profile() {
                 <button
                   key={item.key}
                   onClick={() => setTabActive(item.key)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
+                  className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
                     item.key === tabActive
-                      ? 'bg-blue-50 text-blue-700 border-l-2 border-blue-600'
+                      ? 'bg-blue-50 text-blue-700 lg:border-l-2 border-blue-600'
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
                   <img
                     src={Icon[item.icon as keyof typeof Icon]}
                     alt={item.icon}
-                    className="h-6 w-6"
+                    className="h-5 w-5 lg:h-6 lg:w-6"
                   />
                   <span className="text-sm font-light">{item.label}</span>
                 </button>
@@ -337,7 +338,7 @@ function Profile() {
         </aside>
 
         {/* Main content */}
-        <main className="min-h-[60vh]">
+        <main className="min-w-0 min-h-[60vh]">
           {tabActive === 'profile' && <ProfileContent />}
           {tabActive === 'orders' && <Order />}
           {tabActive === 'wishlist' && <Wishlist />}

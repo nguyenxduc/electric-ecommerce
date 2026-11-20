@@ -28,7 +28,9 @@ export function useAdminProducts(params?: ProductListQuery) {
 
 // Seller dashboard: own shop's products. Shares productKeys.all so
 // create/update/delete invalidation refreshes this list too.
-export function useMyShopProducts(params?: ProductListQuery & { stock?: 'low' }) {
+export function useMyShopProducts(
+  params?: ProductListQuery & { stock?: 'low'; status?: 'live' | 'hidden' }
+) {
   return useQuery<{ data: ProductListResponse }, Error>({
     queryKey: [...productKeys.all, 'mine', params],
     queryFn: () => adminProductService.listMine(params)
@@ -68,6 +70,16 @@ export function useDeleteAdminProduct() {
   const qc = useQueryClient()
   return useMutation<{ data: unknown }, Error, number>({
     mutationFn: id => adminProductService.delete(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.all })
+    }
+  })
+}
+
+export function useSetProductVisibility() {
+  const qc = useQueryClient()
+  return useMutation<unknown, Error, { id: number; is_active: boolean }>({
+    mutationFn: ({ id, is_active }) => adminProductService.setVisibility(id, is_active),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.all })
     }

@@ -179,29 +179,29 @@ function Modal({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex justify-center items-start p-4 sm:pt-16 sm:pb-8 overflow-y-auto transition-colors ${
+      className={`fixed inset-0 z-50 flex justify-center items-start sm:p-4 sm:pt-16 sm:pb-8 overflow-y-auto transition-colors ${
         open ? 'visible bg-black/30 backdrop-blur-sm' : 'invisible pointer-events-none'
       }`}
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[min(90vh,calc(100vh-2rem))] my-auto transition-all ${
+        className={`bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-sm:h-full max-sm:rounded-none sm:max-h-[min(90vh,calc(100vh-2rem))] sm:my-auto transition-all ${
           open
             ? 'scale-100 opacity-100 translate-y-0'
             : 'scale-105 opacity-0 -translate-y-4'
         }`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-blue-50">
+        <div className="flex-shrink-0 p-3 sm:p-6 border-b border-gray-100">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-2 rounded-xl bg-blue-50 max-sm:hidden">
               <img src={SearchIcon} alt="Search" className="h-5 w-5" />
             </div>
             <input
               autoFocus
               type="text"
               placeholder="Search products, categories or keywords..."
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={searchTerm}
               onChange={e => onChange(e.target.value)}
               onKeyDown={e => {
@@ -213,7 +213,7 @@ function Modal({
             />
             <button
               onClick={onSubmit}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
+              className="max-sm:hidden px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
               disabled={!searchTerm.trim()}
             >
               Search
@@ -221,17 +221,19 @@ function Modal({
             <button
               onClick={handleChooseImage}
               type="button"
-              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 inline-flex items-center gap-1.5"
+              aria-label="Search by image"
+              className="shrink-0 px-3 py-2.5 sm:py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 inline-flex items-center gap-1.5"
             >
               <Camera className="h-4 w-4" />
-              Image
+              <span className="max-sm:hidden">Image</span>
             </button>
             <button
               onClick={onClose}
               type="button"
-              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+              className="shrink-0 px-2 sm:px-3 py-2 rounded-lg sm:border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
             >
-              Close
+              <span className="sm:hidden">Cancel</span>
+              <span className="max-sm:hidden">Close</span>
             </button>
             <input
               ref={fileInputRef}
@@ -273,7 +275,7 @@ function Modal({
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6">
           {imageData && (
             <div className="mb-6 space-y-4">
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">

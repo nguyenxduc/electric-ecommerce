@@ -64,8 +64,8 @@ function AiChatWidgetInner() {
   useEffect(() => {
     if (!selectedChatId || optimisticMessages.length === 0 || messages.length === 0)
       return
-    setOptimisticMessages(prev =>
-      prev.filter(opt => {
+    setOptimisticMessages(prev => {
+      const next = prev.filter(opt => {
         if (String(opt.chatId) !== String(selectedChatId)) return true
         const matched = messages.some(m => {
           if (m.role !== 'user') return false
@@ -79,7 +79,9 @@ function AiChatWidgetInner() {
         })
         return !matched
       })
-    )
+      // Giu nguyen tham chieu khi khong bo dong nao: mang moi lam effect chay lai vo han
+      return next.length === prev.length ? prev : next
+    })
   }, [messages, optimisticMessages, selectedChatId])
 
   useEffect(() => {

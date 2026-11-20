@@ -1,4 +1,5 @@
-import { Store, ChevronRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Store, ChevronRight, MessageCircle } from 'lucide-react'
 import { formatUsd } from '../../utils/formatMoney'
 
 interface Order {
@@ -20,6 +21,7 @@ interface Order {
 }
 
 interface Product {
+  slug?: string
   name: string
   image?: string
   color?: string
@@ -32,22 +34,30 @@ interface Product {
 interface OrderDetail {
   order: Order
   onClick?: () => void
+  onContact?: () => void
+  onBuyAgain?: () => void
+  buyingAgain?: boolean
 }
 
 // Nhan trang thai theo ngon ngu nguoi mua (giong tab "To ship / Shipping" cua app san)
 const STATUS: Record<string, { label: string; cls: string }> = {
-  pending: { label: 'To confirm', cls: 'text-amber-600' },
+  pending: { label: 'To ship', cls: 'text-blue-600' },
   processing: { label: 'To ship', cls: 'text-blue-600' },
-  shipped: { label: 'Shipping', cls: 'text-indigo-600' },
-  delivered: { label: 'Delivered', cls: 'text-green-600' },
+  shipped: { label: 'To receive', cls: 'text-indigo-600' },
+  delivered: { label: 'Completed', cls: 'text-green-600' },
   cancelled: { label: 'Cancelled', cls: 'text-gray-500' },
   returned: { label: 'Returned', cls: 'text-rose-600' }
 }
 
 const isUrl = (v?: string) => typeof v === 'string' && /^https?:\/\//.test(v)
 
-const OrderCard = ({ order, onClick }: OrderDetail) => {
-  const st = STATUS[order.status || ''] || { label: order.status || '', cls: 'text-gray-600' }
+const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain }: OrderDetail) => {
+  // Don online pending la dang cho thanh toan
+  const st =
+    order.status === 'pending' && order.paymentType && order.paymentType !== 'cod'
+      ? { label: 'To pay', cls: 'text-amber-600' }
+      : STATUS[order.status || ''] || { label: order.status || '', cls: 'text-gray-600' }
+  const reviewSlug = order.status === 'delivered' ? order.products.find(p => p.slug)?.slug : undefined
   const shown = order.products.slice(0, 2)
   const more = order.products.length - shown.length
   const itemCount = order.products.reduce((n, p) => n + (p.quantity || 1), 0)
@@ -88,10 +98,15 @@ const OrderCard = ({ order, onClick }: OrderDetail) => {
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-900 line-clamp-2">{product.name}</p>
               {product.variant && <p className="text-xs text-gray-500 mt-0.5">{product.variant}</p>}
-              <p className="text-xs text-gray-500 mt-0.5">x{product.quantity ?? 1}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                x{product.quantity ?? 1}
+                {product.price != null && ` · ${formatUsd(Number(product.price))} each`}
+              </p>
             </div>
             {product.price != null && (
-              <span className="text-sm text-gray-900 shrink-0">{formatUsd(Number(product.price))}</span>
+              <span className="text-sm font-medium text-gray-900 shrink-0">
+                {formatUsd(Number(product.price) * (product.quantity ?? 1))}
+              </span>
             )}
           </li>
         ))}
@@ -104,20 +119,45 @@ const OrderCard = ({ order, onClick }: OrderDetail) => {
         <span className="text-xs text-gray-500">
           {order.orderNumber || `#${order.id}`} · {order.placedOn}
         </span>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">
-            {itemCount} item{itemCount > 1 ? 's' : ''}:{' '}
-            <span className="font-semibold text-rose-600">{formatUsd(order.total)}</span>
-          </span>
-          {onClick && (
-            <button
-              onClick={onClick}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
-            >
-              View details <ChevronRight className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+        <span className="text-sm text-gray-600">
+          {itemCount} item{itemCount > 1 ? 's' : ''}:{' '}
+          <span className="font-semibold text-rose-600">{formatUsd(order.total)}</span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center justify-end gap-2 px-4 sm:px-5 py-3 border-t border-gray-100">
+        {onContact && (
+          <button
+            onClick={onContact}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            <MessageCircle className="w-4 h-4" /> Contact shop
+          </button>
+        )}
+        {reviewSlug && (
+          <Link
+            to={`/product/${reviewSlug}#reviews`}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            Write review
+          </Link>
+        )}
+        {onBuyAgain && (
+          <button
+            onClick={onBuyAgain}
+            disabled={buyingAgain}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
+          >
+            {buyingAgain ? 'Adding...' : 'Buy again'}
+          </button>
+        )}
+        {onClick && (
+          <button
+            onClick={onClick}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+          >
+            View details <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </div>
   )

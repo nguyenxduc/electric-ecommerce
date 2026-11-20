@@ -19,7 +19,8 @@ export const addToCart = asyncHandler(async (req, res) => {
     where: {
       id: BigInt(product_id),
       deleted_at: null,
-      // Only products from active shops are purchasable
+      // Chi mua duoc hang dang ban (seller khong an) cua shop dang hoat dong
+      is_active: true,
       shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
     },
     include: { product_colors: true, variants: { where: { deleted_at: null } } },
@@ -202,7 +203,8 @@ export const getCartProducts = asyncHandler(async (req, res) => {
     const unitFinalPrice = finalPrice;
     const subtotal = finalPrice * item.quantity;
     // Bien the da xoa mem: giu dong de nguoi mua go bo, khong tinh vao tong
-    const unavailable = !!item.variant?.deleted_at;
+    // Bien the da xoa mem hoac san pham seller da an: giu dong de go bo, khong tinh tien
+    const unavailable = !!item.variant?.deleted_at || product.is_active === false;
     
     // Get first image from product.img array
     const imageUrl = Array.isArray(product.img) && product.img.length > 0 
@@ -228,7 +230,8 @@ export const getCartProducts = asyncHandler(async (req, res) => {
       id: Number(item.id),
       product_id: Number(item.product_id),
       name: product.name || '',
-      price: price,
+      // Gia goc da cong chenh lech bien the, de gach ngang khop voi final_price
+      price: price + variantDelta,
       final_price: finalPrice,
       discount: discount,
       subtotal: subtotal,
@@ -398,7 +401,7 @@ async function summarizeCart(cartId) {
   let total_original_price = 0;
   let total_price = 0;
   for (const it of items) {
-    if (it.variant?.deleted_at) continue; // bien the da xoa mem khong tinh gia
+    if (it.variant?.deleted_at || it.product.is_active === false) continue; // khong tinh gia dong khong mua duoc
     const price = Number(it.product.price);
     const discount = Number(it.product.discount || 0);
     const unit_final = price - discount + Number(it.variant?.price_delta || 0);

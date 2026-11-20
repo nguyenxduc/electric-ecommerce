@@ -1,6 +1,5 @@
 import { toast } from 'sonner'
 import axiosClient from '../../lib/axios'
-import { apiErrorResponse } from '../../lib/apiError'
 
 export type CreateOrderPayload = {
   items: Array<{
@@ -50,6 +49,7 @@ export type Order = {
     reason: string
     resolution_note: string | null
   } | null
+  invoice?: { id: number; invoice_number: string } | null
   order_items: Array<{
     id: number
     product_id: number
@@ -104,8 +104,8 @@ export const fetchMyOrders = async (): Promise<Order[]> => {
   return data
 }
 
-export const cancelMyOrder = async (orderId: number) => {
-  const { data } = await axiosClient.patch(`/orders/${orderId}/cancel`, {})
+export const cancelMyOrder = async (orderId: number, reason?: string) => {
+  const { data } = await axiosClient.patch(`/orders/${orderId}/cancel`, { reason })
   return data
 }
 
@@ -151,16 +151,6 @@ export const fetchShipment = async (orderId: number): Promise<Shipment | null> =
 
 export const reportNotReceived = async (orderId: number, note?: string) =>
   (await axiosClient.post(`/shipments/orders/${orderId}/not-received`, { note })).data
-
-export const fetchInvoice = async (orderId: number): Promise<{ id: number; invoice_number: string } | null> => {
-  try {
-    const { data } = await axiosClient.get(`/invoices/orders/${orderId}`)
-    return data.data ?? null
-  } catch (err: unknown) {
-    if (apiErrorResponse(err).status === 404) return null
-    throw err
-  }
-}
 
 // Fetch with the auth token, then open the HTML in a new tab via Blob URL
 export const openInvoiceHtml = async (invoiceId: number) => {

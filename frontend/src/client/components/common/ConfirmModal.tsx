@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 type Tone = 'info' | 'danger'
 
@@ -12,6 +12,9 @@ type Props = {
   confirmClassName?: string
   onConfirm?: () => void
   onClose: () => void
+  // Noi dung them giua mo ta va nut (vd. o chon ly do)
+  children?: ReactNode
+  confirmDisabled?: boolean
 }
 
 const ConfirmModal = ({
@@ -23,7 +26,9 @@ const ConfirmModal = ({
   tone = 'info',
   confirmClassName,
   onConfirm,
-  onClose
+  onClose,
+  children,
+  confirmDisabled
 }: Props) => {
   useEffect(() => {
     if (!open) return
@@ -47,11 +52,15 @@ const ConfirmModal = ({
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl transition"
         onClick={e => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
         {description && <p className="mt-2 text-sm text-gray-600">{description}</p>}
+        {children}
 
         <div className="mt-6 flex justify-end gap-3">
           <button
@@ -64,7 +73,8 @@ const ConfirmModal = ({
             onClick={() => {
               onConfirm?.()
             }}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition ${confirmClasses}`}
+            disabled={confirmDisabled}
+            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-60 ${confirmClasses}`}
           >
             {confirmText}
           </button>

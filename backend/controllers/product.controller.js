@@ -193,6 +193,20 @@ export const createProduct = asyncHandler(async (req, res) => {
     return BigInt(num);
   };
 
+  // Thieu truong bat buoc thi tra 400 ro rang, khong de Prisma nem loi 500.
+  const missing = [];
+  if (!String(name ?? "").trim()) missing.push("name");
+  if (price === undefined || price === null || String(price).trim() === "") missing.push("price");
+  if (!parseBigIntOrUndefined(category_id)) missing.push("category_id");
+  if (missing.length) {
+    return res.status(400).json({ message: `Missing required fields: ${missing.join(", ")}` });
+  }
+  const category = await prisma.category.findFirst({
+    where: { id: parseBigIntOrUndefined(category_id), deleted_at: null },
+    select: { id: true },
+  });
+  if (!category) return res.status(400).json({ message: "Category not found" });
+
   // Sellers always create under their own shop (client-supplied shop_id is
   // ignored); admins must name the target shop explicitly.
   let shopId;
@@ -218,14 +232,16 @@ export const createProduct = asyncHandler(async (req, res) => {
   const specsDetailJson = parseJsonArray(specs_detail);
   const colorJson = parseJsonArray(color);
 
-  let imageUrls = Array.isArray(img) ? img : [];
+  // URL anh co san (img) dung truoc, anh tai len noi tiep phia sau.
+  const imgInput = parseJsonArray(img);
+  let imageUrls = (Array.isArray(imgInput) ? imgInput : []).filter((u) => typeof u === "string");
   if (Array.isArray(req.files) && req.files.length > 0) {
     const uploads = await Promise.all(
       req.files.map((file) =>
         cloudinary.uploader.upload(file.path, { folder: "products" })
       )
     );
-    imageUrls = uploads.map((u) => u.secure_url);
+    imageUrls = [...imageUrls, ...uploads.map((u) => u.secure_url)];
   }
 
   const colorsInput =
@@ -262,10 +278,10 @@ export const createProduct = asyncHandler(async (req, res) => {
   result = await prisma.$transaction(async (tx) => {
     const savedProduct = await tx.product.create({
       data: {
-        name,
+        name: String(name).trim(),
         price: numericPrice,
         discount: numericDiscount,
-        quantity: Number(quantity),
+        quantity: Number(quantity) || 0,
         img: imageUrls,
         specs: specsJson, // ✅ JSON
         specs_detail: specsDetailJson, // ✅ JSON
@@ -433,7 +449,9 @@ export const getProductById = asyncHandler(async (req, res) => {
     req.user && product?.shop?.owner_id?.toString() === req.user.id;
   if (
     !product ||
-    (product.shop?.status !== SHOP_STATUS.ACTIVE && !isAdmin && !isShopOwner)
+    ((product.shop?.status !== SHOP_STATUS.ACTIVE || !product.is_active) &&
+      !isAdmin &&
+      !isShopOwner)
   ) {
     return res.status(404).json({ message: "Product not found" });
   }
@@ -576,7 +594,10 @@ export const updateProduct = asyncHandler(async (req, res) => {
         name: data.name ?? undefined,
         price: data.price !== undefined ? numericPrice : undefined,
         discount: data.discount !== undefined ? numericDiscount : undefined,
-        img: imageUrls ?? parsedImg ?? undefined,
+        // Anh moi tai len noi sau danh sach URL giu lai, khong ghi de.
+        img: imageUrls
+          ? [...(Array.isArray(parsedImg) ? parsedImg : []), ...imageUrls]
+          : parsedImg ?? undefined,
         specs: parsedSpecs ?? undefined,
         specs_detail: parsedSpecsDetail ?? undefined,
         category_id: parseBigIntOrUndefined(data.category_id),
@@ -637,6 +658,20 @@ export const updateProduct = asyncHandler(async (req, res) => {
     message: "Product updated successfully",
     product: updatedProduct,
   });
+});
+
+// PATCH /api/products/:id/visibility { is_active } - an/hien san pham tren san
+export const setProductVisibility = asyncHandler(async (req, res) => {
+  const { is_active } = req.body ?? {};
+  if (typeof is_active !== "boolean") {
+    return res.status(400).json({ message: "is_active must be a boolean" });
+  }
+  const product = await prisma.product.update({
+    where: { id: BigInt(req.params.id) },
+    data: { is_active },
+    select: { id: true, is_active: true },
+  });
+  res.json({ message: is_active ? "Product is live" : "Product hidden", product });
 });
 
 export const deleteProduct = asyncHandler(async (req, res) => {
@@ -755,6 +790,7 @@ export const getProductsByShop = asyncHandler(async (req, res) => {
   const where = {
     shop_id: shop.id,
     deleted_at: null,
+    is_active: true,
     ...(search && {
       name: { contains: String(search), mode: "insensitive" },
     }),
@@ -795,6 +831,9 @@ export const getMyShopProducts = asyncHandler(async (req, res) => {
     }),
     // ?stock=low: cung nguong voi o "Low stock" tren dashboard (todo.service)
     ...(req.query.stock === "low" && { quantity: { lte: LOW_STOCK_THRESHOLD } }),
+    // ?status=live|hidden: tab An/Hien tren trang san pham cua nguoi ban
+    ...(req.query.status === "live" && { is_active: true }),
+    ...(req.query.status === "hidden" && { is_active: false }),
   };
 
   const { total_count, products } = await fetchPaginatedProducts(
@@ -1011,6 +1050,7 @@ export const getSimilarProducts = asyncHandler(async (req, res) => {
     JOIN shops s ON s.id = p.shop_id
     WHERE p.id != ${BigInt(id)}
       AND p.deleted_at IS NULL
+      AND p.is_active
       AND s.status = 'active'
       AND s.deleted_at IS NULL
       AND p.description IS NOT NULL

@@ -87,6 +87,7 @@ const Payment = ({
   const selectedQty = hasVariants
     ? selectedVariant?.quantity ?? 0
     : selectedColorObj?.quantity ?? quantity
+  const needsVariant = hasVariants && !selectedVariant
   const canBuy = hasVariants ? !!selectedVariant && selectedQty > 0 : quantity > 0
   const [qty, setQty] = useState(1)
   // Thanh mua hang dinh day tren mobile: bao cho cac nut chat noi nhuong cho
@@ -359,8 +360,14 @@ const Payment = ({
       {/* Mobile: thanh mua dinh day nhu cac app san */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         <div className="min-w-0">
-          <p className="text-lg font-bold text-rose-600 leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
-          <p className="text-xs text-gray-500">Qty {buyQty}</p>
+          {needsVariant ? (
+            <p className="text-sm font-semibold text-gray-700 leading-tight">Select options</p>
+          ) : (
+            <>
+              <p className="text-lg font-bold text-rose-600 leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
+              <p className="text-xs text-gray-500">Qty {buyQty}</p>
+            </>
+          )}
         </div>
         <button
           onClick={handleAddToCart}
@@ -375,7 +382,7 @@ const Payment = ({
           disabled={(!canBuy && !(hasVariants && !selectedVariant)) || addToCartMutation.isPending}
           className="h-11 px-6 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50"
         >
-          Buy now
+          {needsVariant ? 'Select options' : 'Buy now'}
         </button>
       </div>
     </div>

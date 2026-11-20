@@ -16,7 +16,7 @@ export const adminProductService = {
     return axiosClient.get<ProductListResponse>('/products', { params })
   },
   // Seller dashboard: own shop's products (any shop status)
-  listMine(params?: ProductListQuery & { stock?: 'low' }) {
+  listMine(params?: ProductListQuery & { stock?: 'low'; status?: 'live' | 'hidden' }) {
     return axiosClient.get<ProductListResponse>('/products/shop/mine', {
       params
     })
@@ -31,6 +31,8 @@ export const adminProductService = {
     if (data?.shop_id !== undefined && data?.shop_id !== null && data?.shop_id !== '')
       form.append('shop_id', String(data.shop_id))
     if (data?.name) form.append('name', String(data.name))
+    if (data?.description !== undefined)
+      form.append('description', String(data.description))
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)
       form.append('discount', String(data.discount))
@@ -62,6 +64,8 @@ export const adminProductService = {
     const data = ((payload as { product?: Record<string, unknown> }).product ||
       payload) as Record<string, unknown>
     if (data?.name !== undefined) form.append('name', String(data.name))
+    if (data?.description !== undefined)
+      form.append('description', String(data.description))
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)
       form.append('discount', String(data.discount))
@@ -92,6 +96,10 @@ export const adminProductService = {
   },
   delete(id: number) {
     return axiosClient.delete(`/products/${id}`)
+  },
+  // An/hien san pham tren san (nguoi mua khong thay hang an)
+  setVisibility(id: number, is_active: boolean) {
+    return axiosClient.patch(`/products/${id}/visibility`, { is_active })
   },
   addSales(id: number, payload: AddSalesRequest) {
     return axiosClient.patch<AddSalesResponse>(

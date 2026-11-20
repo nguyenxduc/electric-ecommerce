@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { usePublicSettings } from '../../hooks/useSettings'
 
 import LocationIcon from '../../../assets/location-icon.svg'
@@ -17,31 +18,39 @@ const Footer = () => {
 
   // Extract settings with fallback values
   const settings = settingsData?.settings || {}
-  const companyName = settings.store_name || 'Tech Heim'
+  const companyName = settings.store_name || 'Tech Shop'
   const companyAddress =
     settings.store_address || '123 Main Street, Anytown, USA'
   const companyPhone = settings.store_phone || '+1 (555) 123-4567'
   const companyEmail = settings.store_email || 'TechHeimSupport@gmail.com'
-  const facebookUrl = settings.facebook_url || '#'
-  const instagramUrl = settings.instagram_url || '#'
-  const twitterUrl = settings.twitter_url || '#'
-  const copyrightYear = settings.copyright_year || '2023'
+  // Chua cau hinh link mang xa hoi thi an icon, khong de link chet '#'
+  const socials = [
+    { url: settings.facebook_url, label: 'Facebook', Icon: TbBrandMeta },
+    { url: settings.instagram_url, label: 'Instagram', Icon: IoLogoInstagram },
+    { url: settings.twitter_url, label: 'X (Twitter)', Icon: RiTwitterXLine }
+  ].filter(s => !!s.url)
+  const copyrightYear = settings.copyright_year || new Date().getFullYear()
 
   return (
     <footer className="border-t bg-gradient-to-b from-blue-950 to-blue-900 pt-5">
       <div className="container grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 px-6 sm:px-14">
         <div className="flex flex-col text-white font-thin space-y-1">
           <h3 className="text-xl font-normal mb-2">Company</h3>
-          <p>about us</p>
-          <p>blog</p>
-          <p>returns</p>
-          <p>order status</p>
+          <Link to="/profile?tab=orders" className="hover:text-gray-300">
+            order status
+          </Link>
+          <Link to="/profile?tab=orders" className="hover:text-gray-300">
+            returns
+          </Link>
         </div>
         <div className="flex flex-col text-white font-thin space-y-1">
-          <h3 className="text-xl font-normal mb-2">Info</h3>
-          <p>How it works?</p>
-          <p>our promises</p>
-          <p>FAQ</p>
+          <h3 className="text-xl font-normal mb-2">Shop</h3>
+          <Link to="/collection/all" className="hover:text-gray-300">
+            all products
+          </Link>
+          <Link to="/cart" className="hover:text-gray-300">
+            cart
+          </Link>
         </div>
         <div className="flex flex-col text-white font-thin space-y-1">
           <h3 className="text-xl font-normal mb-2">Contact us</h3>
@@ -83,32 +92,22 @@ const Footer = () => {
               onChange={e => setEmail(e.target.value)}
             />
           </div>
-          <div className="inline-flex space-x-5 pt-3">
-            <a
-              href={facebookUrl}
-              className="hover:text-gray-300"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <TbBrandMeta className="h-7 w-7" />
-            </a>
-            <a
-              href={instagramUrl}
-              className="hover:text-gray-300"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <IoLogoInstagram className="h-7 w-7" />
-            </a>
-            <a
-              href={twitterUrl}
-              className="hover:text-gray-300"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <RiTwitterXLine className="h-7 w-7" />
-            </a>
-          </div>
+          {socials.length > 0 && (
+            <div className="inline-flex space-x-5 pt-3">
+              {socials.map(({ url, label, Icon }) => (
+                <a
+                  key={label}
+                  href={url}
+                  aria-label={label}
+                  className="hover:text-gray-300"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icon className="h-7 w-7" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       {/* Chi liet ke phuong thuc san thuc su ho tro (xem Checkout) */}

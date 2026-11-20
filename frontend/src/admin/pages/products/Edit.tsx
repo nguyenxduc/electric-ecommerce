@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { ImageOff } from 'lucide-react'
 import {
   useAdminProduct,
   useCreateAdminProduct,
-  useUpdateAdminProduct,
-  useAdminCategories
+  useUpdateAdminProduct
 } from '../../hooks'
+import { useCategories } from '../../../client/hooks/useCategories'
+import { useValidateToken } from '../../../client/hooks/useAuth'
+import adminShopService from '../../services/shopService'
+import { apiErrorMessage } from '../../../lib/apiError'
 import VariantsEditor from './VariantsEditor'
 import {
   VariantRow,
@@ -14,7 +19,70 @@ import {
   variantsToPayload,
   variantsTotal
 } from './variantsUtil'
-import { SpecEntry } from '../../types'
+import { SpecDetailEntry, SpecEntry } from '../../types'
+
+// Mot dong thong so chi tiet tren form; group rong = dong phang {label, value}
+type SpecDetailRow = { group: string; label: string; value: string }
+
+// API tra specs_detail dang nhom [{category, items:[{label,value}]}] hoac phang
+const specsDetailToRows = (list: unknown): SpecDetailRow[] =>
+  (Array.isArray(list) ? (list as SpecDetailEntry[]) : []).flatMap(e =>
+    'items' in e && Array.isArray(e.items)
+      ? e.items.map(i => ({ group: e.category, label: i.label, value: String(i.value) }))
+      : 'label' in e
+      ? [{ group: '', label: e.label, value: String(e.value) }]
+      : []
+  )
+
+// Gom lai theo nhom de giu dung dinh dang trang chi tiet san pham doc
+const rowsToSpecsDetail = (rows: SpecDetailRow[]): SpecDetailEntry[] => {
+  const out: SpecDetailEntry[] = []
+  for (const r of rows) {
+    if (!r.group) {
+      out.push({ label: r.label, value: r.value })
+      continue
+    }
+    const g = out.find(e => 'items' in e && e.category === r.group)
+    if (g && 'items' in g) g.items.push({ label: r.label, value: r.value })
+    else out.push({ category: r.group, items: [{ label: r.label, value: r.value }] })
+  }
+  return out
+}
+
+// Anh tren form: URL da co (giu lai) hoac file moi chon (src = blob preview)
+type ImageItem = { src: string; file?: File }
+
+type FieldKey = 'shop' | 'name' | 'category' | 'price' | 'discount' | 'stock' | 'images'
+// Thu tu cuon toi loi dau tien = thu tu hien tren man hinh
+const FIELD_ORDER: FieldKey[] = ['shop', 'name', 'category', 'price', 'discount', 'stock', 'images']
+
+const inputCls = (err?: string) =>
+  `w-full border rounded px-3 py-2 ${err ? 'border-red-500' : ''}`
+
+function Field({
+  label,
+  required,
+  error,
+  className = '',
+  children
+}: {
+  label: string
+  required?: boolean
+  error?: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={className}>
+      <label className="block text-sm mb-1">
+        {label}
+        {required && <span className="text-red-600"> *</span>}
+      </label>
+      {children}
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+    </div>
+  )
+}
 
 export default function AdminProductEdit({
   basePath = '/admin/products'
@@ -22,114 +90,146 @@ export default function AdminProductEdit({
   basePath?: string
 } = {}) {
   const { id } = useParams()
-  const isNew = id === 'new'
+  // Route /products/new khong co :id; Create.tsx dung lai form nay
+  const isNew = !id || id === 'new'
   const pid = isNew ? undefined : Number(id)
   const { data } = useAdminProduct(pid as number)
   const create = useCreateAdminProduct()
   const update = useUpdateAdminProduct(pid as number)
   const nav = useNavigate()
 
-  const { data: catData } = useAdminCategories({ limit: 100 })
+  // Endpoint cong khai: nguoi ban khong co quyen goi /categories/admin
+  const { data: categories = [] } = useCategories()
+  const { data: userData } = useValidateToken()
+  const isAdmin = userData?.user?.role === 'admin'
+  // Admin tao san pham phai chon shop; nguoi ban luon tao cho shop cua minh
+  const { data: shopsData } = useQuery({
+    queryKey: ['admin-shops', 'picker'],
+    queryFn: () => adminShopService.list({ limit: 100 }),
+    enabled: isAdmin && isNew
+  })
+  const [shopId, setShopId] = useState<number | ''>('')
 
   const [name, setName] = useState('')
-  const [price, setPrice] = useState<number>(0)
+  const [description, setDescription] = useState('')
+  const [price, setPrice] = useState<number | ''>('')
+  const [discount, setDiscount] = useState<number | ''>('')
+  const [stock, setStock] = useState<number | ''>('')
   const [weightGrams, setWeightGrams] = useState<number>(500)
-  const [discountPercent, setDiscountPercent] = useState<number>(0)
-  const [, setQuantity] = useState<number>(0)
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [subCategoryId, setSubCategoryId] = useState<number | ''>('')
   const [colors, setColors] = useState<
     { name: string; code: string; quantity?: number }[]
   >([])
   const [specs, setSpecs] = useState<SpecEntry[]>([])
-  const [specsDetail, setSpecsDetail] = useState<SpecEntry[]>([])
+  const [specsDetail, setSpecsDetail] = useState<SpecDetailRow[]>([])
   const [variants, setVariants] = useState<VariantRow[]>([])
-  const [images, setImages] = useState<File[]>([])
-  const [imagePreviews, setImagePreviews] = useState<string[]>([])
-  const [imageUrls, setImageUrls] = useState<string[]>([])
-  const [existingImages, setExistingImages] = useState<string[]>([])
+  const [images, setImages] = useState<ImageItem[]>([])
+  const [broken, setBroken] = useState<string[]>([])
+  const [dragOver, setDragOver] = useState(false)
   const [newImageUrl, setNewImageUrl] = useState('')
   const [newSpecLabel, setNewSpecLabel] = useState('')
   const [newSpecValue, setNewSpecValue] = useState('')
+  const [newDetailGroup, setNewDetailGroup] = useState('')
   const [newSpecDetailLabel, setNewSpecDetailLabel] = useState('')
   const [newSpecDetailValue, setNewSpecDetailValue] = useState('')
   const [colorName, setColorName] = useState('')
   const [colorCode, setColorCode] = useState('#000000')
   const [colorQty, setColorQty] = useState<number | ''>('')
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({})
+  const clearError = (k: FieldKey) =>
+    setErrors(prev => (prev[k] ? { ...prev, [k]: undefined } : prev))
 
   useEffect(() => {
     if (!isNew && data?.data) {
       const p = data.data
       setName(p.name)
+      setDescription(p.description ?? '')
       setPrice(Number(p.price))
+      setDiscount(Number(p.discount || 0))
+      setStock(Number(p.quantity || 0))
       setWeightGrams(Number(p.weight_grams) || 500)
-      setDiscountPercent(
-        p.price
-          ? Math.round((Number(p.discount || 0) / Number(p.price)) * 100)
-          : 0
-      )
-      setQuantity(Number(p.quantity || 0))
       setCategoryId(Number(p.category_id))
       setSubCategoryId(p.sub_category_id ? Number(p.sub_category_id) : '')
-      const colorArr = (
+      setColors(
         Array.isArray(p.available_colors) && p.available_colors.length > 0
           ? p.available_colors
           : Array.isArray(p.color)
           ? p.color
           : []
       )
-      setColors(colorArr)
       setVariants(variantsFromProduct(p.variants))
       setSpecs(Array.isArray(p.specs) ? p.specs : [])
-      setSpecsDetail(
-        Array.isArray(p.specs_detail) ? p.specs_detail : []
-      )
-      // Set existing images from the product data
-      setExistingImages(Array.isArray(p.img) ? p.img : [])
-      // Clear any previous file uploads when loading existing product
-      setImages([])
-      setImagePreviews([])
+      setSpecsDetail(specsDetailToRows(p.specs_detail))
+      setImages((Array.isArray(p.img) ? p.img : []).map(src => ({ src })))
+      setBroken([])
     }
   }, [data, isNew])
 
-  const onFilesChange = (files: FileList | null) => {
+  const subCategories =
+    categories.find(c => c.id === Number(categoryId))?.sub_categories ?? []
+
+  // Ton kho lay tu bien the/mau neu co; khong thi nhap tay
+  const derivedStock = variants.length
+    ? variantsTotal(variants)
+    : colors.length
+    ? colors.reduce((s, c) => s + Number(c.quantity || 0), 0)
+    : null
+
+  // URL giu lai luu truoc, file moi noi sau (dung thu tu backend ghi) - anh dau la Cover
+  const orderedImages = [
+    ...images.filter(i => !i.file),
+    ...images.filter(i => i.file)
+  ]
+
+  const addFiles = (files: FileList | null) => {
     if (!files) return
-    const arr = Array.from(files)
-    // Append new files to existing ones instead of replacing
-    setImages(prev => [...prev, ...arr])
-    setImagePreviews(prev => [...prev, ...arr.map(f => URL.createObjectURL(f))])
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'))
+    if (!arr.length) return
+    // Noi them, khong thay the anh da chon
+    setImages(prev => [
+      ...prev,
+      ...arr.map(file => ({ src: URL.createObjectURL(file), file }))
+    ])
+    clearError('images')
   }
   const addImageUrl = () => {
     const url = newImageUrl.trim()
     if (!url) return
-    setImageUrls(prev => [...prev, url])
+    setImages(prev => [...prev, { src: url }])
     setNewImageUrl('')
+    clearError('images')
   }
-  const removeImageUrl = (index: number) => {
-    setImageUrls(prev => prev.filter((_, i) => i !== index))
+  const removeImage = (item: ImageItem) => {
+    if (item.file) URL.revokeObjectURL(item.src)
+    setImages(prev => prev.filter(i => i !== item))
   }
-  const removeImagePreview = (index: number) => {
-    setImagePreviews(prev => prev.filter((_, i) => i !== index))
-    setImages(prev => prev.filter((_, i) => i !== index))
-  }
-  const removeColor = (index: number) => {
-    setColors(prev => prev.filter((_, i) => i !== index))
-  }
-  const removeSpec = (index: number) => {
-    setSpecs(prev => prev.filter((_, i) => i !== index))
-  }
-  const removeSpecDetail = (index: number) => {
-    setSpecsDetail(prev => prev.filter((_, i) => i !== index))
+
+  const validate = () => {
+    const e: Partial<Record<FieldKey, string>> = {}
+    const priceNum = Number(price)
+    const discountNum = Number(discount || 0)
+    if (isAdmin && isNew && shopId === '') e.shop = 'Select a shop'
+    if (!name.trim()) e.name = 'Product name is required'
+    if (categoryId === '') e.category = 'Select a category'
+    if (price === '' || !(priceNum > 0)) e.price = 'Price must be greater than 0'
+    if (discountNum < 0 || (priceNum > 0 && discountNum >= priceNum))
+      e.discount = 'Discount must be at least 0 and less than the price'
+    if (derivedStock === null && (stock === '' || !Number.isInteger(Number(stock)) || Number(stock) < 0))
+      e.stock = 'Stock must be a whole number of 0 or more'
+    if (images.length === 0) e.images = 'Add at least one image'
+    return e
   }
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (Number(price) < 0) {
-      toast.error('Price cannot be negative')
-      return
-    }
-    if (!isNew && (Number(discountPercent) < 0 || Number(discountPercent) > 100)) {
-      toast.error('Discount must be between 0 and 100%')
+    const found = validate()
+    setErrors(found)
+    const first = FIELD_ORDER.find(k => found[k])
+    if (first) {
+      const el = document.getElementById(`pf-${first}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) el.focus({ preventScroll: true })
       return
     }
     const colorsPayload = colors.map(c => ({
@@ -137,44 +237,34 @@ export default function AdminProductEdit({
       code: c.code,
       quantity: Number(c.quantity || 0)
     }))
-    const totalQty = variants.length
-      ? variantsTotal(variants)
-      : colorsPayload.reduce((s, c) => s + Number(c.quantity || 0), 0)
     const variantsPayload = variantsToPayload(variants)
+    const payload = {
+      name: name.trim(),
+      description,
+      price: Number(price),
+      discount: Number(discount || 0),
+      quantity: derivedStock ?? Number(stock),
+      weight_grams: weightGrams || undefined,
+      category_id: Number(categoryId),
+      color: colorsPayload,
+      product_colors: colorsPayload,
+      specs,
+      specs_detail: rowsToSpecsDetail(specsDetail),
+      img: images.filter(i => !i.file).map(i => i.src),
+      images: images.flatMap(i => (i.file ? [i.file] : []))
+    }
     try {
       if (isNew) {
         await create.mutateAsync({
-          name,
-          price: Number(price),
-          quantity: totalQty,
-          weight_grams: weightGrams || undefined,
-          category_id: Number(categoryId || 0),
-          sub_category_id:
-            subCategoryId === '' ? undefined : Number(subCategoryId),
-          img: imageUrls,
-          color: colorsPayload,
-          product_colors: colorsPayload,
-          specs,
-          specs_detail: specsDetail,
+          ...payload,
+          shop_id: isAdmin && shopId !== '' ? Number(shopId) : undefined,
+          sub_category_id: subCategoryId === '' ? undefined : Number(subCategoryId),
           variants: variantsPayload.length ? variantsPayload : undefined
         })
       } else {
-        const discountAmount =
-          (Number(price) * Number(discountPercent || 0)) / 100
         await update.mutateAsync({
-          name,
-          price: Number(price),
-          discount: Number(discountAmount.toFixed(2)),
-          quantity: totalQty,
-          weight_grams: weightGrams || undefined,
-          category_id: categoryId === '' ? undefined : Number(categoryId),
+          ...payload,
           sub_category_id: subCategoryId === '' ? null : Number(subCategoryId),
-          color: colorsPayload,
-          product_colors: colorsPayload,
-          img: [...existingImages, ...imageUrls], // Combine existing and new URL images
-          images, // New file uploads
-          specs, // ✅ ADD: specs
-          specs_detail: specsDetail, // ✅ ADD: specs_detail
           variants: variantsPayload // full set; missing ones are removed
         })
       }
@@ -196,103 +286,164 @@ export default function AdminProductEdit({
       } else {
         nav(basePath)
       }
-    } catch {
-      toast.error('Failed to save product')
+    } catch (err) {
+      toast.error(apiErrorMessage(err, 'Failed to save product'))
     }
   }
 
+  const saving = create.isPending || update.isPending
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">
-            {isNew ? 'Add Product' : 'Edit Product'}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {!isNew && (
-            <button className="px-3 py-2 border rounded">Save to draft</button>
-          )}
-          <button
-            onClick={onSubmit}
-            className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
-            disabled={create.isPending || update.isPending}
-          >
-            {create.isPending || update.isPending
-              ? 'Saving...'
-              : isNew
-              ? 'Publish Product'
-              : 'Save'}
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">
+          {isNew ? 'Add Product' : 'Edit Product'}
+        </h1>
+        <button
+          type="submit"
+          form="product-form"
+          className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
+          disabled={saving}
+        >
+          {saving ? 'Saving...' : isNew ? 'Publish Product' : 'Save'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4">
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form id="product-form" onSubmit={onSubmit} noValidate className="space-y-4 min-w-0">
           <div className="bg-white rounded border p-4">
             <div className="font-semibold mb-3">Basic Information</div>
             <div className="grid md:grid-cols-2 gap-3">
-              <div className="md:col-span-2">
-                <label className="block text-sm mb-1">Product Name</label>
+              {isAdmin && isNew && (
+                <Field label="Shop" required error={errors.shop} className="md:col-span-2">
+                  <select
+                    id="pf-shop"
+                    className={inputCls(errors.shop)}
+                    value={shopId}
+                    onChange={e => {
+                      setShopId(e.target.value ? Number(e.target.value) : '')
+                      clearError('shop')
+                    }}
+                  >
+                    <option value="">Select shop</option>
+                    {shopsData?.data?.data?.shops?.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.status})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+              <Field label="Product Name" required error={errors.name} className="md:col-span-2">
                 <input
-                  className="w-full border rounded px-3 py-2"
+                  id="pf-name"
+                  className={inputCls(errors.name)}
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => {
+                    setName(e.target.value)
+                    clearError('name')
+                  }}
                 />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Category</label>
+              </Field>
+              <Field label="Category" required error={errors.category}>
                 <select
-                  className="w-full border rounded px-3 py-2"
+                  id="pf-category"
+                  className={inputCls(errors.category)}
                   value={categoryId}
-                  onChange={e =>
+                  onChange={e => {
                     setCategoryId(e.target.value ? Number(e.target.value) : '')
-                  }
+                    setSubCategoryId('')
+                    clearError('category')
+                  }}
                 >
                   <option value="">Select category</option>
-                  {catData?.data?.categories?.map(c => (
+                  {categories.map(c => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
                   ))}
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-sm mb-1">Weight (grams, for shipping)</label>
+              </Field>
+              <Field label="Subcategory">
+                <select
+                  className={inputCls()}
+                  value={subCategoryId}
+                  disabled={subCategories.length === 0}
+                  onChange={e =>
+                    setSubCategoryId(e.target.value ? Number(e.target.value) : '')
+                  }
+                >
+                  <option value="">None</option>
+                  {subCategories.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Product Price" required error={errors.price}>
+                <input
+                  id="pf-price"
+                  type="number"
+                  min={0}
+                  className={inputCls(errors.price)}
+                  value={price}
+                  onChange={e => {
+                    setPrice(e.target.value === '' ? '' : Number(e.target.value))
+                    clearError('price')
+                  }}
+                />
+              </Field>
+              <Field label="Discount (amount off price)" error={errors.discount}>
+                <input
+                  id="pf-discount"
+                  type="number"
+                  min={0}
+                  className={inputCls(errors.discount)}
+                  value={discount}
+                  onChange={e => {
+                    setDiscount(e.target.value === '' ? '' : Number(e.target.value))
+                    clearError('discount')
+                  }}
+                />
+              </Field>
+              <Field label="Stock" required error={errors.stock}>
+                <input
+                  id="pf-stock"
+                  type="number"
+                  min={0}
+                  step={1}
+                  className={inputCls(errors.stock)}
+                  value={derivedStock ?? stock}
+                  disabled={derivedStock !== null}
+                  onChange={e => {
+                    setStock(e.target.value === '' ? '' : Number(e.target.value))
+                    clearError('stock')
+                  }}
+                />
+                {derivedStock !== null && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Total of {variants.length ? 'variants' : 'colors'}
+                  </p>
+                )}
+              </Field>
+              <Field label="Weight (grams, for shipping)">
                 <input
                   type="number"
                   min={1}
-                  className="w-full border rounded px-3 py-2"
+                  className={inputCls()}
                   value={weightGrams}
                   onChange={e => setWeightGrams(Number(e.target.value))}
                 />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Product Price</label>
-                <input
-                  type="number"
-                  min={0}
-                  className="w-full border rounded px-3 py-2"
-                  value={price === 0 ? '' : price}
-                  onChange={e =>
-                    setPrice(e.target.value === '' ? 0 : Number(e.target.value))
-                  }
+              </Field>
+              <Field label="Description" className="md:col-span-2">
+                <textarea
+                  rows={5}
+                  className={inputCls()}
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
                 />
-              </div>
-              {!isNew && (
-                <div>
-                  <label className="block text-sm mb-1">Discount (%)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    className="w-full border rounded px-3 py-2"
-                    value={discountPercent}
-                    onChange={e => setDiscountPercent(Number(e.target.value))}
-                  />
-                </div>
-              )}
+              </Field>
             </div>
           </div>
           <div className="bg-white rounded border p-4">
@@ -311,7 +462,7 @@ export default function AdminProductEdit({
                       <button
                         type="button"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center"
-                        onClick={() => removeSpec(idx)}
+                        onClick={() => setSpecs(prev => prev.filter((_, i) => i !== idx))}
                         aria-label="Remove spec"
                       >
                         ×
@@ -322,13 +473,13 @@ export default function AdminProductEdit({
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
                   <input
                     placeholder="Label"
-                    className="border rounded px-2 py-1 text-sm"
+                    className="border rounded px-2 py-1 text-sm min-w-0"
                     value={newSpecLabel}
                     onChange={e => setNewSpecLabel(e.target.value)}
                   />
                   <input
                     placeholder="Value"
-                    className="border rounded px-2 py-1 text-sm"
+                    className="border rounded px-2 py-1 text-sm min-w-0"
                     value={newSpecValue}
                     onChange={e => setNewSpecValue(e.target.value)}
                   />
@@ -358,12 +509,13 @@ export default function AdminProductEdit({
                       key={idx}
                       className="relative text-sm flex items-center gap-2 pr-6 border rounded px-2 py-1"
                     >
+                      {s.group && <span className="text-gray-500">{s.group} ·</span>}
                       <span className="font-medium">{s.label}:</span>
-                      <span>{String(s.value)}</span>
+                      <span>{s.value}</span>
                       <button
                         type="button"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center"
-                        onClick={() => removeSpecDetail(idx)}
+                        onClick={() => setSpecsDetail(prev => prev.filter((_, i) => i !== idx))}
                         aria-label="Remove spec detail"
                       >
                         ×
@@ -371,16 +523,22 @@ export default function AdminProductEdit({
                     </div>
                   ))}
                 </div>
-                <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center">
+                  <input
+                    placeholder="Group (e.g. Display)"
+                    className="border rounded px-2 py-1 text-sm min-w-0"
+                    value={newDetailGroup}
+                    onChange={e => setNewDetailGroup(e.target.value)}
+                  />
                   <input
                     placeholder="Label"
-                    className="border rounded px-2 py-1 text-sm"
+                    className="border rounded px-2 py-1 text-sm min-w-0"
                     value={newSpecDetailLabel}
                     onChange={e => setNewSpecDetailLabel(e.target.value)}
                   />
                   <input
                     placeholder="Value"
-                    className="border rounded px-2 py-1 text-sm"
+                    className="border rounded px-2 py-1 text-sm min-w-0"
                     value={newSpecDetailValue}
                     onChange={e => setNewSpecDetailValue(e.target.value)}
                   />
@@ -392,6 +550,7 @@ export default function AdminProductEdit({
                         setSpecsDetail(prev => [
                           ...prev,
                           {
+                            group: newDetailGroup.trim(),
                             label: newSpecDetailLabel,
                             value: newSpecDetailValue
                           }
@@ -410,143 +569,108 @@ export default function AdminProductEdit({
           <VariantsEditor rows={variants} onChange={setVariants} />
         </form>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           <div className="bg-white rounded border p-4">
-            <div className="font-semibold mb-3">Images</div>
-
-            {/* Image URL Input */}
-            <div className="mb-4">
-              <label className="block text-sm mb-2">Add Image URL</label>
-              <div className="flex gap-2">
-                <input
-                  className="border rounded px-3 py-2 flex-1"
-                  placeholder="Paste image URL"
-                  value={newImageUrl}
-                  onChange={e => setNewImageUrl(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="px-3 py-2 border rounded"
-                  onClick={addImageUrl}
-                >
-                  Add URL
-                </button>
-              </div>
+            <div className="font-semibold mb-3">
+              Images<span className="text-red-600"> *</span>
             </div>
 
-            {/* File Upload */}
-            {!isNew && (
-              <div className="mb-4">
-                <label className="block text-sm mb-2">Upload New Images</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                  <label className="cursor-pointer">
-                    <input
-                      multiple
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => onFilesChange(e.target.files)}
-                    />
-                    <div className="text-gray-500">
-                      <div className="text-lg mb-2">📁</div>
-                      <div>Click to browse files or drag and drop</div>
-                      <div className="text-xs mt-1">
-                        PNG, JPG, GIF up to 10MB
-                      </div>
-                    </div>
-                  </label>
+            <div
+              id="pf-images"
+              onDragOver={e => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => {
+                e.preventDefault()
+                setDragOver(false)
+                addFiles(e.dataTransfer.files)
+              }}
+              className={`mb-3 border-2 border-dashed rounded-lg p-4 text-center ${
+                dragOver
+                  ? 'border-blue-500 bg-blue-50'
+                  : errors.images
+                  ? 'border-red-400'
+                  : 'border-gray-300'
+              }`}
+            >
+              <label className="cursor-pointer block">
+                <input
+                  multiple
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="product-image-input"
+                  onChange={e => {
+                    addFiles(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+                <div className="text-gray-500 text-sm">
+                  <div>Click to browse or drag and drop images</div>
+                  <div className="text-xs mt-1">PNG, JPG, GIF up to 10MB. First image is the cover.</div>
                 </div>
-              </div>
-            )}
+              </label>
+            </div>
+            {errors.images && <p className="text-xs text-red-600 -mt-2 mb-3">{errors.images}</p>}
 
-            {/* Current Images */}
-            <div>
-              <label className="block text-sm mb-2">Current Images</label>
-              <div className="flex gap-2 flex-wrap">
-                {/* Existing Images from Product */}
-                {existingImages.map((src, i) => (
-                  <div key={`existing-${i}`} className="relative group">
-                    <img
-                      src={src}
-                      className="h-20 w-20 object-cover rounded border"
-                      onError={e => {
-                        e.currentTarget.src =
-                          'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiAxNkM4LjY4NjI5IDE2IDYgMTMuMzEzNyA2IDEwQzYgNi42ODYyOSA4LjY4NjI5IDQgMTIgNEMxNS4zMTM3IDQgMTggNi42ODYyOSAxOCAxMEMxOCAxMy4zMTM3IDE1LjMxMzcgMTYgMTIgMTZaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik0xMiAxNEMxMy4xMDQ2IDE0IDE0IDEzLjEwNDYgMTQgMTJDMTQgMTAuODk1NCAxMy4xMDQ2IDEwIDEyIDEwQzEwLjg5NTQgMTAgMTAgMTAuODk1NCAxMCAxMkMxMCAxMy4xMDQ2IDEwLjg5NTQgMTQgMTIgMTRaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K'
-                      }}
-                    />
-                    <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs px-1 rounded-bl">
-                      EXISTING
-                    </div>
-                    <button
-                      type="button"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() =>
-                        setExistingImages(prev =>
-                          prev.filter((_, idx) => idx !== i)
-                        )
-                      }
-                      aria-label="Remove image"
+            <div className="mb-3 flex gap-2">
+              <input
+                className="border rounded px-3 py-2 flex-1 min-w-0 text-sm"
+                placeholder="Or paste image URL"
+                value={newImageUrl}
+                onChange={e => setNewImageUrl(e.target.value)}
+              />
+              <button type="button" className="px-3 py-2 border rounded text-sm" onClick={addImageUrl}>
+                Add URL
+              </button>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+              {orderedImages.map((item, i) => (
+                <div key={`${i}-${item.src}`} className="relative">
+                  {broken.includes(item.src) ? (
+                    <div
+                      className="h-20 w-20 rounded border bg-gray-100 text-gray-400 flex flex-col items-center justify-center text-[10px]"
+                      title={item.src}
                     >
-                      ×
-                    </button>
-                  </div>
-                ))}
-
-                {/* URL Images */}
-                {imageUrls.map((src, i) => (
-                  <div key={`url-${i}`} className="relative group">
-                    <img
-                      src={src}
-                      className="h-20 w-20 object-cover rounded border"
-                      onError={e => {
-                        e.currentTarget.src =
-                          'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiAxNkM4LjY4NjI5IDE2IDYgMTMuMzEzNyA2IDEwQzYgNi42ODYyOSA4LjY4NjI5IDQgMTIgNEMxNS4zMTM3IDQgMTggNi42ODYyOSAxOCAxMEMxOCAxMy4zMTM3IDE1LjMxMzcgMTYgMTIgMTZaIiBmaWxsPSIjOUI5QkEwIi8+CjxwYXRoIGQ9Ik0xMiAxNEMxMy4xMDQ2IDE0IDE0IDEzLjEwNDYgMTQgMTJDMTQgMTAuODk1NCAxMy4xMDQ2IDEwIDEyIDEwQzEwLjg5NTQgMTAgMTAgMTAuODk1NCAxMCAxMkMxMCAxMy4xMDQ2IDEwLjg5NTQgMTQgMTIgMTRaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K'
-                      }}
-                    />
-                    <div className="absolute top-0 right-0 bg-blue-500 text-white text-xs px-1 rounded-bl">
-                      URL
+                      <ImageOff size={18} />
+                      Broken link
                     </div>
-                    <button
-                      type="button"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => removeImageUrl(i)}
-                      aria-label="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-
-                {/* File Images */}
-                {imagePreviews.map((src, i) => (
-                  <div key={`file-${i}`} className="relative group">
+                  ) : (
                     <img
-                      src={src}
-                      className="h-20 w-20 object-cover rounded border"
+                      src={item.src}
+                      alt=""
+                      className="h-20 w-20 object-cover rounded border bg-gray-100"
+                      onError={() => setBroken(prev => [...prev, item.src])}
                     />
-                    <div className="absolute top-0 right-0 bg-green-500 text-white text-xs px-1 rounded-bl">
-                      NEW FILE
-                    </div>
-                    <button
-                      type="button"
-                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => removeImagePreview(i)}
-                      aria-label="Remove image"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-
-                {/* Empty state */}
-                {existingImages.length === 0 &&
-                  imageUrls.length === 0 &&
-                  imagePreviews.length === 0 && (
-                    <div className="h-20 w-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 text-xs">
-                      No images
+                  )}
+                  {i === 0 && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center rounded-b">
+                      Cover
                     </div>
                   )}
-              </div>
+                  {item.file && (
+                    <div className="absolute top-0 left-0 bg-green-500 text-white text-[10px] px-1 rounded-br">
+                      NEW
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center"
+                    onClick={() => removeImage(item)}
+                    aria-label="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {orderedImages.length === 0 && (
+                <div className="h-20 w-20 border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 text-xs">
+                  No images
+                </div>
+              )}
             </div>
           </div>
 
@@ -568,7 +692,7 @@ export default function AdminProductEdit({
                     <button
                       type="button"
                       className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-600 text-white text-xs flex items-center justify-center"
-                      onClick={() => removeColor(idx)}
+                      onClick={() => setColors(prev => prev.filter((_, i) => i !== idx))}
                       aria-label="Remove color"
                     >
                       ×

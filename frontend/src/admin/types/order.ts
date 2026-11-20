@@ -38,6 +38,9 @@ export type ShippingAddress = {
   state?: string
   zip_code?: string
   country?: string
+  ward?: string
+  district?: string
+  province?: string
 }
 
 export type AdminOrder = {
@@ -56,6 +59,10 @@ export type AdminOrder = {
   receiver_name?: string | null
   receiver_phone?: string | null
   shop?: { id?: number; name?: string } | null
+  shop_id?: number
+  shipping_fee?: number | string
+  // Chi tiet don: biet don online da tra tien chua
+  order_group?: { id: number; group_number?: string; payments?: { status: string }[] } | null
 }
 
 export type OrderResponse = AdminOrder
@@ -79,6 +86,8 @@ export type CancelOrderResponse = SuccessResponse<{
 
 export type UpdateOrderStatusRequest = {
   status: OrderStatus
+  // Ly do huy, luu vao audit log
+  reason?: string
 }
 
 export type UpdateOrderStatusResponse = SuccessResponse<{

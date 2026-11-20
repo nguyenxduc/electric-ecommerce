@@ -22,7 +22,10 @@ interface ProductDetailProps {
 }
 
 const ProductDetail = ({ product }: ProductDetailProps) => {
-  const [selectedInfo, setSelectedInfo] = useState('description')
+  // /product/<slug>#reviews (nut "Write review" o don hang) mo thang tab danh gia
+  const [selectedInfo, setSelectedInfo] = useState(() =>
+    window.location.hash === '#reviews' ? 'comment' : 'description'
+  )
   const [mainImage, setMainImage] = useState(
     'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
   )
@@ -45,6 +48,10 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
 
   useEffect(() => {
     // Scroll to top only when the product changes, not on every render or tab switch
+    if (window.location.hash === '#reviews') {
+      document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [product?.id])
 
@@ -231,7 +238,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
         )}
 
         {/* Tabs Section */}
-        <div className="mt-12">
+        <div id="reviews" className="mt-12 scroll-mt-24">
           <nav className="border-b border-gray-200 overflow-x-auto">
             <div className="flex gap-6 sm:gap-8 whitespace-nowrap">
               <button

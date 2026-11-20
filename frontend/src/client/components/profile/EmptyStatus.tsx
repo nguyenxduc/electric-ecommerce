@@ -3,6 +3,7 @@ const EmptySVG = () => (
     width="314"
     height="235"
     viewBox="0 0 314 235"
+    className="max-w-full h-auto"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     xmlnsXlink="http://www.w3.org/1999/xlink"
@@ -36,13 +37,11 @@ const EmptySVG = () => (
   </svg>
 )
 
-const EmptyState = () => {
+const EmptyState = ({ message = 'You have not placed any orders yet' }: { message?: string }) => {
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <EmptySVG />
-      <p className="text-gray-600 text-lg">
-        You have not placed any orders yet
-      </p>
+      <p className="text-gray-600 text-lg text-center">{message}</p>
     </div>
   )
 }

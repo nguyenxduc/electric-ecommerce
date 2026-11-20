@@ -13,13 +13,23 @@ import {
 
 const orderKeys = {
   all: ['admin', 'orders'] as const,
-  list: (params?: { page?: number; limit?: number; status?: string; q?: string }) =>
+  list: (params?: AdminOrderListParams) =>
     [...orderKeys.all, 'list', params] as const,
   detail: (id: number) => [...orderKeys.all, id] as const,
   stats: ['admin', 'orders', 'stats'] as const
 }
 
-export function useAdminOrders(params?: { page?: number; limit?: number; status?: string; q?: string }) {
+export type AdminOrderListParams = {
+  page?: number
+  limit?: number
+  status?: string
+  q?: string
+  shop_id?: number
+  from?: string
+  to?: string
+}
+
+export function useAdminOrders(params?: AdminOrderListParams) {
   return useQuery<{ data: OrderListResponse }, Error>({
     queryKey: orderKeys.list(params),
     queryFn: () => adminOrderService.list(params)

@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Heart, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Heart, ShoppingCart, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -7,6 +7,9 @@ import {
   useRemoveFromWishlist,
   useClearWishlist
 } from '../../hooks/useWishlist'
+import { useAddToCart } from '../../hooks/useCart'
+import { apiErrorMessage } from '../../../lib/apiError'
+import type { WishlistItem } from '../../services/wishlistService'
 import ConfirmModal from '../common/ConfirmModal'
 import { makeProductSlug } from '../../utils/productSlug'
 
@@ -15,6 +18,7 @@ export default function Wishlist() {
   const { data: wishlistData, isLoading } = useWishlist()
   const removeMutation = useRemoveFromWishlist()
   const clearMutation = useClearWishlist()
+  const addToCartMutation = useAddToCart()
   const [pendingRemove, setPendingRemove] = useState<{
     id: number
     name: string
@@ -51,6 +55,22 @@ export default function Wishlist() {
         toast.error('Failed to clear wishlist')
       }
     })
+  }
+
+  const handleAddToCart = (product: WishlistItem['product'], productSlug: string) => {
+    // Can chon bien the/mau thi backend tu choi: mo trang san pham de nguoi mua chon
+    if ((product._count?.variants ?? 0) > 0 || (product._count?.product_colors ?? 0) > 0) {
+      toast.info('Choose an option for this product')
+      navigate(`/product/${productSlug}`)
+      return
+    }
+    addToCartMutation.mutate(
+      { productId: parseInt(product.id), payload: { quantity: 1 } },
+      {
+        onSuccess: () => toast.success('Added to cart'),
+        onError: err => toast.error(apiErrorMessage(err, 'Failed to add to cart'))
+      }
+    )
   }
 
   const formatPrice = (price: string, discount: string) => {
@@ -165,39 +185,66 @@ export default function Wishlist() {
               const productSlug = makeProductSlug(product.name, productId)
               const mainImage =
                 product.img && product.img.length > 0 ? product.img[0] : ''
+              const priceNum = parseFloat(product.price)
+              const discountNum = parseFloat(product.discount)
+              const discountPct =
+                priceNum > 0 && discountNum > 0
+                  ? Math.round((discountNum / priceNum) * 100)
+                  : 0
+              const openProduct = () => navigate(`/product/${productSlug}`)
 
               return (
                 <div
                   key={item.id}
-                  className="flex gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition"
+                  role="link"
+                  tabIndex={0}
+                  onClick={openProduct}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') openProduct()
+                  }}
+                  className="flex cursor-pointer flex-wrap gap-4 p-4 border border-gray-200 rounded-lg hover:shadow-md transition sm:flex-nowrap"
                 >
-                  <div
-                    className="w-24 h-24 flex-shrink-0 cursor-pointer"
-                    onClick={() => navigate(`/product/${productSlug}`)}
-                  >
+                  <div className="relative w-24 h-24 flex-shrink-0">
                     <img
                       src={mainImage}
                       alt={product.name}
                       className="w-full h-full object-cover rounded-lg"
                     />
+                    {discountPct > 0 && (
+                      <span className="absolute left-1 top-1 rounded bg-red-500 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                        -{discountPct}%
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h3
-                      className="text-lg font-semibold text-gray-900 mb-1 cursor-pointer hover:text-blue-600 transition"
-                      onClick={() => navigate(`/product/${productSlug}`)}
-                    >
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1 hover:text-blue-600 transition">
                       {product.name}
                     </h3>
                     <div className="mb-2">
                       {formatPrice(product.price, product.discount)}
                     </div>
+                    {product.quantity <= 0 && (
+                      <p className="text-sm text-red-500">Out of stock</p>
+                    )}
                   </div>
 
-                  <div className="flex flex-col">
+                  <div
+                    className="flex w-full gap-2 sm:w-auto sm:flex-col"
+                    onClick={e => e.stopPropagation()}
+                    onKeyDown={e => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => handleAddToCart(product, productSlug)}
+                      disabled={product.quantity <= 0 || addToCartMutation.isPending}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>Add to cart</span>
+                    </button>
                     <button
                       onClick={() => handleRemove(productId, product.name)}
-                      className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition flex items-center gap-2"
+                      className="flex-1 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition flex items-center justify-center gap-2"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Remove</span>

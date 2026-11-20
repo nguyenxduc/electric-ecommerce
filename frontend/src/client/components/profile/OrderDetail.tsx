@@ -1,10 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiErrorMessage } from '../../../lib/apiError'
 import { formatUsd } from '../../utils/formatMoney'
 import {
-  fetchInvoice,
   fetchShipment,
   openInvoiceHtml,
   reportNotReceived
@@ -24,9 +24,11 @@ interface Order {
   paymentType?: string
   transactionId?: string
   amountPaid?: number
+  invoice?: { id: number; invoice_number: string } | null
 }
 
 interface Product {
+  slug?: string
   name: string
   image?: string
   color?: string
@@ -43,17 +45,27 @@ interface OrderDetail {
 // Ma phuong thuc thanh toan -> nhan cho nguoi mua
 const PAYMENT_LABEL: Record<string, string> = { cod: 'Cash on delivery', momo: 'MoMo' }
 
+// Trang thai van don (ma carrier) -> nhan de hieu cho nguoi mua
+const SHIPMENT_LABEL: Record<string, string> = {
+  created: 'Order handed to carrier',
+  picked: 'Parcel picked up',
+  in_transit: 'On the way',
+  out_for_delivery: 'Out for delivery',
+  delivered: 'Delivered',
+  failed: 'Delivery attempt failed',
+  returned: 'Returned to seller',
+  cancelled: 'Shipment cancelled'
+}
+const shipmentLabel = (s: string) => SHIPMENT_LABEL[s] || s.replace(/_/g, ' ')
+
 const OrderDetails = ({ order }: OrderDetail) => {
   const { data: shipment } = useQuery({
     queryKey: ['shipment', order.id],
     queryFn: () => fetchShipment(order.id),
     retry: false
   })
-  const { data: invoice } = useQuery({
-    queryKey: ['invoice', order.id],
-    queryFn: () => fetchInvoice(order.id),
-    retry: false
-  })
+  // Hoa don di kem danh sach don (GET /orders/user/orders), khong goi rieng nua
+  const invoice = order.invoice
   const [note, setNote] = useState('')
   const [reported, setReported] = useState(false)
   const report = useMutation({
@@ -66,7 +78,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
   })
 
   return (
-    <div className="bg-white rounded-lg p-6">
+    <div className="bg-white rounded-lg p-4 sm:p-6">
       <div className="flex flex-col mb-10">
         <dl className="rounded-xl border border-gray-100 divide-y divide-gray-100 text-sm">
           {(
@@ -93,41 +105,50 @@ const OrderDetails = ({ order }: OrderDetail) => {
         <div className="mb-8 border border-gray-200 rounded-lg p-4">
           <h3 className="font-semibold mb-2">Shipment tracking</h3>
           <p className="text-sm text-gray-600">
-            Carrier: <span className="font-medium">{shipment.carrier}</span>
+            {/* carrier "mock" la carrier gia lap, nguoi mua chi can thay "Standard delivery" */}
+            <span className="font-medium">
+              {shipment.carrier && shipment.carrier !== 'mock' ? shipment.carrier : 'Standard delivery'}
+            </span>
             {shipment.tracking_code && (
               <>
                 {' '}
-                · Tracking code:{' '}
-                <span className="font-mono">{shipment.tracking_code}</span>
+                · Tracking code: <span className="font-mono break-all">{shipment.tracking_code}</span>
               </>
             )}
           </p>
           <p className="text-sm text-gray-600 mb-2">
-            Status: <span className="font-medium">{shipment.status}</span>
+            Status: <span className="font-medium">{shipmentLabel(shipment.status)}</span>
           </p>
+          {/* COD tren van don tinh bang VND cho carrier; nguoi mua thay tong don bang USD */}
           {shipment.cod_amount_vnd > 0 && (
             <p className="text-sm text-gray-600 mb-2">
-              COD amount to pay on delivery:{' '}
-              <span className="font-medium">
-                {shipment.cod_amount_vnd.toLocaleString('vi-VN')}₫
-              </span>
+              {shipment.status === 'delivered' ? 'Paid on delivery' : 'Cash to pay on delivery'}:{' '}
+              <span className="font-medium">{formatUsd(order.amountPaid ?? order.total)}</span>
             </p>
           )}
           {shipment.events?.length > 0 && (
-            <ol className="border-l-2 border-gray-200 ml-1 space-y-2 mt-3">
+            <ol className="mt-4 space-y-4">
               {[...shipment.events]
-                .sort(
-                  (a, b) =>
-                    new Date(b.occurred_at).getTime() -
-                    new Date(a.occurred_at).getTime()
-                )
-                .map(ev => (
-                  <li key={ev.id} className="pl-3 text-sm">
-                    <span className="font-medium">{ev.status}</span>
-                    {ev.description && ` - ${ev.description}`}
-                    <span className="block text-xs text-gray-400">
-                      {new Date(ev.occurred_at).toLocaleString('en-GB')}
-                    </span>
+                .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+                .map((ev, i) => (
+                  <li key={ev.id} className="relative pl-6 text-sm">
+                    {i < shipment.events.length - 1 && (
+                      <span className="absolute left-[5px] top-4 -bottom-4 w-0.5 bg-gray-200" />
+                    )}
+                    <span
+                      className={`absolute left-0 top-1 w-3 h-3 rounded-full ${
+                        i === 0 ? 'bg-green-500 ring-4 ring-green-100' : 'bg-gray-300'
+                      }`}
+                    />
+                    <p className={i === 0 ? 'font-medium text-gray-900' : 'text-gray-600'}>
+                      {shipmentLabel(ev.status)}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(ev.occurred_at).toLocaleString('en-GB', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      })}
+                    </p>
                   </li>
                 ))}
             </ol>
@@ -193,10 +214,10 @@ const OrderDetails = ({ order }: OrderDetail) => {
           return (
             <div
               key={`${product.name}-${index}`}
-              className="flex items-center justify-between border-b border-gray-100 pb-4"
+              className="flex items-center justify-between gap-3 border-b border-gray-100 pb-4"
             >
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center text-2xl overflow-hidden">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-16 h-16 shrink-0 bg-gray-100 rounded-lg flex items-center justify-center text-2xl overflow-hidden">
                   {typeof product.image === 'string' &&
                   product.image.startsWith('http') ? (
                     <img
@@ -211,8 +232,8 @@ const OrderDetails = ({ order }: OrderDetail) => {
                     <span>{product.image || '🛒'}</span>
                   )}
                 </div>
-                <div>
-                  <p className="font-normal">{product.name}</p>
+                <div className="min-w-0">
+                  <p className="font-normal line-clamp-2">{product.name}</p>
                   {product.variant && (
                     <p className="text-sm text-gray-500">{product.variant}</p>
                   )}
@@ -220,11 +241,22 @@ const OrderDetails = ({ order }: OrderDetail) => {
                     <p className="text-sm text-gray-500">{product.color}</p>
                   )}
                   {product.quantity && (
-                    <p className="text-sm text-gray-500">×{product.quantity}</p>
+                    <p className="text-sm text-gray-500">
+                      ×{product.quantity}
+                      {priceVal !== undefined && !Number.isNaN(priceVal) && ` · ${formatUsd(priceVal)} each`}
+                    </p>
+                  )}
+                  {order.status === 'delivered' && product.slug && (
+                    <Link
+                      to={`/product/${product.slug}#reviews`}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                    >
+                      Write review
+                    </Link>
                   )}
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right shrink-0">
                 {originalVal !== undefined && !Number.isNaN(originalVal) && (
                   <p className="text-sm text-gray-400 line-through">
                     {formatUsd(originalVal)}
@@ -232,7 +264,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
                 )}
                 {priceVal !== undefined && !Number.isNaN(priceVal) ? (
                   <p className="font-semibold">
-                    {formatUsd(priceVal)}
+                    {formatUsd(priceVal * (product.quantity ?? 1))}
                   </p>
                 ) : (
                   <p className="font-semibold text-gray-500">—</p>

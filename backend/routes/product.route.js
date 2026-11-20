@@ -6,6 +6,7 @@ import {
   getProductById,
   updateProduct,
   deleteProduct,
+  setProductVisibility,
   searchProducts,
   getProductsByCategory,
   getMyShopProducts,
@@ -73,6 +74,13 @@ router.patch(
   requireShopOwnership(resolveProductShop),
   upload.array("images", 10),
   updateProduct
+);
+router.patch(
+  "/:id/visibility",
+  protectRoute,
+  sellerRoute,
+  requireShopOwnership(resolveProductShop),
+  setProductVisibility
 );
 router.delete(
   "/:id",

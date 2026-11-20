@@ -10,11 +10,12 @@ import { SHOP_STATUS } from "../constants/status.js";
 
 export const shopSelect = { id: true, name: true, slug: true, status: true };
 
-// Buyers only see products from active shops; admins see everything.
+// Buyers only see live products (is_active) from active shops; admins see everything.
+// Chu shop xem hang an cua minh qua GET /products/shop/mine va GET /products/:id.
 export const buyerVisibilityWhere = (req) =>
   req?.user?.role === ROLES.ADMIN
     ? {}
-    : { shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null } };
+    : { is_active: true, shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null } };
 
 // Bien the con hieu luc (chua xoa mem); dung chung cho list va detail.
 export const variantsInclude = {

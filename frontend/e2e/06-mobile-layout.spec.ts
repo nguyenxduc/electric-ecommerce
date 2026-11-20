@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { loginAs } from './helpers'
+import { API, clearCart, loginAs } from './helpers'
 
 test.use({ viewport: { width: 390, height: 844 } })
 
@@ -49,4 +49,21 @@ test('mobile: drawer closes on Escape and when tapping the current page', async 
   await open.click()
   await nav.getByRole('link', { name: 'Orders' }).first().click()
   await expect(nav).toBeHidden()
+})
+
+test('mobile: cart and checkout have no horizontal scroll', async ({ page }) => {
+  const token = await loginAs(page, 'jane@example.com')
+  await clearCart(page, token)
+  const p = (await (await page.request.get(`${API}/products?search=Xiaomi 14&limit=1`)).json()).products[0]
+  const r = await page.request.post(`${API}/cart/add_item/${p.id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { quantity: 1, color: p.available_colors?.[0] ?? null, variant_id: p.variants?.[0]?.id }
+  })
+  expect(r.ok(), await r.text()).toBeTruthy()
+  for (const url of ['/cart', '/checkout']) {
+    await page.goto(url)
+    await page.waitForLoadState('networkidle')
+    expect(await overflowX(page), url).toBeLessThanOrEqual(0)
+  }
+  await clearCart(page, token)
 })

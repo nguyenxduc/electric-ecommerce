@@ -238,6 +238,12 @@ Nho vay khong can chuan hoa thang do, va tai lieu duoc nhieu nhanh cung tim
 thay se tu dong len tren. Nhanh trigram mang trong so 0.5 vi no la luoi an toan
 cho loi go phim, nhieu hon hai nhanh kia.
 
+Rieng o tim kiem cua nguoi dung (`findSearchCandidateIds`) con mot nhanh phu
+`searchSubstring`, trong so 0.5: khop chuoi con khong dau tren ten san pham + ten
+danh muc, moi token deu phai xuat hien. Nho no ma go do "lap" ra laptop, "xiao"
+ra Xiaomi - full-text chi khop tron tu, trigram can token >= 4 ky tu. Chatbot
+khong dung nhanh nay.
+
 Phan cong vai tro giua hai tang:
 
 | Tang | Nhiem vu | Khong lam gi |
@@ -342,6 +348,9 @@ Ba trang thai cuoi la `delivered`, `cancelled`, `returned`. Rieng `returned`
 tra hang moi dua don sang do, dong thoi hoan kho va thu hoi diem thuong.
 
 Nguoi mua chi tu huy duoc khi don con o `pending` hoac `processing`.
+`PATCH /orders/:id/cancel` nhan `reason` tuy chon (chuoi, cat 200 ky tu): luu vao
+`metadata.reason` cua audit log `ORDER_CANCEL` va gui kem thong bao cho seller,
+khong co cot rieng trong schema.
 
 > Bang chuyen trang thai nay dat tai `constants/status.js` va la nguon su that
 > duy nhat. Truoc day seed tung sinh trang thai `confirmed` khong co trong bang,
@@ -401,6 +410,11 @@ Khi shop roi khoi `active`, toan bo san pham cua shop bien mat khoi trang chu,
 tim kiem, goi y AI va khong the them vao gio. Rang buoc nay ap o **tang truy
 van du lieu** (`buyerVisibilityWhere` trong `lib/productQuery.js`) chu khong va
 o tung man hinh — nen khong co duong nao lot.
+
+Tung san pham con co co `is_active` (nguoi ban bat/tat qua
+`PATCH /products/:id/visibility`). `buyerVisibilityWhere` loc ca `is_active`
+voi nguoi khong phai admin; chu shop van thay hang an trong
+`GET /products/shop/mine` (`?status=live|hidden`) va `GET /products/:id`.
 
 Ho so mo shop (`POST /shops/apply`) gom thong tin shop, dia chi lay hang
 (`pickup_*`) va thue (`tax_entity_type`, `tax_code`). `validateTax` trong

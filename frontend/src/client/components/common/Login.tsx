@@ -11,6 +11,7 @@ import {
   useForgotPassword,
   useResetPassword
 } from '../../hooks/useAuth'
+import { usePublicSettings } from '../../hooks/useSettings'
 import { useQueryClient } from '@tanstack/react-query'
 
 interface AuthModalProps {
@@ -146,9 +147,11 @@ const Login = ({
   onClose,
   onLogin,
   onRegister,
-  brand = 'Tech Heim',
+  brand,
   onSuccess
 }: AuthModalProps) => {
+  const { data: settingsData } = usePublicSettings('general')
+  const brandName = brand || settingsData?.settings?.store_name || 'Tech Shop'
   const [tab, setTab] = useState<'login' | 'register'>('login')
   const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'reset'>(
     'login'
@@ -162,6 +165,8 @@ const Login = ({
   const [resetEmail, setResetEmail] = useState('')
   const [resetCode, setResetCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  // Quen mat khau 2 buoc: gui ma ve email -> nhap ma + mat khau moi
+  const [resetStep, setResetStep] = useState<'request' | 'confirm'>('request')
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [agreeCondition, setAgreeCondition] = useState(false)
@@ -306,6 +311,10 @@ const Login = ({
         toast.error('Enter email to receive code')
         return
       }
+      if (resetStep === 'request') {
+        sendResetCode()
+        return
+      }
       if (!resetCode || !newPassword) {
         toast.error('Enter code and new password')
         return
@@ -320,6 +329,7 @@ const Login = ({
             setPassword('')
             setResetCode('')
             setNewPassword('')
+            setResetStep('request')
           },
           onError: (err: unknown) => {
             toast.error(apiErrorMessage(err, 'Password change failed'))
@@ -328,6 +338,16 @@ const Login = ({
       )
     }
   }
+
+  const sendResetCode = () =>
+    forgotMutation.mutate(resetEmail, {
+      onSuccess: () => {
+        toast.success('Password reset code sent to your email')
+        setResetStep('confirm')
+      },
+      onError: (err: unknown) =>
+        toast.error(apiErrorMessage(err, 'Failed to send code'))
+    })
 
   return (
     <div className="fixed inset-0 z-50" onClick={onClose}>
@@ -374,13 +394,22 @@ const Login = ({
           <div className="px-8 pb-8">
             <h2 className="text-2xl sm:text-3xl font-normal text-center mt-8">
               {mode === 'login'
-                ? `Log in to ${brand}`
+                ? `Log in to ${brandName}`
                 : mode === 'register'
-                ? `Create your ${brand} account`
+                ? `Create your ${brandName} account`
                 : mode === 'verify'
                 ? 'Verify Email'
-                : 'Forgot Password'}
+                : resetStep === 'request'
+                ? 'Forgot your password?'
+                : 'Set a new password'}
             </h2>
+            {mode === 'reset' && (
+              <p className="mt-2 text-center text-sm text-gray-500">
+                {resetStep === 'request'
+                  ? 'Step 1 of 2: enter your email and we will send you a reset code.'
+                  : `Step 2 of 2: enter the code sent to ${resetEmail} and your new password.`}
+              </p>
+            )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               {mode === 'register' && (
@@ -400,7 +429,7 @@ const Login = ({
               )}
 
               {/* Email */}
-              {mode !== 'verify' && (
+              {mode !== 'verify' && !(mode === 'reset' && resetStep === 'confirm') && (
                 <label className="relative block">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                     <MailIcon className="w-5 h-5" />
@@ -525,11 +554,14 @@ const Login = ({
               )}
 
               {/* Reset password form */}
-              {mode === 'reset' && (
+              {mode === 'reset' && resetStep === 'confirm' && (
                 <>
                   <label className="block">
                     <input
                       type="text"
+                      required
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
                       value={resetCode}
                       onChange={e => setResetCode(e.target.value)}
                       placeholder="Reset code sent to email"
@@ -539,6 +571,8 @@ const Login = ({
                   <label className="block">
                     <input
                       type="password"
+                      required
+                      autoComplete="new-password"
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
                       placeholder="New password (>=6)"
@@ -546,26 +580,23 @@ const Login = ({
                       minLength={6}
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!resetEmail) {
-                        toast.error('Enter email first')
-                        return
-                      }
-                      forgotMutation.mutate(resetEmail, {
-                        onSuccess: () =>
-                          toast.success('Password reset code sent'),
-                        onError: (err: unknown) =>
-                          toast.error(
-                            apiErrorMessage(err, 'Failed to send code')
-                          )
-                      })
-                    }}
-                    className="text-blue-600 hover:underline text-sm"
-                  >
-                    Send Password Reset Code
-                  </button>
+                  <div className="flex items-center justify-between text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setResetStep('request')}
+                      className="text-gray-600 hover:underline"
+                    >
+                      Change email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={sendResetCode}
+                      disabled={forgotMutation.isPending}
+                      className="text-blue-600 hover:underline disabled:opacity-50"
+                    >
+                      {forgotMutation.isPending ? 'Sending...' : 'Resend code'}
+                    </button>
+                  </div>
                 </>
               )}
 
@@ -577,6 +608,7 @@ const Login = ({
                     type="button"
                     onClick={() => {
                       setResetEmail(email)
+                      setResetStep('request')
                       setMode('reset')
                     }}
                     className="text-blue-600 hover:underline"
@@ -613,6 +645,8 @@ const Login = ({
                     ? registerMutation.isPending
                     : mode === 'verify'
                     ? verifyMutation.isPending
+                    : resetStep === 'request'
+                    ? forgotMutation.isPending
                     : resetMutation.isPending
                 }
                 className="w-full bg-blue-600 text-white rounded-lg py-3 text-sm font-light hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -620,7 +654,7 @@ const Login = ({
                 {(mode === 'login' && loginMutation.isPending) ||
                 (mode === 'register' && registerMutation.isPending) ||
                 (mode === 'verify' && verifyMutation.isPending) ||
-                (mode === 'reset' && resetMutation.isPending) ? (
+                (mode === 'reset' && (resetMutation.isPending || forgotMutation.isPending)) ? (
                   <span className="w-5 h-5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
                 ) : null}
                 {mode === 'login'
@@ -629,6 +663,8 @@ const Login = ({
                   ? 'Create Account'
                   : mode === 'verify'
                   ? 'Verify Email'
+                  : resetStep === 'request'
+                  ? 'Send reset code'
                   : 'Reset Password'}
               </button>
 

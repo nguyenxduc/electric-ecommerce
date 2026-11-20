@@ -617,10 +617,10 @@ const Checkout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-12">
+    <div className="min-h-screen bg-gray-50 pb-28 lg:pb-12 overflow-x-hidden">
       <div className="bg-white border-b">
-        <div className="max-w-5xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-center gap-16">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+          <div className="flex items-center justify-center gap-3 sm:gap-16">
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center">
                 <CartIcon />
@@ -629,7 +629,7 @@ const Checkout = () => {
                 Cart
               </span>
             </div>
-            <div className="w-16 h-0.5 bg-gray-300" />
+            <div className="w-8 sm:w-16 h-0.5 bg-gray-300" />
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center">
                 <Truck className="w-6 h-6" />
@@ -638,7 +638,7 @@ const Checkout = () => {
                 Checkout
               </span>
             </div>
-            <div className="w-16 h-0.5 bg-gray-300" />
+            <div className="w-8 sm:w-16 h-0.5 bg-gray-300" />
             <div className="flex flex-col items-center">
               <div className="w-12 h-12 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center">
                 <CreditCard className="w-6 h-6" />
@@ -651,8 +651,8 @@ const Checkout = () => {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
-        <div className="space-y-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 sm:gap-8">
+        <div className="space-y-6 min-w-0">
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <User className="w-5 h-5" /> Contact
@@ -816,7 +816,7 @@ const Checkout = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6 h-fit">
+        <div className="bg-white rounded-lg shadow p-4 sm:p-6 h-fit min-w-0">
           <h3 className="text-lg font-semibold mb-4">Order summary</h3>
           {shopGroups.length > 1 && (
             <p className="text-xs text-gray-500 mb-3">
@@ -871,12 +871,12 @@ const Checkout = () => {
             ))}
           </div>
           <div className="border-t mt-4 pt-4 space-y-2 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 value={couponInput}
                 onChange={e => setCouponInput(e.target.value)}
                 placeholder="Enter voucher code"
-                className="flex-1 border rounded px-3 py-2 text-sm "
+                className="flex-1 min-w-0 border rounded px-3 py-2 text-sm"
               />
               <button
                 type="button"
@@ -889,7 +889,7 @@ const Checkout = () => {
               <button
                 type="button"
                 onClick={openVoucherModal}
-                className="h-9 w-full px-3 py-2 text-sm border border-blue-200 text-blue-700 rounded hover:bg-blue-50"
+                className="w-full px-3 py-2 text-sm border border-blue-200 text-blue-700 rounded hover:bg-blue-50"
               >
                 Vouchers
               </button>
@@ -968,6 +968,28 @@ const Checkout = () => {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Mobile: thanh dat hang dinh day */}
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        <div className="min-w-0">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-lg font-bold text-rose-600 leading-tight">{formatUsd(displayTotal)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handlePay}
+          disabled={processing}
+          className="ml-auto h-11 px-6 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
+        >
+          {processing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : paymentMethod === 'cod' ? (
+            'Place order'
+          ) : (
+            'Pay with MoMo'
+          )}
+        </button>
       </div>
 
       {/* QR Code Modal */}
@@ -1134,7 +1156,7 @@ const Checkout = () => {
       {/* Voucher list modal */}
       {showVoucherModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full relative">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full min-w-0 relative">
             <button
               onClick={() => setShowVoucherModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full p-1 hover:bg-gray-100 transition"

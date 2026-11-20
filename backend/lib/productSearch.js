@@ -78,7 +78,8 @@ const SELECT_COLUMNS = `p.id, p.name, p.price, p.discount, p.quantity, p.img,
 const fromJoins = (activeShopsOnly) =>
   `FROM products p
   JOIN shops s ON s.id = p.shop_id AND s.deleted_at IS NULL${
-    activeShopsOnly ? " AND s.status = 'active'" : ""
+    // nguoi mua: shop dang hoat dong va san pham chua bi seller an
+    activeShopsOnly ? " AND s.status = 'active' AND p.is_active" : ""
   }
   LEFT JOIN product_embeddings pe ON pe.product_id = p.id`;
 
@@ -135,6 +136,38 @@ export const searchTrigram = async (
      LIMIT $2`,
     probes,
     limit
+  );
+  return rows || [];
+};
+
+/**
+ * Nhanh phu - khop chuoi con khong dau tren ten san pham + ten danh muc.
+ * Full-text chi khop tron tu, trigram can token >= 4 ky tu, nen go do "lap"
+ * hay "xiao" truoc day ra rong. Moi token deu phai xuat hien (AND) de go
+ * nhieu tu khong lam ket qua loang ra. Token chi gom [a-z0-9] (normalizeText)
+ * nen khong can escape ky tu dai dien cua LIKE.
+ */
+export const searchSubstring = async (
+  prisma,
+  tokens,
+  limit,
+  { activeShopsOnly = true } = {}
+) => {
+  if (tokens.length === 0) return [];
+  const rows = await prisma.$queryRawUnsafe(
+    `SELECT ${SELECT_COLUMNS}
+     ${fromJoins(activeShopsOnly)}
+     LEFT JOIN categories c ON c.id = p.category_id
+     WHERE p.deleted_at IS NULL
+       AND (SELECT bool_and(
+              immutable_unaccent(lower(coalesce(p.name, '') || ' ' || coalesce(c.name, '')))
+                LIKE '%' || t.tok || '%')
+            FROM unnest($1::text[]) AS t(tok))
+     ORDER BY (immutable_unaccent(lower(coalesce(p.name, ''))) LIKE '%' || $3 || '%') DESC, p.id
+     LIMIT $2`,
+    tokens,
+    limit,
+    tokens[0]
   );
   return rows || [];
 };
@@ -199,7 +232,7 @@ export const findSearchCandidateIds = async (
   const tokens = [...new Set(tokenize(query))].slice(0, 12);
   if (tokens.length === 0) return [];
 
-  const [fts, trgm] = await Promise.all([
+  const [fts, trgm, sub] = await Promise.all([
     searchFullText(prisma, tokens, limit, { activeShopsOnly }).catch((e) => {
       console.error("[productSearch:fulltext]", e?.message || e);
       return [];
@@ -208,10 +241,15 @@ export const findSearchCandidateIds = async (
       console.error("[productSearch:trigram]", e?.message || e);
       return [];
     }),
+    searchSubstring(prisma, tokens, limit, { activeShopsOnly }).catch((e) => {
+      console.error("[productSearch:substring]", e?.message || e);
+      return [];
+    }),
   ]);
 
   return fuseByRRF([
     { key: "fulltext", rows: fts, weight: 1 },
     { key: "trigram", rows: trgm, weight: 0.5 },
+    { key: "substring", rows: sub, weight: 0.5 },
   ]).map((entry) => BigInt(entry.id));
 };

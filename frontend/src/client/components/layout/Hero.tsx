@@ -12,7 +12,7 @@ const PERKS = [
 
 const Hero = () => {
   const { data } = usePublicSettings('general')
-  const storeName = data?.settings?.store_name || 'Tech Heim'
+  const storeName = data?.settings?.store_name || 'Tech Shop'
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 pt-6">
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-600 to-indigo-700 text-white">

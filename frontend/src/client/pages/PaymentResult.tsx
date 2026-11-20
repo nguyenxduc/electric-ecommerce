@@ -163,16 +163,43 @@ const PaymentResult = () => {
           )}
         </div>
 
-        <div className="flex justify-center gap-3 pt-2">
+        {isSuccess && !momoPending && (
+          <div className="text-left text-sm text-gray-600 border border-blue-100 bg-blue-50 rounded-xl p-4">
+            <p className="font-medium text-gray-900 mb-1">What happens next</p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              <li>The shop confirms and packs your order.</li>
+              <li>You get a notification when it ships, with live tracking.</li>
+              <li>
+                {method === 'cod'
+                  ? 'Pay the courier in cash when the parcel arrives.'
+                  : 'Track progress any time under Profile > Orders.'}
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="flex flex-wrap justify-center gap-3 pt-2">
+          {isSuccess && !momoPending && (
+            <button
+              onClick={() => navigate('/profile?tab=orders')}
+              className="px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              View order
+            </button>
+          )}
           <button
             onClick={() => navigate('/collection/all')}
-            className="px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className={
+              isSuccess && !momoPending
+                ? 'px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50'
+                : 'px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
+            }
           >
             Continue shopping
           </button>
           {momoPending ? (
             <button
-              onClick={() => navigate('/collection/all')}
+              onClick={() => navigate('/profile?tab=orders')}
               className="px-5 py-3 border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center gap-2"
             >
               Check order

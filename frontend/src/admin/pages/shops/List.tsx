@@ -25,6 +25,13 @@ const STATUS_BADGE: Record<string, string> = {
   suspended: 'bg-gray-200 text-gray-700'
 }
 
+// Ly do tu choi hay gap, admin bam de dien nhanh
+const REJECT_TEMPLATES = [
+  'Missing or invalid tax information',
+  'Pickup address incomplete',
+  'Shop name violates policy'
+]
+
 type ReasonAction = { type: 'reject' | 'suspend'; shop: AdminShop } | null
 
 export default function AdminShopsList() {
@@ -384,6 +391,25 @@ export default function AdminShopsList() {
               value={reason}
               onChange={e => setReason(e.target.value)}
             />
+            {reasonAction.type === 'reject' && (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {REJECT_TEMPLATES.map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      className="px-2 py-1 text-xs border rounded-full hover:bg-gray-50"
+                      onClick={() => setReason(t)}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500">
+                  A reason of at least 5 characters is required so the owner knows what to fix.
+                </p>
+              </>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 className="px-4 py-2 text-sm border rounded"
@@ -395,7 +421,8 @@ export default function AdminShopsList() {
                 Cancel
               </button>
               <button
-                className={`px-4 py-2 text-sm text-white rounded ${
+                disabled={reasonAction.type === 'reject' && reason.trim().length < 5}
+                className={`px-4 py-2 text-sm text-white rounded disabled:opacity-50 disabled:cursor-not-allowed ${
                   reasonAction.type === 'reject'
                     ? 'bg-red-600 hover:bg-red-700'
                     : 'bg-orange-600 hover:bg-orange-700'

@@ -4,6 +4,7 @@ import { asyncHandler } from "../middleware/error.middleware.js";
 
 // Buyers only ever see recommendations from active shops
 const activeShopWhere = {
+  is_active: true,
   shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
 };
 

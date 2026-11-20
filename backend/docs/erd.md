@@ -59,6 +59,7 @@ erDiagram
     datetime updated_at
     datetime deleted_at
     string description
+    bool is_active
     int weight_grams
   }
   Category {

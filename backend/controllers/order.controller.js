@@ -104,9 +104,9 @@ export const createOrder = async (req, res) => {
           .status(400)
           .json({ message: `Product ${it.product_id} not found` });
 
-      if (product.shop?.status !== SHOP_STATUS.ACTIVE) {
+      if (product.shop?.status !== SHOP_STATUS.ACTIVE || product.is_active === false) {
         return res.status(400).json({
-          message: `"${product.name}" is no longer available (shop inactive)`,
+          message: `"${product.name}" is no longer available`,
         });
       }
 
@@ -537,8 +537,15 @@ export const getOrderById = asyncHandler(async (req, res) => {
       user: { select: { id: true, name: true, email: true } },
       shop: { select: { id: true, name: true, slug: true, owner_id: true } },
       order_group: {
-        select: { id: true, group_number: true, total_amount: true },
+        select: {
+          id: true,
+          group_number: true,
+          total_amount: true,
+          // Trang chi tiet seller/admin can biet don online da tra tien chua
+          payments: { select: { status: true } },
+        },
       },
+      shipment: { select: { tracking_code: true } },
       order_items: {
         include: {
           product: { select: { id: true, name: true, img: true } },
@@ -580,6 +587,8 @@ export const getUserOrders = asyncHandler(async (req, res) => {
       return_request: {
         select: { id: true, status: true, reason: true, resolution_note: true },
       },
+      // Kem hoa don de trang chi tiet khong phai goi GET /invoices/orders/:id (404 khi chua co)
+      invoice: { select: { id: true, invoice_number: true } },
       order_items: {
         include: {
           product: true,
@@ -591,13 +600,44 @@ export const getUserOrders = asyncHandler(async (req, res) => {
   res.json(orders);
 });
 
+// Bo loc chung cho danh sach don (admin + seller): q tim theo ma don, nguoi mua
+// (ten/email/sdt), nguoi nhan, ma van don, ten san pham; from/to loc ngay tao.
+// shortcut: chi khong phan biet hoa/thuong, chua bo dau (can extension unaccent).
+const applyOrderListFilters = (where, { q, from, to }) => {
+  const term = typeof q === "string" ? q.trim().slice(0, 100) : "";
+  if (term) {
+    const has = { contains: term, mode: "insensitive" };
+    where.OR = [
+      { order_number: has },
+      { receiver_name: has },
+      { receiver_phone: has },
+      { user: { name: has } },
+      { user: { email: has } },
+      { user: { phone: has } },
+      { shipment: { tracking_code: has } },
+      { order_items: { some: { product: { name: has } } } },
+    ];
+  }
+  const fromDate = typeof from === "string" ? new Date(from) : null;
+  const toDate = typeof to === "string" ? new Date(to) : null;
+  if (fromDate && !Number.isNaN(fromDate.getTime())) {
+    where.created_at = { ...where.created_at, gte: fromDate };
+  }
+  if (toDate && !Number.isNaN(toDate.getTime())) {
+    // "to" dang YYYY-MM-DD: lay het ngay do
+    if (/^\d{4}-\d{2}-\d{2}$/.test(to)) toDate.setUTCDate(toDate.getUTCDate() + 1);
+    where.created_at = { ...where.created_at, lt: toDate };
+  }
+  return where;
+};
+
 export const getAllOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, status, q, shop_id } = req.query;
+  const { page = 1, limit = 20, status, shop_id } = req.query;
 
   const where = { deleted_at: null };
   if (status) where.status = String(status);
-  if (shop_id) where.shop_id = BigInt(shop_id);
-  if (q) where.order_number = { contains: String(q), mode: "insensitive" };
+  if (typeof shop_id === "string" && /^\d+$/.test(shop_id)) where.shop_id = BigInt(shop_id);
+  applyOrderListFilters(where, req.query);
 
   const { skip, take } = parsePagination(page, limit);
 
@@ -630,7 +670,7 @@ export const getAllOrders = asyncHandler(async (req, res) => {
 
 // GET /api/orders/shop/mine — seller dashboard: own shop's orders only
 export const getShopOrders = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, status, q } = req.query;
+  const { page = 1, limit = 20, status } = req.query;
 
   if (!req.shop) {
     return res.status(400).json({
@@ -640,7 +680,7 @@ export const getShopOrders = asyncHandler(async (req, res) => {
 
   const where = { shop_id: req.shop.id, deleted_at: null };
   if (status) where.status = String(status);
-  if (q) where.order_number = { contains: String(q), mode: "insensitive" };
+  applyOrderListFilters(where, req.query);
 
   const { skip, take } = parsePagination(page, limit);
 
@@ -677,6 +717,9 @@ export const getShopOrders = asyncHandler(async (req, res) => {
 export const updateOrderStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+  // Ly do (tuy chon, bat buoc o UI khi huy) chi luu vao audit log, khong doi schema
+  const reason =
+    typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 200) : "";
 
   // "returned" khong nam trong danh sach: chi luong tra hang moi dat duoc.
   const validStatuses = [
@@ -694,6 +737,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     orderId: id,
     status,
     actor: actorFromReq(req),
+    auditMetadata: reason ? { reason } : {},
   });
   if (!result.ok) {
     return res.status(HTTP_BY_CODE[result.code] || 400).json({ message: result.message });
@@ -790,12 +834,19 @@ export const cancelOrder = asyncHandler(async (req, res) => {
       .status(400)
       .json({ success: false, message: "Cannot cancel in current status" });
 
+  // Ly do huy (tuy chon) chi luu vao audit log + bao cho seller, khong doi schema.
+  const reason =
+    typeof req.body?.reason === "string"
+      ? req.body.reason.trim().slice(0, 200)
+      : "";
+
   const result = await transitionOrderStatus({
     orderId: id,
     status: ORDER_STATUS.CANCELLED,
     allowedFrom: cancellableStatuses,
     actor: actorFromReq(req),
     auditAction: "ORDER_CANCEL",
+    auditMetadata: reason ? { reason } : {},
     // Nguoi mua tu huy thi khong can bao lai cho chinh ho.
     notifyBuyer: order.user_id.toString() !== userId,
   });
@@ -817,7 +868,9 @@ export const cancelOrder = asyncHandler(async (req, res) => {
     notifyUser({
       userId: order.shop?.owner_id,
       title: "Order cancelled",
-      message: `Buyer cancelled order ${order.order_number || `#${order.id}`}.`,
+      message: `Buyer cancelled order ${order.order_number || `#${order.id}`}.${
+        reason ? ` Reason: ${reason}` : ""
+      }`,
       type: "ORDER",
     });
   }

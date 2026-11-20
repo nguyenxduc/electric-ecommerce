@@ -7,7 +7,7 @@ test('seller: shipment, label, simulate delivered, invoice', async ({ page, cont
   await loginAs(page, 'seller1@example.com')
 
   await page.goto('/seller/orders')
-  const search = page.getByPlaceholder('Search by order number')
+  const search = page.getByPlaceholder('Search order no., buyer, phone, tracking')
   await search.fill(orderNumber)
   await search.press('Enter')
   await page.getByRole('link', { name: `#${orderNumber}` }).first().click()

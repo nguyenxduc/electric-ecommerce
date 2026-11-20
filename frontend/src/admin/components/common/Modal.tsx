@@ -12,7 +12,7 @@ type ModalProps = {
 export default function Modal({ open, onClose, title, children, footer, variant = 'default' }: ModalProps) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className={`relative w-full max-w-lg rounded border bg-white shadow ${variant === 'danger' ? 'border-red-300' : ''}`}>
         {title ? (

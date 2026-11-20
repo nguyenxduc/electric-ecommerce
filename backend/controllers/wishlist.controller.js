@@ -6,7 +6,12 @@ export const getUserWishlist = asyncHandler(async (req, res) => {
 
   const items = await prisma.wishlist.findMany({
     where: { user_id: BigInt(userId), product: { deleted_at: null } },
-    include: { product: true },
+    // Dem bien the/mau de frontend biet co the them thang vao gio hay phai mo trang san pham
+    include: {
+      product: {
+        include: { _count: { select: { variants: { where: { deleted_at: null } }, product_colors: true } } },
+      },
+    },
     orderBy: { created_at: "desc" },
   });
 

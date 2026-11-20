@@ -2,6 +2,8 @@ import { SuccessResponse } from './common'
 import { AdminCategory } from './category'
 
 export type SpecEntry = { label: string; value: unknown }
+// specs_detail: dong phang hoac nhom {category, items}
+export type SpecDetailEntry = SpecEntry | { category: string; items: SpecEntry[] }
 
 // Payload phang tu form tao/sua san pham (service tu dong goi thanh FormData)
 export type ProductFormPayload = Record<string, unknown> & { images?: File[] }
@@ -29,8 +31,11 @@ export type AdminProduct = {
   number_of_ratings?: number
   img?: string[]
   specs?: SpecEntry[]
-  specs_detail?: SpecEntry[]
+  specs_detail?: SpecDetailEntry[]
   color?: ProductColor[]
+  description?: string | null
+  // false = nguoi ban da an khoi san
+  is_active?: boolean
   category_id: number
   sub_category_id: number
   final_price?: number

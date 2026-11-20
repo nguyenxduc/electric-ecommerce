@@ -29,7 +29,7 @@ export const summarizeItems = (items: CartItem[]) => {
   let original = 0
   let total = 0
   for (const i of items) {
-    original += (i.price + Number(i.variant?.price_delta || 0)) * i.quantity
+    original += i.price * i.quantity // price tu backend da gom price_delta
     total += i.final_price * i.quantity
   }
   const r = (n: number) => Math.round(n * 100) / 100

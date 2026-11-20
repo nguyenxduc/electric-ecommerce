@@ -29,6 +29,7 @@ export const compareProductsByAi = async (req, res) => {
         id: { in: ids },
         deleted_at: null,
         // Comparison is buyer-facing: only active shops' products
+        is_active: true,
         shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null },
       },
       include: {

@@ -143,7 +143,6 @@ const Navbar = () => {
         onLoginWithFacebook={() =>
           setInfoModal('Facebook OAuth is being prepared.')
         }
-        brand="Tech Heim"
       />
       <ConfirmModal
         open={!!infoModal}

@@ -17,6 +17,8 @@ export const adminOrderService = {
     status?: string
     q?: string
     shop_id?: number
+    from?: string
+    to?: string
   }) {
     return axiosClient.get<OrderListResponse>('/orders', { params })
   },
