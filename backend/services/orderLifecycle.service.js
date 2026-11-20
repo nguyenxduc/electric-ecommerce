@@ -168,6 +168,24 @@ export const transitionOrderStatus = async ({
     }
   }
 
+  // Don online chua tra tien chi duoc huy: callback MoMo tu day pending ->
+  // processing khi da tra. Neu seller day ra khoi pending, job huy don qua han
+  // (chi quet pending) khong con thay va don ket mai ma khong ai tra tien.
+  if (
+    currentStatus === ORDER_STATUS.PENDING &&
+    status !== ORDER_STATUS.CANCELLED &&
+    order.payment_method &&
+    order.payment_method !== "cod"
+  ) {
+    const paid = await prisma.payment.findFirst({
+      where: { order_group_id: order.order_group_id, status: PAYMENT_STATUS.PAID },
+      select: { id: true },
+    });
+    if (!paid) {
+      return { ok: false, code: "UNPAID", message: "This online order has not been paid yet" };
+    }
+  }
+
   let refundOwed = null;
   let updated;
   try {

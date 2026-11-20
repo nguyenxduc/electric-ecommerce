@@ -28,7 +28,7 @@ export function useAdminProducts(params?: ProductListQuery) {
 
 // Seller dashboard: own shop's products. Shares productKeys.all so
 // create/update/delete invalidation refreshes this list too.
-export function useMyShopProducts(params?: ProductListQuery) {
+export function useMyShopProducts(params?: ProductListQuery & { stock?: 'low' }) {
   return useQuery<{ data: ProductListResponse }, Error>({
     queryKey: [...productKeys.all, 'mine', params],
     queryFn: () => adminProductService.listMine(params)

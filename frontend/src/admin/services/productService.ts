@@ -16,7 +16,7 @@ export const adminProductService = {
     return axiosClient.get<ProductListResponse>('/products', { params })
   },
   // Seller dashboard: own shop's products (any shop status)
-  listMine(params?: ProductListQuery) {
+  listMine(params?: ProductListQuery & { stock?: 'low' }) {
     return axiosClient.get<ProductListResponse>('/products/shop/mine', {
       params
     })

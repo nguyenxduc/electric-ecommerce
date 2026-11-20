@@ -18,6 +18,7 @@ import {
   variantsInclude,
 } from "../lib/productQuery.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
 import { resolveFilteredProductIds } from "../services/productFilter.service.js";
 
@@ -792,6 +793,8 @@ export const getMyShopProducts = asyncHandler(async (req, res) => {
     ...(search && {
       name: { contains: String(search), mode: "insensitive" },
     }),
+    // ?stock=low: cung nguong voi o "Low stock" tren dashboard (todo.service)
+    ...(req.query.stock === "low" && { quantity: { lte: LOW_STOCK_THRESHOLD } }),
   };
 
   const { total_count, products } = await fetchPaginatedProducts(

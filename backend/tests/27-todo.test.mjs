@@ -38,3 +38,11 @@ test('to-do endpoints are role-gated', async () => {
   assert.equal((await req('/dashboard/shop/todo', { token: buyer })).status, 403)
   assert.equal((await req('/dashboard/todo', { token: seller1 })).status, 403)
 })
+
+test('seller product list ?stock=low matches the low-stock tile', async () => {
+  const todo = (await req('/dashboard/shop/todo', { token: seller1 })).json.data
+  const res = await req('/products/shop/mine?stock=low&limit=50', { token: seller1 })
+  assert.equal(res.status, 200)
+  assert.equal(res.json.pagination.total_count, todo.low_stock)
+  assert.ok(res.json.products.every(p => Number(p.quantity) <= 5))
+})

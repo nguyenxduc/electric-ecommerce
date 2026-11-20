@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { prisma } from '../lib/db.js'
 import { req, login, ACCOUNTS } from './helpers.mjs'
-import { evaluateShipment, areaAnomalies, areaKey, SHIPPER_DEFAULTS } from '../services/shipperFraud.service.js'
+import { evaluateShipment, areaAnomalies, areaKey, SHIPPER_DEFAULTS, SHIPPER_RULES } from '../services/shipperFraud.service.js'
 
 const run = promisify(execFile)
 const BACKEND_DIR = fileURLToPath(new URL('..', import.meta.url))
@@ -130,7 +130,10 @@ test('nguoi mua bao chua nhan hang -> flag SHIPPER_SUSPECT, job gop tin hieu gia
   assert.match(stdout, /shipper-fraud-scan\] \d+ shipment/)
   flag = await prisma.fraudFlag.findFirst({ where })
   assert.ok(flag.reasons.includes('FAST_DELIVERY'), JSON.stringify(flag.reasons))
-  assert.equal(flag.score, 110)
+  // simulate dung gio that: chay test ban dem se them ODD_HOUR_DELIVERY, nen
+  // so diem phai bang tong cac ly do co mat thay vi mot hang so co dinh
+  assert.equal(flag.score, flag.reasons.reduce((n, r) => n + SHIPPER_RULES[r], 0), JSON.stringify(flag.reasons))
+  assert.ok(flag.score >= 110)
   assert.equal(flag.details.buyer_note, 'Chua thay shipper goi', 'gop khong lam mat ghi chu')
 
   const list = await req('/fraud/flags?type=SHIPPER_SUSPECT&limit=50', { token: admin })

@@ -188,7 +188,10 @@ export default function SellerOrdersList() {
                     </Link>
                   </td>
                   <td className="p-2 text-right whitespace-nowrap">
-                    {o.status === 'pending' ? (
+                    {o.status === 'pending' && o.payment_method && o.payment_method !== 'cod' ? (
+                      // Don online cho tra tien: callback thanh toan tu chuyen sang To ship
+                      <span className="text-xs text-amber-600">Awaiting payment</span>
+                    ) : o.status === 'pending' ? (
                       <button
                         onClick={() => confirmOrder(o.id)}
                         disabled={statusMut.isPending}

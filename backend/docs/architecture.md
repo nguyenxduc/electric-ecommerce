@@ -353,7 +353,10 @@ deu di qua `services/orderLifecycle.service.js` (`transitionOrderStatus`): cap
 nhat co dieu kien theo trang thai cu nen hai yeu cau dong thoi chi mot cai
 thang; huy thi hoan kho + thu hoi diem trong cung giao dich; giao thi phat
 hanh hoa don + ghi khau tru thue. Don con van don dang chay bi chan huy
-(`SHIPMENT_ACTIVE`) cho toi khi seller huy van don.
+(`SHIPMENT_ACTIVE`) cho toi khi seller huy van don. Don online (MoMo) chua
+tra tien chi duoc huy (`UNPAID`): chi callback thanh toan moi day no ra khoi
+`pending`, vi job het han chi quet `pending` - seller "Confirm" som se lam don
+ket mai.
 
 ### Van don dieu khien don hang
 
@@ -437,3 +440,8 @@ flowchart LR
 Lop thu ba la lop quan trong nhat va cung de quen nhat: no ngan seller A doc
 don hang hay sua san pham cua seller B. Chi kiem tra vai tro thoi thi *chua du*,
 vi ca hai deu co vai tro `seller`.
+
+Truoc ca ba lop, `middleware/scalarBody.middleware.js` bat `email`, `password`,
+`new_password`, `code`, `coupon_code` trong body phai la chuoi. Prisma hieu
+object trong `where` la bo loc, nen `{"email": {"contains": "@"}}` tung dang
+nhap duoc bang mat khau doan ma khong can biet email (tests/29-scalar-inputs).

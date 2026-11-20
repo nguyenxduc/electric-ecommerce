@@ -106,7 +106,7 @@ export default function SellerDashboard() {
           { label: 'In transit', count: todo?.shipping, to: '/seller/orders?status=shipped' },
           { label: 'Return requests', count: todo?.returns_pending, to: '/seller/returns?status=pending' },
           { label: 'Unread messages', count: todo?.unread_messages, to: '/seller/chat' },
-          { label: 'Low stock', count: todo?.low_stock, to: '/seller/products', hint: '5 or fewer left' }
+          { label: 'Low stock', count: todo?.low_stock, to: '/seller/products?stock=low', hint: '5 or fewer left' }
         ]}
       />
 

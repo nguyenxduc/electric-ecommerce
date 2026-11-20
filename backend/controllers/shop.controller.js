@@ -83,12 +83,12 @@ export const applyForShop = asyncHandler(async (req, res) => {
   const shop = await prisma.shop.create({
     data: {
       owner_id: userId,
-      name: String(name).trim(),
+      name: String(name).trim().slice(0, 120),
       slug,
-      description: description ? String(description).trim() : null,
-      contact_email: contact_email || req.user.email || null,
-      contact_phone: contact_phone || req.user.phone || null,
-      address: address || req.user.address || null,
+      description: text(description, 2000) ?? null,
+      contact_email: text(contact_email, 255) || req.user.email || null,
+      contact_phone: text(contact_phone, 30) || req.user.phone || null,
+      address: text(address, 255) || req.user.address || null,
       pickup_province: text(pickup_province, 100),
       pickup_district: text(pickup_district, 100),
       pickup_ward: text(pickup_ward, 100),
@@ -202,12 +202,13 @@ export const updateMyShop = asyncHandler(async (req, res) => {
   const updated = await prisma.shop.update({
     where: { id: shop.id },
     data: {
-      name: name ? String(name).trim() : undefined,
+      name: name ? String(name).trim().slice(0, 120) : undefined,
       slug: slug ?? undefined,
-      description: description !== undefined ? description : undefined,
-      contact_email: contact_email ?? undefined,
-      contact_phone: contact_phone ?? undefined,
-      address: address ?? undefined,
+      // Gioi han do dai: cac truong nay hien tren trang shop cong khai va trang admin
+      description: text(description, 2000),
+      contact_email: text(contact_email, 255),
+      contact_phone: text(contact_phone, 30),
+      address: text(address, 255),
       shipping_fee_override: parseOverride(shipping_fee_override),
       free_shipping_threshold_override: parseOverride(
         free_shipping_threshold_override

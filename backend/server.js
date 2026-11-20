@@ -87,6 +87,7 @@ import {
   errorHandler,
 } from "./middleware/error.middleware.js";
 import { metricsMiddleware } from "./middleware/metrics.middleware.js";
+import { requireScalarBody } from "./middleware/scalarBody.middleware.js";
 
 const app = express();
 dotenv.config();
@@ -128,6 +129,8 @@ app.use(
 // Chặn payload quá lớn (ảnh upload đi qua multer riêng, không qua đây).
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
+// email/ma coupon/ma reset phai la chuoi, khong de Prisma hieu thanh bo loc
+app.use(requireScalarBody);
 app.use(cookieParser());
 
 // Dat TRUOC apiLimiter: de ca response bi chan boi rate limit (429) van duoc

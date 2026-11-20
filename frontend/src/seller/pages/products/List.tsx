@@ -13,12 +13,22 @@ import { useListQueryParams } from '../../../admin/hooks/useListQueryParams'
 export default function SellerProductsList() {
   const [limit] = useState(10)
   const [pendingDelete, setPendingDelete] = useState<number | null>(null)
-  const { page, q: query, setPage, setQ: setQuery } = useListQueryParams()
+  const { page, q: query, setPage, setQ: setQuery, searchParams, setSearchParams } = useListQueryParams()
+  // ?stock=low: o "Low stock" tren dashboard mo thang danh sach nay
+  const lowOnly = searchParams.get('stock') === 'low'
+  const toggleLow = () => {
+    const next = new URLSearchParams(searchParams)
+    if (lowOnly) next.delete('stock')
+    else next.set('stock', 'low')
+    next.set('page', '1')
+    setSearchParams(next)
+  }
 
   const { data, isLoading } = useMyShopProducts({
     page,
     limit,
-    search: query || undefined
+    search: query || undefined,
+    stock: lowOnly ? 'low' : undefined
   })
   const del = useDeleteAdminProduct()
 
@@ -33,6 +43,16 @@ export default function SellerProductsList() {
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">My Products</h1>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleLow}
+            aria-pressed={lowOnly}
+            className={`px-3 py-2 text-sm rounded border ${
+              lowOnly ? 'bg-red-50 border-red-300 text-red-700' : 'hover:bg-gray-50'
+            }`}
+          >
+            Low stock only
+          </button>
           <input
             className="border rounded px-3 py-2 text-sm w-56"
             placeholder="Search by name"
