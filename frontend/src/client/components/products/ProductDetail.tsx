@@ -1,11 +1,3 @@
-// @ts-ignore
-import StarIcon from '../../../assets/star-icon.svg'
-// @ts-ignore
-import StockIcon from '../../../assets/stock-icon.svg'
-// @ts-ignore
-import GuaranteeIcon from '../../../assets/guarantee-icon.svg'
-// @ts-ignore
-import DeliveryIcon from '../../../assets/delivery-icon.svg'
 import { Star, Store as StoreIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
