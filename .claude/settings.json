@@ -9,5 +9,6 @@
       "Bash(awk '{print $2}')",
       "Bash(node -e ' *)"
     ]
-  }
+  },
+  "enabledPlugins": {}
 }
