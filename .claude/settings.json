@@ -8,6 +8,11 @@
       "Read(//c/Users/Lecoo/.claude/projects/**)",
       "Bash(awk '{print $2}')",
       "Bash(node -e ' *)"
+    ],
+    "deny": [
+      "Bash(gh pr create*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)"
     ]
   },
   "enabledPlugins": {}
