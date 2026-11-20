@@ -108,8 +108,8 @@ const ShopPublic = () => {
         ) : (
           <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600" />
         )}
-        <div className="px-6 pb-6 -mt-8 flex flex-col md:flex-row md:items-end gap-4">
-          <div className="h-20 w-20 rounded-xl bg-white border shadow flex items-center justify-center overflow-hidden shrink-0">
+        <div className="px-6 pb-6 flex flex-col md:flex-row md:items-start gap-4">
+          <div className="-mt-10 h-20 w-20 rounded-xl bg-white border shadow flex items-center justify-center overflow-hidden shrink-0">
             {shop.logo_url ? (
               <img
                 src={shop.logo_url}
@@ -120,7 +120,7 @@ const ShopPublic = () => {
               <Store className="w-8 h-8 text-gray-400" />
             )}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 md:pt-4">
             <h1 className="text-2xl font-bold text-gray-900">{shop.name}</h1>
             {shop.description && (
               <p className="text-gray-600 text-sm mt-1 max-w-2xl">

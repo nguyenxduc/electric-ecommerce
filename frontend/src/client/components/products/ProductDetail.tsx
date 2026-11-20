@@ -21,6 +21,7 @@ import ListProduct from './ListProduct'
 import ReviewComponent from './Review'
 import { getProductColors } from '../../utils/productColors'
 import VariantPicker from './VariantPicker'
+import ShopCard from './ShopCard'
 
 interface ProductDetailProps {
   product: Product
@@ -133,12 +134,11 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 {product.shop && (
                   <Link
                     to={`/shop/${product.shop.slug}`}
-                    className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-blue-600 border rounded-lg px-3 py-2 transition"
+                    className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600"
                   >
                     <StoreIcon className="w-4 h-4" />
                     Sold by{' '}
-                    <span className="font-semibold">{product.shop.name}</span>
-                    <span className="text-blue-600">Visit shop →</span>
+                    <span className="font-medium text-blue-600">{product.shop.name}</span>
                   </Link>
                 )}
               </div>
@@ -227,10 +227,12 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
           </div>
         </div>
 
+        {product.shop && <ShopCard slug={product.shop.slug} />}
+
         {/* Tabs Section */}
         <div className="mt-12">
-          <nav className="border-b border-gray-200">
-            <div className="flex space-x-8">
+          <nav className="border-b border-gray-200 overflow-x-auto">
+            <div className="flex gap-6 sm:gap-8 whitespace-nowrap">
               <button
                 onClick={() => setSelectedInfo('description')}
                 className={`pb-4 px-1 text-base font-medium transition-colors ${

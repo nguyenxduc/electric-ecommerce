@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, ShoppingCart, Zap } from 'lucide-react'
+import { Heart, ShoppingCart, Zap, Minus, Plus, Truck, ShieldCheck, BadgeCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAddToCart } from '../../hooks/useCart'
 import {
@@ -86,6 +86,9 @@ const Payment = ({
     : selectedColorObj?.quantity ?? quantity
   const stockQty = hasVariants && selectedVariant ? selectedVariant.quantity : quantity
   const canBuy = hasVariants ? !!selectedVariant && selectedQty > 0 : quantity > 0
+  const [qty, setQty] = useState(1)
+  // Doi bien the co ton thap hon thi tu ha so luong
+  const buyQty = Math.max(1, Math.min(qty, selectedQty || 1))
 
   const handleAddToCart = () => {
     if (hasVariants && !selectedVariant) {
@@ -110,7 +113,7 @@ const Payment = ({
       {
         productId: id,
         payload: {
-          quantity: 1,
+          quantity: buyQty,
           color: colorPayload,
           variant_id: selectedVariant?.id
         }
@@ -156,7 +159,7 @@ const Payment = ({
       {
         productId: id,
         payload: {
-          quantity: 1,
+          quantity: buyQty,
           color: colorPayload,
           variant_id: selectedVariant?.id
         }
@@ -234,24 +237,43 @@ const Payment = ({
           )}
         </div>
 
-        {/* Stock Status */}
-        <div className="mb-6">
+        {/* Quantity + stock */}
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="inline-flex items-center border border-gray-200 rounded-lg">
+            <button
+              type="button"
+              aria-label="Decrease quantity"
+              onClick={() => setQty(Math.max(1, buyQty - 1))}
+              disabled={!canBuy || buyQty <= 1}
+              className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <span className="w-10 text-center text-sm font-medium" aria-live="polite">{buyQty}</span>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              onClick={() => setQty(Math.min(selectedQty, buyQty + 1))}
+              disabled={!canBuy || buyQty >= selectedQty}
+              className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
           {hasVariants && !selectedVariant ? (
             <span className="text-sm text-gray-500">
               Select a variant to see stock
             </span>
           ) : stockQty > 0 ? (
-            <div className="flex items-center gap-2 text-green-600">
-              <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-              <span className="text-sm font-medium">
-                In Stock{hasVariants ? ` (${stockQty} left)` : ''}
-              </span>
-            </div>
+            <span className="flex items-center gap-2 text-sm font-medium text-green-600">
+              <span className="w-2 h-2 bg-green-600 rounded-full" />
+              {stockQty} in stock
+            </span>
           ) : (
-            <div className="flex items-center gap-2 text-red-600">
-              <div className="w-2 h-2 bg-red-600 rounded-full"></div>
-              <span className="text-sm font-medium">Out of Stock</span>
-            </div>
+            <span className="flex items-center gap-2 text-sm font-medium text-red-600">
+              <span className="w-2 h-2 bg-red-600 rounded-full" />
+              Out of Stock
+            </span>
           )}
         </div>
 
@@ -290,23 +312,30 @@ const Payment = ({
               addToWishlistMutation.isPending ||
               removeFromWishlistMutation.isPending
             }
-            className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-lg font-semibold border-2 transition-all ${
-              isInWishlist
-                ? 'bg-red-600 text-white border-none hover:bg-red-500'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-            } ${!userData?.user ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="w-full flex items-center justify-center gap-2 py-2 text-sm font-medium text-gray-600 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Heart
-              className={`w-5 h-5 ${isInWishlist ? 'fill-current' : ''}`}
+              className={`w-4 h-4 ${isInWishlist ? 'fill-red-600 text-red-600' : ''}`}
             />
-            {addToWishlistMutation.isPending ||
-            removeFromWishlistMutation.isPending
-              ? 'Processing...'
-              : isInWishlist
-              ? 'Added to Wishlist'
-              : 'Add to Wishlist'}
+            {isInWishlist ? 'Saved to wishlist' : 'Add to wishlist'}
           </button>
         </div>
+
+        {/* Delivery + buyer protection */}
+        <ul className="mt-6 pt-6 border-t border-gray-200 space-y-3 text-sm text-gray-600">
+          <li className="flex gap-3">
+            <Truck className="w-5 h-5 text-gray-400 shrink-0" />
+            <span>Shipping fee and delivery estimate shown at checkout</span>
+          </li>
+          <li className="flex gap-3">
+            <BadgeCheck className="w-5 h-5 text-gray-400 shrink-0" />
+            <span>Sold by a seller verified by the marketplace</span>
+          </li>
+          <li className="flex gap-3">
+            <ShieldCheck className="w-5 h-5 text-gray-400 shrink-0" />
+            <span>Secure checkout, order tracked until delivery</span>
+          </li>
+        </ul>
       </div>
     </div>
   )
