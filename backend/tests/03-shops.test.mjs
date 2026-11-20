@@ -34,6 +34,14 @@ test('shop application lifecycle: apply -> reject -> resubmit -> approve', async
   })
   assert.equal(badTax.status, 400)
 
+  // Doanh nghiep bat buoc co MST (khong chi chan o wizard)
+  const companyNoTax = await req('/shops/apply', {
+    method: 'POST',
+    token: applicant,
+    body: { name: 'Charlie Corner', tax_entity_type: 'company' }
+  })
+  assert.equal(companyNoTax.status, 400)
+
   // apply (kem dia chi lay hang + thue nhu wizard dang ky)
   const applied = await req('/shops/apply', {
     method: 'POST',

@@ -57,10 +57,9 @@ const Checkout = () => {
 
   const cart = cartData?.cart
   // Dong het hang (variant bi xoa) khong duoc gui len server; chi lay dong
-  // nguoi mua chon o gio, bo chon het thi coi nhu chon ca gio.
+  // nguoi mua chon o gio. Bo chon het thi KHONG dat gi (khong tu chon ca gio).
   const available = (cart?.items || []).filter(i => !i.unavailable)
-  const picked = selectedItems(available, getExcluded())
-  const items = picked.length ? picked : available
+  const items = selectedItems(available, getExcluded())
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [name, setName] = useState('')
@@ -89,6 +88,8 @@ const Checkout = () => {
     orderDbId: number
     amount: number
     voucherDiscount: number
+    subtotal: number
+    tierDiscount: number
   } | null>(null)
   const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null)
@@ -276,17 +277,25 @@ const Checkout = () => {
   // Mua ca gio thi xoa gio; mua mot phan thi chi go cac dong da dat
   const clearCartAfterOrder = async () => {
     const ordered = items
-    try {
-      if (ordered.length === available.length) {
+    if (ordered.length === available.length) {
+      try {
         await clearCartMutation.mutateAsync()
-      } else {
-        for (const it of ordered) {
-          await removeItemMutation.mutateAsync({ productId: it.product_id, cartItemId: it.id })
-        }
+        setExcluded(new Set())
+      } catch (err) {
+        // Dong da mua con trong gio: bo chon het de lan sau khong dat lai
+        setExcluded(new Set(available.map(i => i.id)))
+        console.error('Failed to clear cart:', err)
       }
-      setExcluded(new Set())
-    } catch (err) {
-      console.error('Failed to clear cart:', err)
+      return
+    }
+    const results = await Promise.allSettled(
+      ordered.map(it => removeItemMutation.mutateAsync({ productId: it.product_id, cartItemId: it.id }))
+    )
+    const stuck = ordered.filter((_, i) => results[i].status === 'rejected').map(it => it.id)
+    // Dong khong go duoc da duoc mua: giu o trang thai bo chon de khong dat trung
+    setExcluded(new Set(stuck))
+    if (stuck.length) {
+      toast.warning(`${stuck.length} ordered item(s) are still in your cart. Remove them before checking out again.`)
     }
   }
 
@@ -396,7 +405,10 @@ const Checkout = () => {
         orderNumber: orderResult.order_group.group_number,
         orderDbId: orderResult.order_group.id,
         amount: serverPayAmount,
-        voucherDiscount: couponResult?.discount ?? 0
+        voucherDiscount: couponResult?.discount ?? 0,
+        // Chup lai truoc khi go dong khoi gio: sau do `items` doi sang dong con lai
+        subtotal: totals.grandTotal,
+        tierDiscount: tierDiscountAmount
       })
       // Chi xoa gio sau khi tao thanh toan thanh cong de loi thi gio van con
       await clearCartAfterOrder()
@@ -435,7 +447,7 @@ const Checkout = () => {
         navigate(
           `/payment-result?method=momo&order=${encodeURIComponent(
             momoOrderMeta.orderNumber
-          )}&amount=${momoOrderMeta.amount}&subtotal=${totals.grandTotal}&tierDiscount=${tierDiscountAmount}&voucherDiscount=${
+          )}&amount=${momoOrderMeta.amount}&subtotal=${momoOrderMeta.subtotal}&tierDiscount=${momoOrderMeta.tierDiscount}&voucherDiscount=${
             momoOrderMeta.voucherDiscount
           }`
         )
@@ -565,18 +577,40 @@ const Checkout = () => {
     )
   }
 
+  // Don MoMo da tao (gio da go dong da dat): khong hien lai form voi dong con
+  // lai, tranh nguoi mua bam dat lan nua thanh don thu hai.
+  if (momoOrderMeta && !showQRModal) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white shadow rounded-lg p-8 text-center space-y-4 max-w-md">
+          <p className="text-lg font-semibold text-gray-900">Order {momoOrderMeta.orderNumber} created</p>
+          <p className="text-sm text-gray-600">It is waiting for your MoMo payment.</p>
+          <button
+            onClick={handleConfirmPayment}
+            className="px-5 py-3 bg-blue-600 text-white rounded-lg"
+          >
+            View order status
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // For MoMo: we may create an order and clear the cart before we redirect to MoMo.
   // Avoid showing "Your cart is empty" while we're in the middle of creating MoMo payment.
   if (!items.length && !processing && !showQRModal && !momoOrderMeta && !qrData) {
+    const nothingSelected = available.length > 0
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 text-center space-y-4">
-          <p className="text-lg text-gray-600">Your cart is empty</p>
+          <p className="text-lg text-gray-600">
+            {nothingSelected ? 'No items selected for checkout' : 'Your cart is empty'}
+          </p>
           <button
-            onClick={() => navigate('/collection/all')}
+            onClick={() => navigate(nothingSelected ? '/cart' : '/collection/all')}
             className="px-5 py-3 bg-blue-600 text-white rounded-lg"
           >
-            Continue shopping
+            {nothingSelected ? 'Back to cart' : 'Continue shopping'}
           </button>
         </div>
       </div>

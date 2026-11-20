@@ -10,6 +10,8 @@ import {
 } from '../../hooks/useWishlist'
 import { useValidateToken } from '../../hooks/useAuth'
 import type { ProductVariant } from '../../types/product'
+import { fetchCart } from '../../services/cartService'
+import { setExcluded } from '../../utils/cartSelection'
 
 interface ProductProps {
   discount: number
@@ -84,7 +86,6 @@ const Payment = ({
   const selectedQty = hasVariants
     ? selectedVariant?.quantity ?? 0
     : selectedColorObj?.quantity ?? quantity
-  const stockQty = hasVariants && selectedVariant ? selectedVariant.quantity : quantity
   const canBuy = hasVariants ? !!selectedVariant && selectedQty > 0 : quantity > 0
   const [qty, setQty] = useState(1)
   // Doi bien the co ton thap hon thi tu ha so luong
@@ -165,7 +166,22 @@ const Payment = ({
         }
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Mua ngay = chi thanh toan dong nay (dong gop vao dong cu van giu id cu)
+          try {
+            const { cart } = await fetchCart()
+            const bought = cart.items.find(
+              i =>
+                i.product_id === id &&
+                (i.variant?.id ?? null) === (selectedVariant?.id ?? null) &&
+                (!colorPayload?.name || i.color?.name === colorPayload.name)
+            )
+            if (bought) {
+              setExcluded(new Set(cart.items.filter(i => i.id !== bought.id).map(i => i.id)))
+            }
+          } catch {
+            // khong doc duoc gio: checkout dung lua chon hien co
+          }
           toast.success('Redirecting to checkout...')
           navigate('/checkout')
         },
@@ -264,10 +280,10 @@ const Payment = ({
             <span className="text-sm text-gray-500">
               Select a variant to see stock
             </span>
-          ) : stockQty > 0 ? (
+          ) : selectedQty > 0 ? (
             <span className="flex items-center gap-2 text-sm font-medium text-green-600">
               <span className="w-2 h-2 bg-green-600 rounded-full" />
-              {stockQty} in stock
+              {selectedQty} in stock
             </span>
           ) : (
             <span className="flex items-center gap-2 text-sm font-medium text-red-600">

@@ -38,3 +38,46 @@ test('buyer: checkout only the selected cart items', async ({ page }) => {
     .toEqual(['Apple Watch Series 9'])
   await clearCart(page, token)
 })
+
+const fillCart = async (page: import('@playwright/test').Page, token: string, queries: string[]) => {
+  const headers = { Authorization: `Bearer ${token}` }
+  await clearCart(page, token)
+  const ids: number[] = []
+  for (const q of queries) {
+    const p = (await (await page.request.get(`${API}/products?search=${q}&limit=1`)).json()).products[0]
+    const r = await page.request.post(`${API}/cart/add_item/${p.id}`, {
+      headers,
+      data: { quantity: 1, color: p.available_colors?.[0] ?? null, variant_id: p.variants?.[0]?.id }
+    })
+    expect(r.ok(), await r.text()).toBeTruthy()
+    ids.push(p.id)
+  }
+  return ids
+}
+
+// Bo chon het roi vao thang /checkout: khong duoc tu dat ca gio
+test('buyer: nothing selected means nothing to check out', async ({ page }) => {
+  const token = await loginAs(page, 'john@example.com')
+  await fillCart(page, token, ['MacBook'])
+  await page.goto('/cart')
+  await page.getByRole('checkbox', { name: 'Select all items' }).uncheck()
+  await expect(page.getByRole('button', { name: /Proceed to checkout/ })).toBeDisabled()
+  await page.goto('/checkout')
+  await expect(page.getByText('No items selected for checkout')).toBeVisible()
+  await clearCart(page, token)
+})
+
+// Mua ngay chi thanh toan dung san pham vua bam, du gio con mon khac
+test('buyer: buy now checks out only that product', async ({ page }) => {
+  const token = await loginAs(page, 'john@example.com')
+  const [, watchId] = await fillCart(page, token, ['MacBook', 'Watch'])
+  // Bo chon Watch o gio truoc, mua ngay van phai chon lai no
+  await page.goto('/cart')
+  await page.getByRole('checkbox', { name: /^Select Apple Watch/ }).uncheck()
+  await page.goto(`/product/apple-watch-series-9-p${watchId}`)
+  await page.getByRole('button', { name: 'Buy Now' }).click()
+  await expect(page).toHaveURL(/\/checkout/)
+  await expect(page.getByText('Apple Watch Series 9')).toBeVisible()
+  await expect(page.getByText('MacBook Pro 16')).toBeHidden()
+  await clearCart(page, token)
+})

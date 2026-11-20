@@ -127,12 +127,19 @@ export const getMyShop = asyncHandler(async (req, res) => {
 });
 
 // Tra thong bao loi neu MST / loai hinh thue khong hop le, nguoc lai null.
-const validateTax = (tax_code, tax_entity_type) => {
+// `current` = shop dang luu (khi sua): field khong gui thi lay gia tri cu.
+const validateTax = (tax_code, tax_entity_type, current = null) => {
   if (tax_entity_type !== undefined && !["household", "company"].includes(tax_entity_type)) {
     return "tax_entity_type must be 'household' or 'company'";
   }
   if (tax_code !== undefined && tax_code !== null && tax_code !== "" && !/^\d{10}(-\d{3})?$/.test(String(tax_code).trim())) {
     return "tax_code must be 10 digits (or 13 digits with -XXX branch suffix)";
+  }
+  // Chi xet khi request dong toi thue, de sua mo ta shop cu khong bi chan
+  if (tax_code !== undefined || tax_entity_type !== undefined) {
+    const type = tax_entity_type ?? current?.tax_entity_type ?? "household";
+    const code = tax_code !== undefined ? String(tax_code ?? "").trim() : current?.tax_code || "";
+    if (type === "company" && !code) return "Companies must provide a tax_code";
   }
   return null;
 };
@@ -166,7 +173,7 @@ export const updateMyShop = asyncHandler(async (req, res) => {
     tax_entity_type,
   } = req.body || {};
 
-  const taxError = validateTax(tax_code, tax_entity_type);
+  const taxError = validateTax(tax_code, tax_entity_type, shop);
   if (taxError) return res.status(400).json({ success: false, error: taxError });
   // Shop da duyet: doi MST/loai hinh anh huong hoa don da phat hanh nen phai qua admin
   const taxChanged =
@@ -456,12 +463,12 @@ export const rejectShop = asyncHandler(async (req, res) => {
 export const adminUpdateShopTax = asyncHandler(async (req, res) => {
   const shopId = BigInt(req.params.id);
   const { tax_code, tax_entity_type } = req.body || {};
-  const taxError = validateTax(tax_code, tax_entity_type);
-  if (taxError) return res.status(400).json({ success: false, error: taxError });
   const shop = await prisma.shop.findUnique({ where: { id: shopId } });
   if (!shop || shop.deleted_at) {
     return res.status(404).json({ success: false, error: "Shop not found" });
   }
+  const taxError = validateTax(tax_code, tax_entity_type, shop);
+  if (taxError) return res.status(400).json({ success: false, error: taxError });
   const updated = await prisma.shop.update({
     where: { id: shopId },
     data: {
