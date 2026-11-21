@@ -46,6 +46,12 @@ axiosClient.interceptors.response.use(
     // Tai khoan bi admin khoa: bo token ngay de UI ve trang thai chua dang nhap
     if (error?.response?.data?.code === 'ACCOUNT_SUSPENDED' && localStorage.getItem('accessToken')) {
       localStorage.removeItem('accessToken')
+      // Trang tai lai mat toast: gui ly do qua sessionStorage de App hien sau khi tai
+      try {
+        sessionStorage.setItem('auth_notice', error.response.data.message || 'Your account has been suspended')
+      } catch {
+        // private mode: van dang xuat, chi khong hien ly do
+      }
       window.location.assign('/')
     }
     return Promise.reject(error)

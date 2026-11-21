@@ -132,3 +132,21 @@ test('admins cannot be suspended', async () => {
   })
   assert.equal(byBuyer.status, 403)
 })
+
+// Seller bi khoa khong xu ly duoc don: shop phai bi treo cung (nguoi mua khong dat
+// them), mo khoa thi shop hoat dong lai
+test('suspending a seller suspends their shop; unsuspending restores it', async () => {
+  const seller2Id = (await req('/auth/me', { token: await login(ACCOUNTS.seller2) })).json.data.id
+  const suspendUrl = `/customers/${seller2Id}/suspend`
+  const unsuspend = () => req(`/customers/${seller2Id}/unsuspend`, { method: 'PATCH', token: admin })
+  try {
+    const s = await req(suspendUrl, { method: 'PATCH', token: admin, body: { reason: 'Test owner suspension' } })
+    assert.equal(s.status, 200, JSON.stringify(s.json))
+    assert.equal((await req('/shops/gadget-hub')).status, 404, 'shop hidden from buyers')
+    const p = await req('/shops/gadget-hub/products?limit=5')
+    assert.equal((p.json?.products || []).length, 0)
+  } finally {
+    assert.equal((await unsuspend()).status, 200)
+  }
+  assert.equal((await req('/shops/gadget-hub')).status, 200, 'shop live again')
+})

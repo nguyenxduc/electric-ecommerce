@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 import { useValidateToken } from '../../client/hooks/useAuth'
 import { useAllChats } from '../../client/hooks/useChat'
-import { logout } from '../../client/services/authService'
+import { useLogout } from '../../client/hooks/useAuth'
 import { toast } from 'sonner'
 
 type NavItem = {
@@ -124,9 +124,11 @@ export default function AdminLayout() {
       0
     ) || 0
 
+  // Hook dung chung: dang xuat + xoa cache cua nguoi dung truoc
+  const logoutMutation = useLogout()
   const handleLogout = async () => {
     try {
-      await logout()
+      await logoutMutation.mutateAsync()
       toast.success('Logged out successfully')
       navigate('/')
     } catch {

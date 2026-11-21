@@ -21,7 +21,8 @@ const placeOrder = async (product, payment_method, name = 'Jane Smith') => {
     method: 'POST',
     token: jane,
     body: {
-      items: [{ product_id: product.id, quantity: 1, color: product.available_colors?.[0] || null }],
+      // Mau con hang: chay lai nhieu lan lam mau dau tien het hang
+      items: [{ product_id: product.id, quantity: 1, color: product.available_colors?.find(c => c.quantity > 0) || null }],
       shipping_address: { name, phone: '0912345678', address: '1 Tools St' },
       payment_method
     }
@@ -89,7 +90,7 @@ test('export.csv returns own orders only and neutralises formulas', async () => 
   const lines = csv.replace(/^﻿/, '').split('\r\n')
   assert.equal(
     lines[0],
-    '"order_number","date","buyer","phone","items","total","status","payment_method"'
+    '"order_number","date","buyer","phone","shipping_address","items","shipping_fee","total","status","payment_method"'
   )
 
   const [evilOrder, foreignOrder] = await Promise.all(

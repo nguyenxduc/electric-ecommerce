@@ -62,3 +62,16 @@ test('no usable options leaves rows untouched; options round-trip from rows', ()
   const [row] = generateVariants([{ name: 'Size', values: ['10,5=x'] }], [])
   assert.deepEqual(variantsToPayload([row])[0].attributes, { size: '10 5 x' })
 })
+
+test('generated SKUs are unique even when values slugify the same', () => {
+  const rows = generateVariants([{ name: 'Size', values: ['+', '++'] }], [], 'Phone')
+  const skus = rows.map(r => r.sku)
+  assert.equal(new Set(skus).size, skus.length, JSON.stringify(skus))
+})
+
+test('duplicate existing rows: the first one is kept', () => {
+  const a = { sku: 'A', name: 'Black', attrs: 'color=Black', price_delta: '1', quantity: '5', id: 1 }
+  const b = { sku: 'B', name: 'Black', attrs: 'color=Black', price_delta: '2', quantity: '9', id: 2 }
+  const rows = generateVariants([{ name: 'Color', values: ['Black'] }], [a, b], 'X')
+  assert.equal(rows[0].sku, 'A')
+})

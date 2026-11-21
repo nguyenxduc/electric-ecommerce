@@ -757,14 +757,22 @@ export const exportShopOrdersCsv = asyncHandler(async (req, res) => {
     },
   });
 
+  // Gio Viet Nam nhu file xuat cua cac san (khong de ISO UTC)
+  const vnTime = (d) => d.toLocaleString("sv-SE", { timeZone: "Asia/Ho_Chi_Minh" });
+  const addressOf = (a) =>
+    a && typeof a === "object"
+      ? [a.address, a.ward, a.district, a.province].filter(Boolean).join(", ")
+      : String(a ?? "");
   const csv = toCsv(
-    ["order_number", "date", "buyer", "phone", "items", "total", "status", "payment_method"],
+    ["order_number", "date", "buyer", "phone", "shipping_address", "items", "shipping_fee", "total", "status", "payment_method"],
     orders.map((o) => [
       o.order_number || o.id.toString(),
-      o.created_at.toISOString(),
+      vnTime(o.created_at),
       o.receiver_name || o.user?.name || "",
       o.receiver_phone || "",
+      addressOf(o.shipping_address),
       o.order_items.map((i) => `${i.product?.name || "Product"} x${i.quantity ?? 1}`).join("; "),
+      Number(o.shipping_fee || 0).toFixed(2),
       Number(o.total_amount || 0).toFixed(2),
       o.status || "",
       o.payment_method || "",
@@ -978,9 +986,13 @@ export const getShopOrderStats = asyncHandler(async (req, res) => {
       prisma.order.count({
         where: { ...whereActive, status: ORDER_STATUS.PENDING },
       }),
+      // Doanh thu khong tinh don da huy/tra hang (cung quy tac voi dashboard)
       prisma.order.aggregate({
         _sum: { total_amount: true },
-        where: whereActive,
+        where: {
+          ...whereActive,
+          status: { notIn: [ORDER_STATUS.CANCELLED, ORDER_STATUS.RETURNED] },
+        },
       }),
       prisma.order.findMany({
         orderBy: { created_at: "desc" },

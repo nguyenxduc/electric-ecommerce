@@ -146,6 +146,15 @@ export default function SellerCouponsList() {
                 toast.error('Code and discount value are required')
                 return
               }
+              // Bat loi o form truoc, thay vi de server tra thong bao tho
+              if (form.discount_type === 'percent' && Number(form.discount_value) > 100) {
+                toast.error('A percentage discount cannot be more than 100%')
+                return
+              }
+              if (form.starts_at && form.expires_at && form.starts_at >= form.expires_at) {
+                toast.error('The start date must be before the expiry date')
+                return
+              }
               saveMut.mutate()
             }}
           >
@@ -182,7 +191,7 @@ export default function SellerCouponsList() {
               <span className="block mb-1">
                 Value * {form.discount_type === 'percent' ? '(%)' : '($)'}
               </span>
-              <input type="number" min="0" step="0.01" className={field} value={form.discount_value} onChange={set('discount_value')} />
+              <input type="number" min="0" max={form.discount_type === 'percent' ? 100 : undefined} step="0.01" className={field} value={form.discount_value} onChange={set('discount_value')} />
             </label>
             <label className="block text-sm">
               <span className="block mb-1">Min order ($)</span>

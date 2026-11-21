@@ -60,6 +60,19 @@ import SellerFinance from './seller/pages/finance/Finance'
 const queryClient = new QueryClient()
 
 function App() {
+  // Thong bao de lai truoc khi trang tai lai (vd. bi khoa tai khoan, xem lib/axios.ts)
+  useEffect(() => {
+    try {
+      const notice = sessionStorage.getItem('auth_notice')
+      if (notice) {
+        sessionStorage.removeItem('auth_notice')
+        toast.error(notice, { duration: 10000 })
+      }
+    } catch {
+      // sessionStorage bi chan: bo qua
+    }
+  }, [])
+
   useEffect(() => {
     // Use MutationObserver to detect when toast elements are added to DOM
     const observer = new MutationObserver(mutations => {

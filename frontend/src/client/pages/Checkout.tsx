@@ -295,27 +295,32 @@ const Checkout = () => {
 
     const result = await createOrder(orderPayload)
 
-    // Luu dia chi sau khi dat don thanh cong; loi luu khong anh huong don
-    if (saveAddress && showManualAddress) {
-      createAddressMutation
-        .mutateAsync({
-          name: name.trim(),
-          phone: phone.trim(),
-          street: address.trim(),
-          province: province.trim() || null,
-          district: district.trim() || null,
-          ward: ward.trim() || null
-        })
-        .catch(err => toast.warning(apiErrorMessage(err, 'Could not save the address to your address book')))
-    }
-
     if (clearCart) await clearCartAfterOrder()
 
     return result
   }
 
-  // Mua ca gio thi xoa gio; mua mot phan thi chi go cac dong da dat
+  // Luu dia chi moi vao so dia chi; loi luu khong anh huong don. Chi dia chi nhap
+  // tay (chua co trong so) de khong tao ban trung khi sua mot dia chi da luu.
+  const saveAddressIfWanted = () => {
+    if (!saveAddress || !showManualAddress || addressId) return
+    createAddressMutation
+      .mutateAsync({
+        name: name.trim(),
+        phone: phone.trim(),
+        street: address.trim(),
+        province: province.trim() || null,
+        district: district.trim() || null,
+        ward: ward.trim() || null
+      })
+      .catch(err => toast.warning(apiErrorMessage(err, 'Could not save the address to your address book')))
+  }
+
+  // Mua ca gio thi xoa gio; mua mot phan thi chi go cac dong da dat.
+  // Goi khi don da chot (COD ngay sau khi dat; MoMo sau khi tao duoc thanh toan),
+  // nen luu dia chi o day thay vi ngay sau createOrder (MoMo loi se huy don).
   const clearCartAfterOrder = async () => {
+    saveAddressIfWanted()
     const ordered = items
     if (ordered.length === available.length) {
       try {
@@ -533,6 +538,7 @@ const Checkout = () => {
     discount: number,
     shopName?: string
   ) => {
+    markVoucherTouched()
     setAppliedCoupon(code)
     setCouponInput(code)
     setCouponResult({ discount, finalAmount: 0, shopName })
@@ -547,6 +553,10 @@ const Checkout = () => {
   // Tu chon voucher giam nhieu nhat trong kho, mot lan cho moi gio hang; nguoi
   // dung bo chon thi khong chon lai. Chay sau effect reset o tren.
   const autoPickedFor = useRef<string | null>(null)
+  // Nguoi dung da tu chon / bo / nhap ma: auto-pick ve sau (quote tra cham) khong duoc de len
+  const markVoucherTouched = () => {
+    autoPickedFor.current = quoteKey
+  }
   useEffect(() => {
     if (!voucherQuote.data || autoPickedFor.current === quoteKey) return
     autoPickedFor.current = quoteKey
@@ -560,6 +570,7 @@ const Checkout = () => {
   }, [voucherQuote.data, quoteKey])
 
   const handleApplyCoupon = () => {
+    markVoucherTouched()
     const code = couponInput.trim()
     if (!code) {
       toast.error('Please enter a voucher code')
@@ -620,17 +631,24 @@ const Checkout = () => {
   // Avoid showing "Your cart is empty" while we're in the middle of creating MoMo payment.
   if (!items.length && !processing && !showQRModal && !momoOrderMeta && !qrData) {
     const nothingSelected = available.length > 0
+    // Gio con dong nhung deu khong mua duoc (an/het bien the): dua ve gio de go bo
+    const onlyUnavailable = !available.length && (cart?.items?.length ?? 0) > 0
+    const toCart = nothingSelected || onlyUnavailable
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white shadow rounded-lg p-8 text-center space-y-4">
           <p className="text-lg text-gray-600">
-            {nothingSelected ? 'No items selected for checkout' : 'Your cart is empty'}
+            {nothingSelected
+              ? 'No items selected for checkout'
+              : onlyUnavailable
+                ? 'Items in your cart are no longer available'
+                : 'Your cart is empty'}
           </p>
           <button
-            onClick={() => navigate(nothingSelected ? '/cart' : '/collection/all')}
+            onClick={() => navigate(toCart ? '/cart' : '/collection/all')}
             className="px-5 py-3 bg-blue-600 text-white rounded-lg"
           >
-            {nothingSelected ? 'Back to cart' : 'Continue shopping'}
+            {toCart ? 'Back to cart' : 'Continue shopping'}
           </button>
         </div>
       </div>
@@ -755,6 +773,7 @@ const Checkout = () => {
               />
             </CheckoutField>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              {!addressId && (
               <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
@@ -764,6 +783,7 @@ const Checkout = () => {
                 />
                 Save this address to my address book
               </label>
+              )}
               {savedAddresses.length > 0 && (
                 <button onClick={() => setPickerOpen(true)} className="text-sm font-medium text-blue-600 hover:underline">
                   Choose a saved address
@@ -1229,6 +1249,7 @@ const Checkout = () => {
           appliedCode={appliedCoupon}
           onApply={handleApplyMyVoucher}
           onRemove={() => {
+            markVoucherTouched()
             setAppliedCoupon(null)
             setCouponResult(null)
           }}

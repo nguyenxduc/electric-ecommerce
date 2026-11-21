@@ -122,7 +122,12 @@ export const listShopPublicCoupons = async ({ slug, userId, now = new Date() }) 
  */
 export const claimCoupon = async ({ userId, couponId, now = new Date() }) => {
   const coupon = await prisma.coupon.findFirst({
-    where: { id: BigInt(couponId), deleted_at: null },
+    where: {
+      id: BigInt(couponId),
+      deleted_at: null,
+      // Voucher san hoac cua shop dang hoat dong; shop bi treo/xoa thi khong luu duoc
+      OR: [{ shop_id: null }, { shop: { status: SHOP_STATUS.ACTIVE, deleted_at: null } }],
+    },
     include: { users: { select: { id: true }, take: 1 } },
   });
   if (!coupon) {

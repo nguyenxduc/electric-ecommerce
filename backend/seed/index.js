@@ -1044,7 +1044,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "VIP25",
-      description: "25% off for VIP members",
+      description: "25% off orders from $500",
       discount_type: "percent",
       discount_value: 25,
       min_order: 500,

@@ -74,6 +74,7 @@ import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
 import addressRoutes from "./routes/address.route.js";
 import { startDailyJobsScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
+import { setIO } from "./lib/io.js";
 
 import cors from "cors";
 import helmet from "helmet";
@@ -191,6 +192,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
   },
 });
+setIO(io);
 
 // Socket.io authentication middleware
 io.use(async (socket, next) => {

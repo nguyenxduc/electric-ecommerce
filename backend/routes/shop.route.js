@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "node:fs";
 import {
   applyForShop,
   getMyShop,
@@ -32,8 +33,12 @@ const shopImageUpload = multer({
   { name: "logo", maxCount: 1 },
   { name: "banner", maxCount: 1 },
 ]);
-const shopImages = (req, res, next) =>
-  shopImageUpload(req, res, (err) =>
+const shopImages = (req, res, next) => {
+  // File tam cua multer khong tu xoa: don khi ket noi dong (ca khi client huy giua chung)
+  res.on("close", () => {
+    for (const f of Object.values(req.files || {}).flat()) fs.unlink(f.path, () => {});
+  });
+  return shopImageUpload(req, res, (err) =>
     err
       ? res.status(400).json({
           success: false,
@@ -44,6 +49,7 @@ const shopImages = (req, res, next) =>
         })
       : next()
   );
+};
 
 // Admin moderation (before /:slug so "admin" isn't parsed as a slug)
 router.get("/admin/all", protectRoute, adminRoute, adminListShops);

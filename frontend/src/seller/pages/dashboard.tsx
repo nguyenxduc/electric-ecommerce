@@ -169,7 +169,7 @@ export default function SellerDashboard() {
               </span>
             </div>
             <div className="flex justify-between border-t pt-2 mt-2">
-              <span className="text-gray-500">All-time revenue</span>
+              <span className="text-gray-500">All-time revenue (excl. cancelled)</span>
               <span className="font-semibold">
                 {stats?.revenue.formatted || '$0.00'}
               </span>
@@ -178,7 +178,7 @@ export default function SellerDashboard() {
               <>
                 <div className="flex justify-between">
                   <span className="text-gray-500">
-                    Platform fee ({stats.commission.ratePercent})
+                    Est. platform fee ({stats.commission.ratePercent})
                   </span>
                   <span className="font-medium text-red-600">
                     -{stats.commission.formatted.fee}
@@ -186,7 +186,7 @@ export default function SellerDashboard() {
                 </div>
                 <div className="flex justify-between border-t pt-2">
                   <span className="text-gray-700 font-medium">
-                    Net payout
+                    Est. net payout
                   </span>
                   <span className="font-bold text-green-700">
                     {stats.commission.formatted.netRevenue}
@@ -200,6 +200,12 @@ export default function SellerDashboard() {
             className="mt-4 inline-block text-sm text-blue-600 hover:underline"
           >
             Manage products →
+          </Link>
+          <Link
+            to="/seller/finance"
+            className="mt-2 block text-sm text-blue-600 hover:underline"
+          >
+            Released income (delivered orders) →
           </Link>
         </div>
 

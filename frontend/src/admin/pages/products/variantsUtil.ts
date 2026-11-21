@@ -91,14 +91,27 @@ export const generateVariants = (
     (acc, o) => acc.flatMap(c => o.values.map(v => [...c, v])),
     [[]]
   )
-  const bySig = new Map(existing.map(r => [signature(parseAttrs(r.attrs)), r]))
+  // Hai dong trung thuoc tinh: giu dong dau (Map ghi de se lam mat id/ton kho cua no)
+  const bySig = new Map<string, VariantRow>()
+  existing.forEach(r => {
+    const sig = signature(parseAttrs(r.attrs))
+    if (!bySig.has(sig)) bySig.set(sig, r)
+  })
   const code = (s: string) => slugifyName(s).toUpperCase()
+  // SKU phai duy nhat: gia tri slug rong hoac cat 64 ky tu co the dung nhau -> them -2, -3
+  const usedSkus = new Set(existing.map(r => r.sku).filter(Boolean))
+  const uniqueSku = (base: string) => {
+    let sku = base
+    for (let n = 2; usedSkus.has(sku); n++) sku = `${base.slice(0, 60)}-${n}`
+    usedSkus.add(sku)
+    return sku
+  }
   return combos.map(values => {
     const attrs = Object.fromEntries(opts.map((o, i) => [o.key, values[i]]))
     const found = bySig.get(signature(attrs))
     if (found) return found
     return {
-      sku: [skuBase && code(skuBase).slice(0, 24), ...values.map(code)].filter(Boolean).join('-').slice(0, 64),
+      sku: uniqueSku([skuBase && code(skuBase).slice(0, 24), ...values.map(code)].filter(Boolean).join('-').slice(0, 64)),
       name: values.join(' / '),
       attrs: Object.entries(attrs)
         .map(([k, v]) => `${k}=${v}`)

@@ -89,7 +89,12 @@ export default function VoucherPicker({
                       {v.applicable ? (
                         <p className="text-xs text-green-700 mt-1">Save {formatUsd(v.discount)}</p>
                       ) : (
-                        <p className="text-xs text-red-500 mt-1">{v.reason}</p>
+                        <p className="text-xs text-red-500 mt-1">
+                          {v.reason}
+                          {/* Voucher san xet tren tong don: noi ro con thieu bao nhieu */}
+                          {!v.shop && Number(v.min_order) > amount &&
+                            ` · Add ${formatUsd(Number(v.min_order) - amount)} more to use it`}
+                        </p>
                       )}
                     </div>
                     {!v.claimed ? (

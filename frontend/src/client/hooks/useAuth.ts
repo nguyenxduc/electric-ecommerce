@@ -46,7 +46,9 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: () => logoutSvc(),
     onSuccess: () => {
-      qc.removeQueries({ queryKey: ['me'] })
+      // Xoa het cache cua nguoi dung truoc (so dia chi, voucher, gio, don hang):
+      // nguoi khac dang nhap cung tab khong duoc thay du lieu ca nhan cu
+      qc.clear()
     }
   })
 }
