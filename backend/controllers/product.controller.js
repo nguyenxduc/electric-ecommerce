@@ -380,7 +380,22 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   }
 
   const where = {};
-  if (search) where.name = { contains: String(search), mode: "insensitive" };
+  let rankedIds = null;
+  if (search) {
+    // Cung bo tim kiem voi o tim kiem (searchProducts): khop mot phan tu, ten danh muc, loi go
+    const ids = await findSearchCandidateIds(prisma, String(search), {
+      activeShopsOnly: req?.user?.role !== ROLES.ADMIN,
+    });
+    if (ids.length > 0) {
+      where.id = { in: ids };
+      rankedIds = ids;
+    } else where.name = { contains: String(search), mode: "insensitive" };
+  }
+  // Tim kiem ma nguoi dung khong tu chon sap xep: giu thu hang do khop (khop nhat len dau)
+  const fetchPage = (w) =>
+    rankedIds && !req.query.sort
+      ? fetchRankedProducts(w, rankedIds, skip, perPage)
+      : fetchPaginatedProducts(w, orderBy, skip, perPage);
   if (category_id) where.category_id = BigInt(category_id);
   if (sub_category_id) where.sub_category_id = BigInt(sub_category_id);
   if (shop_id) where.shop_id = BigInt(shop_id);
@@ -398,12 +413,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   const baseWhere = { ...where, deleted_at: null, ...buyerVisibilityWhere(req) };
 
   if (Object.keys(filterParams).length === 0) {
-    const { total_count, products } = await fetchPaginatedProducts(
-      baseWhere,
-      orderBy,
-      skip,
-      perPage
-    );
+    const { total_count, products } = await fetchPage(baseWhere);
 
     return res.json({
       products: products.map(calculateProductPrices),
@@ -421,13 +431,13 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     });
   }
 
-  const filteredWhere = { ...baseWhere, id: { in: productIdsArray } };
-  const { total_count, products } = await fetchPaginatedProducts(
-    filteredWhere,
-    orderBy,
-    skip,
-    perPage
-  );
+  // Giao voi ket qua tim kiem (neu co), khong ghi de mat dieu kien tim kiem
+  const searchIds = rankedIds ? new Set(rankedIds.map(String)) : null;
+  const ids = searchIds
+    ? productIdsArray.filter((id) => searchIds.has(String(id)))
+    : productIdsArray;
+  const filteredWhere = { ...baseWhere, id: { in: ids } };
+  const { total_count, products } = await fetchPage(filteredWhere);
 
   res.json({
     products: products.map(calculateProductPrices),

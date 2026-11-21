@@ -11,6 +11,7 @@ export type WishlistItem = {
     rating: string | null
     quantity: number
     _count?: { variants: number; product_colors: number }
+    product_colors?: { name: string; code: string; quantity: number }[]
   }
   created_at: string
 }

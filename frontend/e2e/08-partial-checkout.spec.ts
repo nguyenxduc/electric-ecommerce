@@ -6,7 +6,7 @@ test('buyer: checkout only the selected cart items', async ({ page }) => {
   const token = await loginAs(page, 'john@example.com')
   const headers = { Authorization: `Bearer ${token}` }
   await clearCart(page, token)
-  for (const q of ['MacBook', 'Watch']) {
+  for (const q of ['MacBook', 'Apple Watch']) {
     const p = (await (await page.request.get(`${API}/products?search=${q}&limit=1`)).json()).products[0]
     const r = await page.request.post(`${API}/cart/add_item/${p.id}`, {
       headers,
@@ -70,7 +70,7 @@ test('buyer: nothing selected means nothing to check out', async ({ page }) => {
 // Mua ngay chi thanh toan dung san pham vua bam, du gio con mon khac
 test('buyer: buy now checks out only that product', async ({ page }) => {
   const token = await loginAs(page, 'john@example.com')
-  const [, watchId] = await fillCart(page, token, ['MacBook', 'Watch'])
+  const [, watchId] = await fillCart(page, token, ['MacBook', 'Apple Watch'])
   // Bo chon Watch o gio truoc, mua ngay van phai chon lai no
   await page.goto('/cart')
   await page.getByRole('checkbox', { name: /^Select Apple Watch/ }).uncheck()

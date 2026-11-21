@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { PLACEHOLDER_IMAGE } from '../utils/placeholderImage'
 import { apiErrorMessage, apiErrorResponse } from '../../lib/apiError'
 import {
   Truck,
@@ -837,7 +838,7 @@ const Checkout = () => {
                       <img
                         src={
                           item.image_url ||
-                          'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+                          PLACEHOLDER_IMAGE
                         }
                         alt={item.name}
                         className="h-14 w-14 object-contain bg-gray-50 rounded"

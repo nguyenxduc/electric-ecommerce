@@ -59,13 +59,19 @@ export default function Wishlist() {
 
   const handleAddToCart = (product: WishlistItem['product'], productSlug: string) => {
     // Can chon bien the/mau thi backend tu choi: mo trang san pham de nguoi mua chon
-    if ((product._count?.variants ?? 0) > 0 || (product._count?.product_colors ?? 0) > 0) {
+    // Chi mot mau (khong bien the) thi khong co gi de chon: them thang voi mau do
+    const colors = product.product_colors ?? []
+    if ((product._count?.variants ?? 0) > 0 || colors.length > 1) {
       toast.info('Choose an option for this product')
       navigate(`/product/${productSlug}`)
       return
     }
+    const only = colors[0]
     addToCartMutation.mutate(
-      { productId: parseInt(product.id), payload: { quantity: 1 } },
+      {
+        productId: parseInt(product.id),
+        payload: { quantity: 1, color: only ? { name: only.name, code: only.code } : null }
+      },
       {
         onSuccess: () => toast.success('Added to cart'),
         onError: err => toast.error(apiErrorMessage(err, 'Failed to add to cart'))

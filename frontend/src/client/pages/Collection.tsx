@@ -246,7 +246,8 @@ const Collection = () => {
   const { data: searchResults, isLoading: isSearching } = useSearchProducts(
     searchQuery,
     {
-      sort: mappedSort,
+      // "featured" khi tim kiem = xep theo do khop: khong gui sort de backend giu thu hang
+      sort: sortBy === 'featured' ? undefined : mappedSort,
       page: currentPage,
       limit: COLLECTION_PAGE_SIZE,
       category_id:

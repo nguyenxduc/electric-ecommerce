@@ -1,4 +1,5 @@
 import { Star, Store as StoreIcon } from 'lucide-react'
+import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
@@ -27,7 +28,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
     window.location.hash === '#reviews' ? 'comment' : 'description'
   )
   const [mainImage, setMainImage] = useState(
-    'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+    PLACEHOLDER_IMAGE
   )
   const [selectedColor, setSelectedColor] = useState<string>('')
   const [expanded, setExpanded] = useState(false)

@@ -33,3 +33,15 @@ test('khong dau / hoa thuong khong anh huong: "XIAO" va "Lap" van ra', async () 
 test('tu vo nghia van tra ve rong', async () => {
   assert.equal((await search('zzqxw')).length, 0)
 })
+
+test('product list ?search= uses the same matching as the search box', async () => {
+  // Trang danh sach (/collection?search=) goi GET /products?search=, phai tim duoc nhu o tim kiem
+  const res = await req('/products?search=lap&limit=20')
+  assert.equal(res.status, 200)
+  assert.ok((res.json.products || []).some(p => /asus rog/i.test(p.name)), JSON.stringify(res.json.products?.map(p => p.name)))
+})
+
+test('product list ?search= keeps relevance order when no sort is chosen', async () => {
+  const res = await req('/products?search=' + encodeURIComponent('Apple Watch') + '&limit=5')
+  assert.equal(res.json.products?.[0]?.name, 'Apple Watch Series 9', JSON.stringify(res.json.products?.map(p => p.name)))
+})

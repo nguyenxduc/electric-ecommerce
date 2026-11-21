@@ -1,3 +1,4 @@
+import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import {
   useEffect,
   useMemo,
@@ -353,7 +354,7 @@ function Modal({
                         <img
                           src={
                             item.thumb ||
-                            'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+                            PLACEHOLDER_IMAGE
                           }
                           alt={item.name}
                           className="h-16 w-16 object-contain rounded-lg bg-gray-50 flex-shrink-0"
@@ -423,7 +424,7 @@ function Modal({
                       <img
                         src={
                           item.thumb ||
-                          'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+                          PLACEHOLDER_IMAGE
                         }
                         alt={item.name}
                         className="h-16 w-16 object-contain rounded-lg bg-gray-50"

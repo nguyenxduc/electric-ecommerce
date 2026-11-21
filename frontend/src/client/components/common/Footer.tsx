@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { usePublicSettings } from '../../hooks/useSettings'
 
@@ -13,7 +12,6 @@ import { RiTwitterXLine } from 'react-icons/ri'
 import CompanyIcon from '../../../assets/company-icon.svg'
 
 const Footer = () => {
-  const [email, setEmail] = useState('')
   const { data: settingsData } = usePublicSettings('general')
 
   // Extract settings with fallback values
@@ -80,18 +78,6 @@ const Footer = () => {
           </div>
         </div>
         <div className="flex flex-col text-white font-thin space-y-1">
-          <h3 className="text-xl font-normal mb-2 text-nowrap">
-            Sign up for News and updates
-          </h3>
-          <div className="w-full max-w-[300px]">
-            <input
-              type="text"
-              placeholder="E-mail Address"
-              className="border border-white bg-transparent px-4 py-3 rounded-md w-full placeholder-white font-normal"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-            />
-          </div>
           {socials.length > 0 && (
             <div className="inline-flex space-x-5 pt-3">
               {socials.map(({ url, label, Icon }) => (

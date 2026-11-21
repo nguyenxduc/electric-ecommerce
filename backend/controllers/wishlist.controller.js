@@ -9,7 +9,11 @@ export const getUserWishlist = asyncHandler(async (req, res) => {
     // Dem bien the/mau de frontend biet co the them thang vao gio hay phai mo trang san pham
     include: {
       product: {
-        include: { _count: { select: { variants: { where: { deleted_at: null } }, product_colors: true } } },
+        include: {
+          _count: { select: { variants: { where: { deleted_at: null } }, product_colors: true } },
+          // Chi mot mau thi them thang vao gio voi mau do, khong bat mo trang san pham
+          product_colors: { select: { name: true, code: true, quantity: true } },
+        },
       },
     },
     orderBy: { created_at: "desc" },

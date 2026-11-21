@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import { useNavigate } from 'react-router-dom'
 import EmptyState from './EmptyStatus'
 import OrderStatus from './OrderStatus'
@@ -113,7 +114,7 @@ const Order = () => {
         image:
           (Array.isArray(oi.product?.img) && oi.product?.img?.[0]) ||
           oi.product?.image_url ||
-          'https://upload.wikimedia.org/wikipedia/commons/6/65/No-Image-Placeholder.svg'
+          PLACEHOLDER_IMAGE
       }))
     }))
   }, [orders])
