@@ -420,6 +420,8 @@ model Notification {
   title      String
   message    String
   type       String? // ORDER, PROMO, SYSTEM...
+  // Duong dan trong app khi bam vao (vd. /profile?tab=orders&order=123)
+  link       String?
   is_read    Boolean   @default(false)
   created_at DateTime  @default(now())
   read_at    DateTime?
@@ -473,6 +475,11 @@ model Review {
   product_id BigInt
   rating     Int?
   comment    String?
+  // Anh nguoi mua dinh kem (URL Cloudinary), toi da 5
+  images     String[]  @default([])
+  // Seller tra loi cong khai mot lan (sua duoc)
+  seller_reply    String?
+  seller_reply_at DateTime?
   client_ip  String?
   device_id  String?
   created_at DateTime  @default(now())
@@ -518,6 +525,8 @@ model Coupon {
   is_active      Boolean   @default(true)
   // Tran giam cho voucher phan tram (null = khong gioi han)
   max_discount   Decimal?  @db.Decimal(10, 2)
+  // So lan toi da moi nguoi mua dung voucher (null = khong gioi han)
+  per_user_limit Int?
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   deleted_at     DateTime?

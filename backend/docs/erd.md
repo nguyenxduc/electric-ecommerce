@@ -242,6 +242,7 @@ erDiagram
     datetime expires_at
     bool is_active
     decimal max_discount
+    int per_user_limit
     datetime created_at
     datetime updated_at
     datetime deleted_at
@@ -370,6 +371,9 @@ erDiagram
     bigint product_id
     int rating
     string comment
+    string images
+    string seller_reply
+    datetime seller_reply_at
     string client_ip
     string device_id
     datetime created_at
@@ -484,6 +488,7 @@ erDiagram
     string title
     string message
     string type
+    string link
     bool is_read
     datetime created_at
     datetime read_at
