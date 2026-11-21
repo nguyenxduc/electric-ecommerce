@@ -12,6 +12,9 @@ import {
 } from "./productsCatalog.js";
 
 async function clearDatabase() {
+  // Bang moi tham chieu users/coupons: xoa truoc
+  await prisma.couponClaim.deleteMany();
+  await prisma.userAddress.deleteMany();
   await prisma.aiMessage.deleteMany();
   await prisma.aiChat.deleteMany();
   await prisma.message.deleteMany();

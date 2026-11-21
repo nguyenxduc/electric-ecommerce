@@ -3,7 +3,7 @@
 > Sinh tu `prisma/schema.prisma` bang `npm run docs:erd`.
 > **Khong sua tay file nay** — sua schema roi chay lai lenh tren.
 
-Tong cong 42 bang nghiep vu (chua tinh 2 bang ha tang cua
+Tong cong 44 bang nghiep vu (chua tinh 2 bang ha tang cua
 cong cu migration). Chia theo mien de doc duoc; quan he bac cau giua cac
 mien duoc noi trong phan mo ta cua tung muc.
 
@@ -60,6 +60,8 @@ erDiagram
     datetime deleted_at
     string description
     bool is_active
+    string takedown_reason
+    datetime taken_down_at
     int weight_grams
   }
   Category {
@@ -184,6 +186,22 @@ erDiagram
     datetime created_at
     datetime updated_at
     datetime deleted_at
+    datetime suspended_at
+    string suspend_reason
+  }
+  UserAddress {
+    bigint id "PK"
+    bigint user_id
+    string name
+    string phone
+    string province
+    string district
+    string ward
+    string street
+    bool is_default
+    datetime created_at
+    datetime updated_at
+    datetime deleted_at
   }
   Cart {
     bigint id "PK"
@@ -220,10 +238,19 @@ erDiagram
     int usage_limit
     int used_count
     bigint shop_id
+    datetime starts_at
     datetime expires_at
+    bool is_active
+    decimal max_discount
     datetime created_at
     datetime updated_at
     datetime deleted_at
+  }
+  CouponClaim {
+    bigint id "PK"
+    bigint user_id
+    bigint coupon_id
+    datetime claimed_at
   }
   LoyaltyPointTransaction {
     bigint id "PK"
@@ -234,10 +261,13 @@ erDiagram
     string description
     datetime created_at
   }
+  User ||--o{ UserAddress : ""
+  User ||--o{ CouponClaim : ""
   User ||--o{ Cart : ""
   User ||--o{ Wishlist : ""
   User ||--o{ Coupon : ""
   Cart ||--o{ CartItem : ""
+  Coupon ||--o{ CouponClaim : ""
 ```
 
 ## 3. Don hang, thanh toan va doi tra

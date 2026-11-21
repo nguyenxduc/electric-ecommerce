@@ -34,7 +34,7 @@ const DOMAINS = [
   {
     title: "2. Nguoi dung, gio hang va uu dai",
     note: "User la trung tam: vua la nguoi mua, vua co the la chu shop (quan he ShopOwner).",
-    models: ["User", "Cart", "CartItem", "Wishlist", "Coupon", "LoyaltyPointTransaction"],
+    models: ["User", "UserAddress", "Cart", "CartItem", "Wishlist", "Coupon", "CouponClaim", "LoyaltyPointTransaction"],
   },
   {
     title: "3. Don hang, thanh toan va doi tra",

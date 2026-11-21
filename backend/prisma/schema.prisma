@@ -79,6 +79,9 @@ model Product {
   description     String?
   // An/hien tren san: false thi nguoi mua khong thay (xem buyerVisibilityWhere).
   is_active       Boolean                  @default(true)
+  // Admin go san pham vi pham: seller khong tu bat lai duoc khi con takedown
+  takedown_reason String?
+  taken_down_at   DateTime?
   // Khoi luong mot don vi, dung de bao gia van chuyen theo can nang.
   weight_grams    Int                      @default(500)
   // Cột full-text do trigger trong DB tự cập nhật, Prisma không ghi vào cột này.
@@ -241,8 +244,13 @@ model User {
   created_at              DateTime  @default(now())
   updated_at              DateTime  @updatedAt
   deleted_at              DateTime?
+  // Admin khoa tai khoan: khong dang nhap / goi API duoc cho toi khi mo lai
+  suspended_at            DateTime?
+  suspend_reason          String?
 
   // relations
+  addresses       UserAddress[]
+  coupon_claims   CouponClaim[]
   orders          Order[]
   order_groups    OrderGroup[]
   reviews         Review[]
@@ -504,7 +512,12 @@ model Coupon {
   used_count     Int?      @default(0)
   // null = platform-wide voucher; set = only applies to that shop's items
   shop_id        BigInt?
+  // Lich ap dung: null = co hieu luc ngay; is_active=false = seller tam dung
+  starts_at      DateTime?
   expires_at     DateTime?
+  is_active      Boolean   @default(true)
+  // Tran giam cho voucher phan tram (null = khong gioi han)
+  max_discount   Decimal?  @db.Decimal(10, 2)
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
   deleted_at     DateTime?
@@ -514,6 +527,7 @@ model Coupon {
   orders       Order[]
   order_groups OrderGroup[]
   users        User[]       @relation("UserCoupons")
+  claims       CouponClaim[]
 
   @@index([shop_id])
   @@map("coupons")
@@ -941,4 +955,41 @@ model TaxWithholding {
   @@index([shop_id, period])
   @@index([period])
   @@map("tax_withholdings")
+}
+
+// So dia chi giao hang cua nguoi mua; mot dia chi mac dinh dien san o checkout
+model UserAddress {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  name       String
+  phone      String
+  province   String?
+  district   String?
+  ward       String?
+  street     String
+  is_default Boolean   @default(false)
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  deleted_at DateTime?
+
+  user User @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@map("user_addresses")
+}
+
+// Voucher nguoi mua "luu" vao kho. Tach rieng voi coupon.users (voucher chi
+// danh cho mot so nguoi) de luu voucher cong khai khong bien no thanh rieng tu.
+model CouponClaim {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  coupon_id  BigInt
+  claimed_at DateTime @default(now())
+
+  user   User   @relation(fields: [user_id], references: [id])
+  coupon Coupon @relation(fields: [coupon_id], references: [id])
+
+  @@unique([user_id, coupon_id])
+  @@index([coupon_id])
+  @@map("coupon_claims")
 }
