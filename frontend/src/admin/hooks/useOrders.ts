@@ -122,3 +122,14 @@ export function useUpdateShopOrderStatus() {
     }
   })
 }
+
+export function useBulkConfirmShopOrders() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (orderIds: number[]) => adminOrderService.bulkConfirmMine(orderIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: orderKeys.all })
+      qc.invalidateQueries({ queryKey: ['seller', 'dashboard'] })
+    }
+  })
+}

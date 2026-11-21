@@ -25,7 +25,8 @@ export const optionalAuth = async (req, res, next) => {
       where: { id: BigInt(decoded.userId) },
     });
 
-    if (userRecord) {
+    // Tai khoan bi khoa: coi nhu khach vang lai
+    if (userRecord && !userRecord.suspended_at) {
       req.user = {
         id: userRecord.id.toString(),
         name: userRecord.name,

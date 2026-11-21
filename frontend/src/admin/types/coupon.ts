@@ -9,12 +9,21 @@ export type AdminCoupon = {
   discount_type: DiscountType | string
   discount_value: number
   min_order?: number
+  max_discount?: number | string | null
   usage_limit?: number
   used_count?: number
+  starts_at?: string | null
   expires_at?: string | null
+  is_active?: boolean
+  // null = voucher cua san
+  shop_id?: number | null
+  shop?: { id: number; name: string; slug: string } | null
+  status?: 'active' | 'scheduled' | 'paused' | 'expired' | 'used_up'
   created_at?: string
   updated_at?: string
 }
+
+export type CouponScope = 'platform' | 'shop' 
 
 export type CouponListResponse = {
   coupons: AdminCoupon[]
@@ -33,9 +42,12 @@ export type CreateCouponRequest = {
   description?: string
   discount_type?: DiscountType
   discount_value: number
-  min_order?: number
-  usage_limit?: number
+  min_order?: number | null
+  max_discount?: number | null
+  usage_limit?: number | null
+  starts_at?: string | null
   expires_at?: string | null
+  is_active?: boolean
 }
 
 export type CreateCouponResponse =
@@ -48,15 +60,9 @@ export type CreateCouponResponse =
       coupon: AdminCoupon
     }
 
-export type UpdateCouponRequest = Partial<{
-  code: string
-  description: string
-  discount_type: DiscountType
-  discount_value: number
-  min_order: number
-  usage_limit: number
-  expires_at: string | null
-}>
+export type UpdateCouponRequest = Partial<Omit<CreateCouponRequest, 'code'>> & {
+  code?: string
+}
 
 export type UpdateCouponResponse =
   | SuccessResponse<{

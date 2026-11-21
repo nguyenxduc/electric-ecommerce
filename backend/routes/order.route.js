@@ -7,6 +7,8 @@ import {
   getAllOrders,
   getShopOrders,
   getShopOrderStats,
+  bulkUpdateShopOrderStatus,
+  exportShopOrdersCsv,
   updateOrderStatus,
   deleteOrder,
   cancelOrder,
@@ -39,6 +41,8 @@ router.get("/user/orders", protectRoute, getUserOrders);
 // Seller routes (place fixed paths before dynamic :id)
 router.get("/shop/mine", protectRoute, sellerRoute, getShopOrders);
 router.get("/shop/stats", protectRoute, sellerRoute, getShopOrderStats);
+router.get("/shop/export.csv", protectRoute, sellerRoute, exportShopOrdersCsv);
+router.post("/shop/bulk-status", protectRoute, sellerRoute, bulkUpdateShopOrderStatus);
 
 // Admin routes
 router.get("/stats", protectRoute, adminRoute, getOrderStats);

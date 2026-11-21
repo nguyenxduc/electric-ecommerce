@@ -54,6 +54,20 @@ export const adminOrderService = {
   // Seller dashboard: own shop's stats
   shopStats() {
     return axiosClient.get<OrderStatsResponse>('/orders/shop/stats')
+  },
+  // Xac nhan hang loat (pending -> processing), backend bo qua don khong hop le
+  bulkConfirmMine(orderIds: number[]) {
+    return axiosClient.post<{
+      updated: string[]
+      skipped: { id: string; reason: string }[]
+    }>('/orders/shop/bulk-status', { order_ids: orderIds, status: 'processing' })
+  },
+  // Xuat CSV theo bo loc hien tai; tra Blob de trinh duyet tai ve
+  exportMineCsv(params?: { status?: string; q?: string; from?: string; to?: string }) {
+    return axiosClient.get<Blob>('/orders/shop/export.csv', {
+      params,
+      responseType: 'blob'
+    })
   }
 }
 

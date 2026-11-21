@@ -8,6 +8,8 @@ export type AdminCustomer = {
   created_at?: string
   loyalty_points?: number
   segment?: string | null
+  suspended_at?: string | null
+  suspend_reason?: string | null
 }
 
 export type CustomerListResponse = {

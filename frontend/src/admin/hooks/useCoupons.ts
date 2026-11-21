@@ -3,6 +3,7 @@ import adminCouponService from '../services/couponService'
 import {
   CouponListResponse,
   CouponResponse,
+  CouponScope,
   CreateCouponRequest,
   CreateCouponResponse,
   UpdateCouponRequest,
@@ -14,7 +15,7 @@ import {
 
 const couponKeys = {
   all: ['admin', 'coupons'] as const,
-  list: (params?: { page?: number; limit?: number; q?: string }) =>
+  list: (params?: { page?: number; limit?: number; q?: string; scope?: CouponScope }) =>
     [...couponKeys.all, 'list', params] as const,
   detail: (id: number) => [...couponKeys.all, id] as const,
   validate: (payload: ValidateCouponRequest) =>
@@ -25,6 +26,7 @@ export function useAdminCoupons(params?: {
   page?: number
   limit?: number
   q?: string
+  scope?: CouponScope
 }) {
   return useQuery<{ data: CouponListResponse }, Error>({
     queryKey: couponKeys.list(params),

@@ -566,7 +566,7 @@ export default function AdminProductEdit({
               </div>
             </div>
           </div>
-          <VariantsEditor rows={variants} onChange={setVariants} />
+          <VariantsEditor rows={variants} onChange={setVariants} skuBase={name} />
         </form>
 
         <div className="space-y-4 min-w-0">

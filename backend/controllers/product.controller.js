@@ -18,6 +18,8 @@ import {
   variantsInclude,
 } from "../lib/productQuery.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { writeAuditLog, auditContext } from "../services/audit.service.js";
+import { notifyUser } from "../lib/notify.js";
 import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
 import { resolveFilteredProductIds } from "../services/productFilter.service.js";
@@ -349,6 +351,7 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     "sort",
     "page",
     "limit",
+    "status",
   ];
 
   const {
@@ -410,6 +413,12 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   const orderBy = resolveOrderBy(sort);
 
   const { currentPage, perPage, skip } = parsePagination(page, limit);
+  // ?status= chi cho admin (nguoi mua luon chi thay hang dang ban)
+  if (req.user?.role === ROLES.ADMIN) {
+    if (req.query.status === "live") where.is_active = true;
+    if (req.query.status === "hidden") Object.assign(where, { is_active: false, taken_down_at: null });
+    if (req.query.status === "taken_down") where.taken_down_at = { not: null };
+  }
   const baseWhere = { ...where, deleted_at: null, ...buyerVisibilityWhere(req) };
 
   if (Object.keys(filterParams).length === 0) {
@@ -687,16 +696,97 @@ export const setProductVisibility = asyncHandler(async (req, res) => {
   if (typeof is_active !== "boolean") {
     return res.status(400).json({ message: "is_active must be a boolean" });
   }
-  // San pham da xoa mem khong duoc bat lai
+  const id = BigInt(req.params.id);
+  const isAdmin = req.user.role === ROLES.ADMIN;
+  // San pham da xoa mem khong duoc bat lai. Hang bi admin go (taken_down_at)
+  // chi admin bat lai duoc; dieu kien nam trong where de khong bi chen ngang.
   const { count } = await prisma.product.updateMany({
-    where: { id: BigInt(req.params.id), deleted_at: null },
-    data: { is_active },
+    where: { id, deleted_at: null, ...(is_active && !isAdmin && { taken_down_at: null }) },
+    data: { is_active, ...(is_active && { takedown_reason: null, taken_down_at: null }) },
   });
-  if (count === 0) return res.status(404).json({ message: "Product not found" });
+  if (count === 0) {
+    const p = await prisma.product.findFirst({
+      where: { id, deleted_at: null },
+      select: { takedown_reason: true },
+    });
+    if (p) {
+      return res.status(403).json({
+        message: `This product was taken down by the marketplace: ${p.takedown_reason}`,
+      });
+    }
+    return res.status(404).json({ message: "Product not found" });
+  }
   res.json({
     message: is_active ? "Product is live" : "Product hidden",
     product: { id: Number(req.params.id), is_active },
   });
+});
+
+// PATCH /api/products/:id/takedown { reason } - admin go san pham vi pham
+export const takedownProduct = asyncHandler(async (req, res) => {
+  const reason = String(req.body?.reason ?? "").trim();
+  if (reason.length < 5 || reason.length > 500) {
+    return res.status(400).json({ message: "Reason must be 5-500 characters" });
+  }
+  const id = BigInt(req.params.id);
+  const product = await prisma.product.findFirst({
+    where: { id, deleted_at: null },
+    select: { name: true, shop: { select: { owner_id: true } } },
+  });
+  if (!product) return res.status(404).json({ message: "Product not found" });
+
+  const taken_down_at = new Date();
+  await prisma.product.update({
+    where: { id },
+    data: { is_active: false, takedown_reason: reason, taken_down_at },
+  });
+  writeAuditLog({
+    ...auditContext(req),
+    action: "PRODUCT_TAKEDOWN",
+    resource: "product",
+    resourceId: id,
+    metadata: { reason },
+  });
+  notifyUser({
+    userId: product.shop?.owner_id,
+    title: "Product taken down",
+    message: `Your product "${product.name}" was taken down for violating marketplace policy: ${reason}. Edit the listing and contact support to restore it.`,
+    type: "SHOP",
+  });
+  res.json({
+    message: "Product taken down",
+    product: { id: Number(id), is_active: false, takedown_reason: reason, taken_down_at },
+  });
+});
+
+// PATCH /api/products/:id/restore - admin go bo takedown, hien lai san pham
+export const restoreProduct = asyncHandler(async (req, res) => {
+  const id = BigInt(req.params.id);
+  const product = await prisma.product.findFirst({
+    where: { id, deleted_at: null },
+    select: { name: true, taken_down_at: true, shop: { select: { owner_id: true } } },
+  });
+  if (!product) return res.status(404).json({ message: "Product not found" });
+  if (!product.taken_down_at) {
+    return res.status(400).json({ message: "Product is not taken down" });
+  }
+  await prisma.product.update({
+    where: { id },
+    data: { is_active: true, takedown_reason: null, taken_down_at: null },
+  });
+  writeAuditLog({
+    ...auditContext(req),
+    action: "PRODUCT_RESTORE",
+    resource: "product",
+    resourceId: id,
+  });
+  notifyUser({
+    userId: product.shop?.owner_id,
+    title: "Product restored",
+    message: `Your product "${product.name}" has been restored and is live again.`,
+    type: "SHOP",
+  });
+  res.json({ message: "Product restored", product: { id: Number(id), is_active: true } });
 });
 
 export const deleteProduct = asyncHandler(async (req, res) => {

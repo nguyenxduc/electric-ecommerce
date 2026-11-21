@@ -83,6 +83,28 @@ export default function SellerProductsList() {
 
   const visibilitySwitch = (p: AdminProduct) => {
     const live = p.is_active !== false
+    // San bi admin go: khoa cong tac, hien ly do (backend cung tra 403)
+    if (p.taken_down_at) {
+      return (
+        <div className="flex flex-col items-start gap-1 text-xs">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={false}
+            aria-label={`${p.name} was taken down`}
+            disabled
+            className="inline-flex items-center gap-2 cursor-not-allowed opacity-60"
+          >
+            <span className="relative h-5 w-9 rounded-full bg-gray-300">
+              <span className="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow" />
+            </span>
+          </button>
+          <span className="inline-block px-2 py-0.5 rounded bg-red-100 text-red-700 font-medium">
+            Taken down: {p.takedown_reason}
+          </span>
+        </div>
+      )
+    }
     return (
       <button
         type="button"

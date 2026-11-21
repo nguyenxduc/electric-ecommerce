@@ -1,8 +1,8 @@
 import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
-import { getSettingNumber } from "../lib/settings.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { getShopTodo, getAdminTodo } from "../services/todo.service.js";
+import { computeCommission, getShopFinance as buildShopFinance } from "../services/finance.service.js";
 
 // Get dashboard statistics.
 // shopId (optional) scopes orders/products to one shop (seller dashboard).
@@ -156,16 +156,15 @@ const buildDashboardStats = async (res, shopId = null) => {
     // Seller view: show the platform commission cut and net payout amount.
     let commission = null;
     if (shopId) {
-      const rate = await getSettingNumber("platform_commission_rate", 0.05);
-      const fee = Math.round(revenue * rate * 100) / 100;
+      const { rate, fee, net } = await computeCommission(revenue);
       commission = {
         rate,
         ratePercent: `${(rate * 100).toFixed(0)}%`,
         fee,
-        netRevenue: Math.round((revenue - fee) * 100) / 100,
+        netRevenue: net,
         formatted: {
           fee: formatCurrency(fee),
-          netRevenue: formatCurrency(revenue - fee),
+          netRevenue: formatCurrency(net),
         },
       };
     }
@@ -481,4 +480,13 @@ export const getShopTodoCounts = asyncHandler(async (req, res) => {
 // GET /api/dashboard/todo - viec admin can xu ly (duyet shop, chat ho tro, gian lan)
 export const getAdminTodoCounts = asyncHandler(async (_req, res) => {
   res.json({ success: true, data: await getAdminTodo() });
+});
+
+// GET /api/dashboard/shop/finance?from&to - thu nhap cua shop (da giao / dang cho / phi san)
+export const getShopFinance = asyncHandler(async (req, res) => {
+  if (!req.shop) {
+    return res.status(400).json({ success: false, error: "No shop attached to this account" });
+  }
+  const { from, to } = req.query;
+  res.json({ success: true, data: await buildShopFinance(req.shop.id, { from, to }) });
 });

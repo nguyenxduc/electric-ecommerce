@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import { promisify } from "util";
 import { writeAuditLog } from "../services/audit.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { suspendedMessage } from "../middleware/auth.middleware.js";
 import crypto from "node:crypto";
 import { normalizeVnPhone, sendSms, exposeDevCode } from "../lib/sms.js";
 
@@ -149,6 +150,14 @@ export const login = asyncHandler(async (req, res) => {
     return res.status(401).json({
       success: false,
       error: "Invalid credentials",
+    });
+  }
+
+  if (user.suspended_at) {
+    return res.status(403).json({
+      success: false,
+      code: "ACCOUNT_SUSPENDED",
+      error: suspendedMessage(user.suspend_reason),
     });
   }
 

@@ -14,16 +14,36 @@ import {
 import { getProductsByShop } from "../controllers/product.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 import { optionalAuth } from "../middleware/optionalAuth.middleware.js";
-import { upload } from "../middleware/upload.middleware.js";
+import multer from "multer";
 import { registerIdParams } from "../middleware/validateId.middleware.js";
 
 const router = express.Router();
 registerIdParams(router);
 
-const shopImages = upload.fields([
+// Logo/banner: chi anh jpg/png/webp <= 2MB; loi multer tra 400 thay vi 500
+const shopImageUpload = multer({
+  storage: multer.diskStorage({}),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) =>
+    /^image\/(jpeg|png|webp)$/.test(file.mimetype)
+      ? cb(null, true)
+      : cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", file.fieldname)),
+}).fields([
   { name: "logo", maxCount: 1 },
   { name: "banner", maxCount: 1 },
 ]);
+const shopImages = (req, res, next) =>
+  shopImageUpload(req, res, (err) =>
+    err
+      ? res.status(400).json({
+          success: false,
+          error:
+            err.code === "LIMIT_FILE_SIZE"
+              ? "Image must be 2MB or smaller"
+              : "Logo/banner must be a JPG, PNG or WebP image",
+        })
+      : next()
+  );
 
 // Admin moderation (before /:slug so "admin" isn't parsed as a slug)
 router.get("/admin/all", protectRoute, adminRoute, adminListShops);

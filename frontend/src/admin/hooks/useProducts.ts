@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import adminProductService from '../services/productService'
+import adminProductService, { type AdminProductListQuery } from '../services/productService'
 import {
   AddRatingRequest,
   AddRatingResponse,
@@ -14,12 +14,12 @@ import {
 
 const productKeys = {
   all: ['admin', 'products'] as const,
-  list: (params?: ProductListQuery) =>
+  list: (params?: AdminProductListQuery) =>
     [...productKeys.all, 'list', params] as const,
   detail: (id: number) => [...productKeys.all, id] as const
 }
 
-export function useAdminProducts(params?: ProductListQuery) {
+export function useAdminProducts(params?: AdminProductListQuery) {
   return useQuery<{ data: ProductListResponse }, Error>({
     queryKey: productKeys.list(params),
     queryFn: () => adminProductService.list(params)
@@ -102,6 +102,28 @@ export function useAddProductRating(id: number) {
     mutationFn: payload => adminProductService.addRating(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: productKeys.detail(id) })
+    }
+  })
+}
+
+export function useTakedownProduct() {
+  const qc = useQueryClient()
+  return useMutation<unknown, Error, { id: number; reason: string }>({
+    mutationFn: ({ id, reason }) => adminProductService.takedown(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.all })
+      qc.invalidateQueries({ queryKey: ['admin', 'dashboard', 'todo'] })
+    }
+  })
+}
+
+export function useRestoreProduct() {
+  const qc = useQueryClient()
+  return useMutation<unknown, Error, number>({
+    mutationFn: id => adminProductService.restore(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.all })
+      qc.invalidateQueries({ queryKey: ['admin', 'dashboard', 'todo'] })
     }
   })
 }

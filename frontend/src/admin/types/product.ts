@@ -36,6 +36,9 @@ export type AdminProduct = {
   description?: string | null
   // false = nguoi ban da an khoi san
   is_active?: boolean
+  // Admin go vi pham: chi admin khoi phuc duoc
+  takedown_reason?: string | null
+  taken_down_at?: string | null
   category_id: number
   sub_category_id: number
   final_price?: number

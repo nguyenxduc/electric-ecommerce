@@ -99,7 +99,11 @@ export type ShopVoucher = {
   discount_type: 'percent' | 'fixed'
   discount_value: number | string
   min_order: number | string | null
+  max_discount?: number | string | null
+  starts_at?: string | null
   expires_at: string | null
+  // nguoi dang xem da luu vao kho (khach: false)
+  claimed?: boolean
 }
 
 // Collectible vouchers displayed on the shop's public page

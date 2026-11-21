@@ -4,7 +4,11 @@ import { toast } from 'sonner'
 import { apiErrorMessage } from '../../../lib/apiError'
 import { BadgeCheck, Clock, Ban, CircleSlash, Store } from 'lucide-react'
 import { getMyShop, updateMyShop } from '../../../client/services/shopService'
-import { updateShopSettings } from '../../services/sellerService'
+import { updateShopSettings, uploadShopImages } from '../../services/sellerService'
+
+type Picked = { file: File; url: string } | null
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 const STATUS_INFO: Record<
   string,
@@ -54,6 +58,20 @@ export default function SellerShopProfile() {
     pickup_address: ''
   })
 
+  // Anh moi chon (chua luu): giu File + object URL de xem truoc
+  const [logo, setLogo] = useState<Picked>(null)
+  const [banner, setBanner] = useState<Picked>(null)
+  useEffect(() => () => void (logo && URL.revokeObjectURL(logo.url)), [logo])
+  useEffect(() => () => void (banner && URL.revokeObjectURL(banner.url)), [banner])
+  const pickImage = (set: (p: Picked) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!IMAGE_TYPES.includes(file.type)) return void toast.error('Use a JPG, PNG or WebP image')
+    if (file.size > MAX_IMAGE_BYTES) return void toast.error('Image must be 2MB or smaller')
+    set({ file, url: URL.createObjectURL(file) })
+  }
+
   useEffect(() => {
     if (shop) {
       setExt({
@@ -83,7 +101,7 @@ export default function SellerShopProfile() {
   const updateMut = useMutation({
     mutationFn: async () => {
       await updateShopSettings(ext)
-      return updateMyShop({
+      const saved = await updateMyShop({
         name,
         description,
         contact_email: contactEmail,
@@ -92,6 +110,17 @@ export default function SellerShopProfile() {
         shipping_fee_override: shippingFee,
         free_shipping_threshold_override: freeShippingThreshold
       })
+      if (logo || banner) {
+        // Thong tin da luu; anh loi (vd. Cloudinary chua cau hinh) chi bao rieng
+        try {
+          await uploadShopImages({ logo: logo?.file, banner: banner?.file })
+          setLogo(null)
+          setBanner(null)
+        } catch (err) {
+          toast.error(apiErrorMessage(err, 'Image upload failed. Other changes were saved.'))
+        }
+      }
+      return saved
     },
     onSuccess: () => {
       toast.success(
@@ -168,7 +197,71 @@ export default function SellerShopProfile() {
           updateMut.mutate()
         }}
       >
-        <div>
+        <div className="space-y-3">
+          <div className="text-sm font-medium">Logo & banner</div>
+          <div className="relative h-28 sm:h-36 rounded-lg border bg-gray-100 overflow-hidden">
+            {banner?.url || shop.banner_url ? (
+              <img
+                src={banner?.url || shop.banner_url || ''}
+                alt="Shop banner"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                No banner
+              </div>
+            )}
+            <label className="absolute right-2 bottom-2 cursor-pointer rounded bg-white/90 border px-2 py-1 text-xs hover:bg-white">
+              {banner ? 'Change banner' : 'Upload banner'}
+              <input
+                type="file"
+                accept={IMAGE_TYPES.join(',')}
+                className="sr-only"
+                aria-label="Banner image"
+                onChange={pickImage(setBanner)}
+              />
+            </label>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 rounded-full border bg-gray-100 overflow-hidden shrink-0">
+              {logo?.url || shop.logo_url ? (
+                <img
+                  src={logo?.url || shop.logo_url || ''}
+                  alt="Shop logo"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Store className="w-6 h-6 m-5 text-gray-400" />
+              )}
+            </div>
+            <label className="cursor-pointer rounded border px-3 py-1.5 text-sm hover:bg-gray-50">
+              {logo ? 'Change logo' : 'Upload logo'}
+              <input
+                type="file"
+                accept={IMAGE_TYPES.join(',')}
+                className="sr-only"
+                aria-label="Logo image"
+                onChange={pickImage(setLogo)}
+              />
+            </label>
+            {(logo || banner) && (
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:underline"
+                onClick={() => {
+                  setLogo(null)
+                  setBanner(null)
+                }}
+              >
+                Discard new images
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-gray-500">
+            JPG, PNG or WebP, up to 2MB. New images upload when you save.
+          </p>
+        </div>
+        <div className="border-t pt-4">
           <label className="block text-sm font-medium mb-1">Shop name</label>
           <input
             className="w-full border rounded-lg px-3 py-2"

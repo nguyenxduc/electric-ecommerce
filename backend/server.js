@@ -71,6 +71,7 @@ import returnRoutes from "./routes/return.route.js";
 import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
 import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
+import addressRoutes from "./routes/address.route.js";
 import { startDailyJobsScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 
@@ -173,6 +174,7 @@ app.use("/api/shipments", shipmentRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/tax", taxRouter);
+app.use("/api/addresses", addressRoutes);
 
 // Phai dung sau moi route: 404 cho endpoint la, roi mot cho duy nhat xu ly loi.
 // Express 4 khong tu bat promise reject, nen neu thieu luoi nay thi mot handler
@@ -231,11 +233,14 @@ io.use(async (socket, next) => {
     // Get user from database to get role
     const user = await prisma.user.findUnique({
       where: { id: BigInt(userId) },
-      select: { id: true, role: true },
+      select: { id: true, role: true, suspended_at: true },
     });
 
     if (!user) {
       return next(new Error("Authentication error: User not found"));
+    }
+    if (user.suspended_at) {
+      return next(new Error("Authentication error: Account suspended"));
     }
 
     socket.userId = userId;

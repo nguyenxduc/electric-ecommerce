@@ -150,10 +150,36 @@ export type ShopTodo = {
   unread_messages: number
   low_stock: number
 }
-export type AdminTodo = { shops_pending: number; unread_support: number; fraud_open: number }
+export type AdminTodo = {
+  shops_pending: number
+  unread_support: number
+  fraud_open: number
+  products_taken_down: number
+}
 
 export const getShopTodo = async (): Promise<ShopTodo> =>
   (await axiosClient.get('/dashboard/shop/todo')).data.data
 
 export const getAdminTodo = async (): Promise<AdminTodo> =>
   (await axiosClient.get('/dashboard/todo')).data.data
+
+// Trang "My income" cua seller: da giao / dang cho / phi san trong khoang ngay
+export type ShopFinance = {
+  rate: number
+  released: { amount: number; count: number }
+  pending: { amount: number; count: number }
+  fee: number
+  net: number
+  orders: {
+    id: number
+    order_number: string | null
+    created_at: string
+    status: string
+    gross: number
+    fee: number
+    net: number
+  }[]
+}
+
+export const getShopFinance = async (params: { from?: string; to?: string }): Promise<ShopFinance> =>
+  (await axiosClient.get('/dashboard/shop/finance', { params })).data.data

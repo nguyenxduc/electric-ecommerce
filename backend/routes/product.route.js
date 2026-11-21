@@ -7,6 +7,8 @@ import {
   updateProduct,
   deleteProduct,
   setProductVisibility,
+  takedownProduct,
+  restoreProduct,
   searchProducts,
   getProductsByCategory,
   getMyShopProducts,
@@ -82,6 +84,9 @@ router.patch(
   requireShopOwnership(resolveProductShop),
   setProductVisibility
 );
+// Kiem duyet cua san: chi admin go / khoi phuc san pham vi pham
+router.patch("/:id/takedown", protectRoute, adminRoute, takedownProduct);
+router.patch("/:id/restore", protectRoute, adminRoute, restoreProduct);
 router.delete(
   "/:id",
   protectRoute,

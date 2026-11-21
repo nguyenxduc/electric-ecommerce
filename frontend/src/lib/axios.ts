@@ -43,6 +43,11 @@ axiosClient.interceptors.response.use(
   response => response,
   async error => {
     // Do not auto-remove token on 401 to avoid logging out during protected flows
+    // Tai khoan bi admin khoa: bo token ngay de UI ve trang thai chua dang nhap
+    if (error?.response?.data?.code === 'ACCOUNT_SUSPENDED' && localStorage.getItem('accessToken')) {
+      localStorage.removeItem('accessToken')
+      window.location.assign('/')
+    }
     return Promise.reject(error)
   }
 )

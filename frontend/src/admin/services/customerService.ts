@@ -8,8 +8,10 @@ import {
   UpdateCustomerPointsRequest
 } from '../types'
 
+export type CustomerListQuery = { page?: number; limit?: number; q?: string; role?: string }
+
 export const adminCustomerService = {
-  list(params?: { page?: number; limit?: number; q?: string }) {
+  list(params?: CustomerListQuery) {
     return axiosClient.get<CustomerListResponse>('/customers', { params })
   },
   getById(id: number) {
@@ -29,6 +31,13 @@ export const adminCustomerService = {
       `/customers/${id}/points`,
       payload
     )
+  },
+  // Khoa tai khoan: chan dang nhap va moi token dang dung
+  suspend(id: number, reason: string) {
+    return axiosClient.patch<{ message: string }>(`/customers/${id}/suspend`, { reason })
+  },
+  unsuspend(id: number) {
+    return axiosClient.patch<{ message: string }>(`/customers/${id}/unsuspend`)
   },
   delete(id: number) {
     return axiosClient.delete<{ message: string }>(`/customers/${id}`)

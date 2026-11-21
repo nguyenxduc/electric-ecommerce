@@ -2,16 +2,11 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Edit3, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  useAdminCoupons,
-  useCreateAdminCoupon,
-  useDeleteAdminCoupon,
-  useUpdateAdminCoupon
-} from '../../hooks/useCoupons'
-import Modal from '../../components/common/Modal'
+import { useAdminCoupons, useDeleteAdminCoupon } from '../../hooks/useCoupons'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
-import { DiscountType, UpdateCouponRequest } from '../../types'
+import { CouponScope } from '../../types'
+import CouponStatusChip from '../../../client/components/common/CouponStatusChip'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
 import { fmtDate } from '../../utils/date'
@@ -19,18 +14,32 @@ import { fmtDate } from '../../utils/date'
 export default function AdminCouponsList() {
   const navigate = useNavigate()
   const [limit] = useState(10)
-  const { page, q: query, setPage, setQ: setQuery } = useListQueryParams()
+  const {
+    page,
+    q: query,
+    setPage,
+    setQ: setQuery,
+    searchParams,
+    setSearchParams
+  } = useListQueryParams()
+  const scopeParam = searchParams.get('scope')
+  const scope: CouponScope | undefined =
+    scopeParam === 'platform' || scopeParam === 'shop' ? scopeParam : undefined
+  const setScope = (value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) params.set('scope', value)
+    else params.delete('scope')
+    params.set('page', '1')
+    setSearchParams(params)
+  }
 
   const { data, isLoading } = useAdminCoupons({
     page,
     limit,
-    q: query || undefined
+    q: query || undefined,
+    scope
   })
   const del = useDeleteAdminCoupon()
-  const createMut = useCreateAdminCoupon()
-  const [createOpen, setCreateOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState<null | number>(null)
-  const updateMut = useUpdateAdminCoupon(editOpen || 0)
 
   const pages = useMemo(
     () => Math.max(1, data?.data.pagination.total_pages || 1),
@@ -51,10 +60,19 @@ export default function AdminCouponsList() {
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
+          <select
+            aria-label="Scope"
+            className="border rounded px-3 py-2 text-sm"
+            value={scope ?? ''}
+            onChange={e => setScope(e.target.value)}
+          >
+            <option value="">All scopes</option>
+            <option value="platform">Platform</option>
+            <option value="shop">Shop vouchers</option>
+          </select>
           <button
-            className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
+            className="px-3 py-2 bg-green-600 text-white rounded"
             onClick={() => navigate('/admin/coupons/new')}
-            disabled={createMut.isPending}
           >
             New Coupon
           </button>
@@ -81,13 +99,15 @@ export default function AdminCouponsList() {
 
       <div className="bg-white rounded border">
         {isLoading ? (
-          <SkeletonTable rows={5} cols={7} />
+          <SkeletonTable rows={5} cols={9} />
         ) : (
           <>
             <div className="overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Code</th>
+                  <th className="text-left p-2">Scope</th>
+                  <th className="text-left p-2">Status</th>
                   <th className="text-left p-2">Type</th>
                   <th className="text-left p-2">Value</th>
                   <th className="text-left p-2">Min Order</th>
@@ -100,8 +120,23 @@ export default function AdminCouponsList() {
                 {data?.data.coupons?.map(c => (
                   <tr key={c.id} className="border-t">
                     <td className="p-2 font-medium">{c.code}</td>
+                    <td className="p-2">
+                      {c.shop ? (
+                        <span className="text-purple-700">{c.shop.name}</span>
+                      ) : (
+                        'Platform'
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <CouponStatusChip status={c.status} />
+                    </td>
                     <td className="p-2">{c.discount_type}</td>
-                    <td className="p-2">{Number(c.discount_value)}</td>
+                    <td className="p-2 whitespace-nowrap">
+                      {Number(c.discount_value)}
+                      {c.discount_type === 'percent' && c.max_discount != null && (
+                        <span className="text-xs text-gray-500"> (max ${Number(c.max_discount)})</span>
+                      )}
+                    </td>
                     <td className="p-2">
                       {c.min_order ? Number(c.min_order) : '-'}
                     </td>
@@ -118,7 +153,7 @@ export default function AdminCouponsList() {
                         <button
                           title="Edit"
                           className="text-blue-600"
-                          onClick={() => setEditOpen(c.id)}
+                          onClick={() => navigate(`/admin/coupons/${c.id}`)}
                         >
                           <Edit3 size={16} />
                         </button>
@@ -146,299 +181,6 @@ export default function AdminCouponsList() {
         )}
       </div>
 
-      {/* Create Modal */}
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Create Coupon"
-        footer={
-          <>
-            <button
-              className="px-3 py-2 border rounded"
-              onClick={() => setCreateOpen(false)}
-              disabled={createMut.isPending}
-            >
-              Cancel
-            </button>
-            <button
-              form="createCouponForm"
-              type="submit"
-              className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
-              disabled={createMut.isPending}
-            >
-              {createMut.isPending ? 'Creating...' : 'Create'}
-            </button>
-          </>
-        }
-      >
-        <form
-          id="createCouponForm"
-          className="space-y-3"
-          onSubmit={async e => {
-            e.preventDefault()
-            const fd = new FormData(e.currentTarget as HTMLFormElement)
-            try {
-              await createMut.mutateAsync({
-                code: String(fd.get('code') || ''),
-                description: String(fd.get('description') || '') || undefined,
-                discount_type: String(
-                  fd.get('discount_type') || 'percent'
-                ) as DiscountType,
-                discount_value: Number(fd.get('discount_value') || 0),
-                min_order: fd.get('min_order')
-                  ? Number(fd.get('min_order'))
-                  : undefined,
-                usage_limit: fd.get('usage_limit')
-                  ? Number(fd.get('usage_limit'))
-                  : undefined,
-                expires_at: fd.get('expires_at')
-                  ? String(fd.get('expires_at'))
-                  : undefined
-              })
-              toast.success('Coupon created')
-              setCreateOpen(false)
-            } catch {
-              toast.error('Failed to create coupon')
-            }
-          }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Code</label>
-              <input
-                name="code"
-                className="w-full border rounded px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Type</label>
-              <select
-                name="discount_type"
-                className="w-full border rounded px-3 py-2 text-sm"
-              >
-                <option value="percent">Percent</option>
-                <option value="fixed">Fixed</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Value</label>
-              <input
-                type="number"
-                step="0.01"
-                name="discount_value"
-                className="w-full border rounded px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Min Order
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                name="min_order"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Usage Limit
-              </label>
-              <input
-                type="number"
-                name="usage_limit"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Expires
-              </label>
-              <input
-                type="date"
-                name="expires_at"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Description
-            </label>
-            <textarea
-              name="description"
-              className="w-full border rounded px-3 py-2 text-sm"
-              rows={3}
-            />
-          </div>
-        </form>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal
-        open={!!editOpen}
-        onClose={() => setEditOpen(null)}
-        title={`Edit Coupon`}
-        footer={
-          <>
-            <button
-              className="px-3 py-2 border rounded"
-              onClick={() => setEditOpen(null)}
-              disabled={updateMut.isPending}
-            >
-              Cancel
-            </button>
-            <button
-              form="editCouponForm"
-              type="submit"
-              className="px-3 py-2 bg-green-600 text-white rounded disabled:opacity-60"
-              disabled={updateMut.isPending}
-            >
-              {updateMut.isPending ? 'Saving...' : 'Save'}
-            </button>
-          </>
-        }
-      >
-        <form
-          id="editCouponForm"
-          className="space-y-3"
-          onSubmit={async e => {
-            e.preventDefault()
-            if (!editOpen) return
-            const fd = new FormData(e.currentTarget as HTMLFormElement)
-            const payload: UpdateCouponRequest = {
-              code: fd.get('code') ? String(fd.get('code')) : undefined,
-              description: fd.get('description')
-                ? String(fd.get('description'))
-                : undefined,
-              discount_type: fd.get('discount_type')
-                ? (String(fd.get('discount_type')) as DiscountType)
-                : undefined,
-              discount_value: fd.get('discount_value')
-                ? Number(fd.get('discount_value'))
-                : undefined,
-              min_order: fd.get('min_order')
-                ? Number(fd.get('min_order'))
-                : undefined,
-              usage_limit: fd.get('usage_limit')
-                ? Number(fd.get('usage_limit'))
-                : undefined,
-              expires_at: fd.get('expires_at')
-                ? String(fd.get('expires_at'))
-                : undefined
-            }
-            try {
-              await updateMut.mutateAsync(payload)
-              toast.success('Coupon updated')
-              setEditOpen(null)
-            } catch {
-              toast.error('Failed to update coupon')
-            }
-          }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Code</label>
-              <input
-                name="code"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Type</label>
-              <select
-                name="discount_type"
-                className="w-full border rounded px-3 py-2 text-sm"
-              >
-                <option value="percent">Percent</option>
-                <option value="fixed">Fixed</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">Value</label>
-              <input
-                type="number"
-                step="0.01"
-                name="discount_value"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Min Order
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                name="min_order"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Usage Limit
-              </label>
-              <input
-                type="number"
-                name="usage_limit"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 mb-1">
-                Expires
-              </label>
-              <input
-                type="date"
-                name="expires_at"
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              Description
-            </label>
-            <textarea
-              name="description"
-              className="w-full border rounded px-3 py-2 text-sm"
-              rows={3}
-            />
-          </div>
-        </form>
-      </Modal>
-
-      {/* Confirm Delete Modal */}
-      <Modal
-        open={confirmId !== null}
-        onClose={() => setConfirmId(null)}
-        title="Confirm delete coupon"
-        variant="danger"
-        footer={
-          <>
-            <button
-              className="px-3 py-2 border rounded"
-              onClick={() => setConfirmId(null)}
-            >
-              Cancel
-            </button>
-            <button
-              className="px-3 py-2 bg-red-600 text-white rounded"
-              onClick={() => {
-                if (confirmId) del.mutate(confirmId)
-                setConfirmId(null)
-              }}
-            >
-              Delete
-            </button>
-          </>
-        }
-      >
-        Are you sure you want to delete this coupon? This action cannot be
-        undone.
-      </Modal>
     </div>
   )
 }

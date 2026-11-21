@@ -11,8 +11,13 @@ import {
   ProductResponse
 } from '../types'
 
+export type AdminProductListQuery = ProductListQuery & {
+  shop_id?: number
+  status?: 'live' | 'hidden' | 'taken_down'
+}
+
 export const adminProductService = {
-  list(params?: ProductListQuery & { shop_id?: number }) {
+  list(params?: AdminProductListQuery) {
     return axiosClient.get<ProductListResponse>('/products', { params })
   },
   // Seller dashboard: own shop's products (any shop status)
@@ -100,6 +105,13 @@ export const adminProductService = {
   // An/hien san pham tren san (nguoi mua khong thay hang an)
   setVisibility(id: number, is_active: boolean) {
     return axiosClient.patch(`/products/${id}/visibility`, { is_active })
+  },
+  // Kiem duyet: admin go / khoi phuc san pham vi pham
+  takedown(id: number, reason: string) {
+    return axiosClient.patch(`/products/${id}/takedown`, { reason })
+  },
+  restore(id: number) {
+    return axiosClient.patch(`/products/${id}/restore`)
   },
   addSales(id: number, payload: AddSalesRequest) {
     return axiosClient.patch<AddSalesResponse>(

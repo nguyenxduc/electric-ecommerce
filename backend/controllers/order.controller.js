@@ -37,6 +37,8 @@ import {
   merchandiseTotalAfterDiscounts,
 } from "../services/pricing.service.js";
 import { parsePagination } from "../lib/pagination.js";
+import { applyOrderListFilters } from "../lib/orderFilters.js";
+import { toCsv } from "../lib/csv.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
 const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409, SHIPMENT_ACTIVE: 409 };
@@ -600,42 +602,6 @@ export const getUserOrders = asyncHandler(async (req, res) => {
   res.json(orders);
 });
 
-// Bo loc chung cho danh sach don (admin + seller): q tim theo ma don, nguoi mua
-// (ten/email/sdt), nguoi nhan, ma van don, ten san pham; from/to loc ngay tao.
-// shortcut: chi khong phan biet hoa/thuong, chua bo dau (can extension unaccent).
-const applyOrderListFilters = (where, { q, from, to }) => {
-  const term = typeof q === "string" ? q.trim().slice(0, 100) : "";
-  if (term) {
-    const has = { contains: term, mode: "insensitive" };
-    where.OR = [
-      { order_number: has },
-      { receiver_name: has },
-      { receiver_phone: has },
-      { user: { name: has } },
-      { user: { email: has } },
-      { user: { phone: has } },
-      { shipment: { tracking_code: has } },
-      { order_items: { some: { product: { name: has } } } },
-    ];
-  }
-  // Ngay YYYY-MM-DD hieu theo gio Viet Nam (+07:00), khong phai UTC: don dat
-  // 00:00-07:00 sang khong bi tinh sang ngay hom truoc
-  const DAY = /^\d{4}-\d{2}-\d{2}$/;
-  const parseDay = (v) =>
-    typeof v === "string" ? new Date(DAY.test(v) ? `${v}T00:00:00+07:00` : v) : null;
-  const fromDate = parseDay(from);
-  const toDate = parseDay(to);
-  if (fromDate && !Number.isNaN(fromDate.getTime())) {
-    where.created_at = { ...where.created_at, gte: fromDate };
-  }
-  if (toDate && !Number.isNaN(toDate.getTime())) {
-    // "to" dang YYYY-MM-DD: lay het ngay do
-    if (DAY.test(to)) toDate.setTime(toDate.getTime() + 24 * 60 * 60 * 1000);
-    where.created_at = { ...where.created_at, lt: toDate };
-  }
-  return where;
-};
-
 export const getAllOrders = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, status, shop_id } = req.query;
 
@@ -717,6 +683,97 @@ export const getShopOrders = asyncHandler(async (req, res) => {
       total_pages: Math.max(1, Math.ceil(total / Number(limit))),
     },
   });
+});
+
+// POST /api/orders/shop/bulk-status — xac nhan hang loat don cua shop minh.
+// Moi don di qua transitionOrderStatus nhu xac nhan le (khoa compare-and-set,
+// chan don online chua tra tien); don khong hop le bi bo qua kem ly do.
+const BULK_STATUS_MAX = 100;
+export const bulkUpdateShopOrderStatus = asyncHandler(async (req, res) => {
+  if (!req.shop) {
+    return res.status(400).json({ message: "No shop attached to this account" });
+  }
+  const { order_ids, status } = req.body || {};
+  // Chi ho tro "Confirm" (pending -> processing); cac buoc sau can van don rieng tung don
+  if (status !== ORDER_STATUS.PROCESSING) {
+    return res.status(400).json({ message: "Only status 'processing' is supported" });
+  }
+  if (!Array.isArray(order_ids) || order_ids.length === 0 || order_ids.length > BULK_STATUS_MAX) {
+    return res
+      .status(400)
+      .json({ message: `order_ids must be a non-empty array (max ${BULK_STATUS_MAX})` });
+  }
+  const ids = [...new Set(order_ids.map((v) => String(v)))];
+  if (ids.some((id) => !/^\d{1,18}$/.test(id))) {
+    return res.status(400).json({ message: "Invalid order id" });
+  }
+
+  // Loc theo shop truoc: id cua shop khac bao "not found", khong lo ton tai
+  const own = await prisma.order.findMany({
+    where: { id: { in: ids.map(BigInt) }, shop_id: req.shop.id, deleted_at: null },
+    select: { id: true },
+  });
+  const ownIds = new Set(own.map((o) => o.id.toString()));
+
+  const updated = [];
+  const skipped = [];
+  // Tuan tu: moi don mot transaction ngan, tranh giu nhieu khoa cung luc
+  for (const id of ids) {
+    if (!ownIds.has(id)) {
+      skipped.push({ id, reason: "Order not found" });
+      continue;
+    }
+    const result = await transitionOrderStatus({
+      orderId: id,
+      status,
+      allowedFrom: [ORDER_STATUS.PENDING],
+      actor: actorFromReq(req),
+      auditMetadata: { bulk: true },
+    });
+    if (result.ok) updated.push(id);
+    else skipped.push({ id, reason: result.message });
+  }
+  res.json({ updated, skipped });
+});
+
+// GET /api/orders/shop/export.csv — xuat don cua shop minh, cung bo loc voi danh sach
+// shortcut: gioi han 5000 dong, can stream theo trang neu shop lon hon.
+const EXPORT_MAX_ROWS = 5000;
+export const exportShopOrdersCsv = asyncHandler(async (req, res) => {
+  if (!req.shop) {
+    return res.status(400).json({ message: "No shop attached to this account" });
+  }
+  const where = { shop_id: req.shop.id, deleted_at: null };
+  if (req.query.status) where.status = String(req.query.status);
+  applyOrderListFilters(where, req.query);
+
+  const orders = await prisma.order.findMany({
+    where,
+    orderBy: { created_at: "desc" },
+    take: EXPORT_MAX_ROWS,
+    include: {
+      order_items: { include: { product: { select: { name: true } } } },
+      user: { select: { name: true } },
+    },
+  });
+
+  const csv = toCsv(
+    ["order_number", "date", "buyer", "phone", "items", "total", "status", "payment_method"],
+    orders.map((o) => [
+      o.order_number || o.id.toString(),
+      o.created_at.toISOString(),
+      o.receiver_name || o.user?.name || "",
+      o.receiver_phone || "",
+      o.order_items.map((i) => `${i.product?.name || "Product"} x${i.quantity ?? 1}`).join("; "),
+      Number(o.total_amount || 0).toFixed(2),
+      o.status || "",
+      o.payment_method || "",
+    ])
+  );
+  const day = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="orders-${day}.csv"`);
+  res.send(csv);
 });
 
 export const updateOrderStatus = asyncHandler(async (req, res) => {

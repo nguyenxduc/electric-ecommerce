@@ -3,6 +3,9 @@ import { prisma } from "../lib/db.js";
 import { ACCESS_TOKEN_SECRET } from "../lib/jwtSecret.js";
 import { ROLES } from "../constants/roles.js";
 
+export const suspendedMessage = (reason) =>
+  `Your account has been suspended${reason ? `: ${reason}` : ""}. Please contact support.`;
+
 export const protectRoute = async (req, res, next) => {
   try {
     let accessToken;
@@ -34,6 +37,15 @@ export const protectRoute = async (req, res, next) => {
         return res.status(401).json({
           success: false,
           error: "User not found",
+        });
+      }
+
+      // Tai khoan bi admin khoa: token cu cung bi tu choi ngay, khong doi het han
+      if (userRecord.suspended_at) {
+        return res.status(403).json({
+          success: false,
+          code: "ACCOUNT_SUSPENDED",
+          error: suspendedMessage(userRecord.suspend_reason),
         });
       }
 

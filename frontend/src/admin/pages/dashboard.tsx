@@ -31,7 +31,8 @@ export default function AdminDashboard() {
         items={[
           { label: 'Shop applications', count: todo?.shops_pending, to: '/admin/shops?status=pending' },
           { label: 'Unread support messages', count: todo?.unread_support, to: '/admin/chat' },
-          { label: 'Open fraud flags', count: todo?.fraud_open, to: '/admin/fraud' }
+          { label: 'Open fraud flags', count: todo?.fraud_open, to: '/admin/fraud' },
+          { label: 'Products taken down', count: todo?.products_taken_down, to: '/admin/products?status=taken_down' }
         ]}
       />
 

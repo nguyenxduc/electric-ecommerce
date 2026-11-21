@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { apiErrorResponse } from '../../lib/apiError'
-import { Camera, LogOut, X, Loader2, Ticket, Store } from 'lucide-react'
+import { Camera, LogOut, X, Loader2, Ticket, Store, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
@@ -20,6 +20,7 @@ import ProfileContent from '../components/profile/Profile'
 import Loyalty from '../components/profile/Loyalty'
 import VoucherWarehouse from '../components/profile/VoucherWarehouse'
 import SellerTab from '../components/profile/SellerTab'
+import AddressBook from '../components/profile/AddressBook'
 import {
   useValidateToken,
   useLogout,
@@ -32,6 +33,7 @@ export type ProfileTabKey =
   | 'profile'
   | 'orders'
   | 'wishlist'
+  | 'addresses'
   | 'security'
   | 'loyalty'
   | 'vouchers'
@@ -54,6 +56,7 @@ const NAV: Array<{
   { key: 'profile', label: 'Personal Data', icon: 'profile' },
   { key: 'orders', label: 'Orders', icon: 'orders' },
   { key: 'wishlist', label: 'Wish list', icon: 'wishlist' },
+  { key: 'addresses', label: 'Addresses', icon: 'loyalty' },
   { key: 'security', label: 'Security & access', icon: 'security' },
   { key: 'loyalty', label: 'Loyalty & Rewards', icon: 'loyalty' },
   { key: 'vouchers', label: 'Voucher warehouse', icon: 'loyalty' },
@@ -324,6 +327,26 @@ function Profile() {
                   </button>
                 )
               }
+              if (item.key === 'addresses') {
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => setTabActive(item.key)}
+                    className={`shrink-0 lg:w-full flex items-center gap-2 lg:gap-3 px-3 py-2 text-left whitespace-nowrap rounded-lg lg:rounded-none transition ${
+                      item.key === tabActive
+                        ? 'bg-blue-50 text-blue-700 lg:border-l-2 border-blue-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <MapPin
+                      className={`h-5 w-5 lg:h-6 lg:w-6 ${
+                        item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
+                      }`}
+                    />
+                    <span className="text-sm font-light">{item.label}</span>
+                  </button>
+                )
+              }
               if (item.key === 'seller') {
                 return (
                   <button
@@ -371,6 +394,7 @@ function Profile() {
           {tabActive === 'profile' && <ProfileContent />}
           {tabActive === 'orders' && <Order />}
           {tabActive === 'wishlist' && <Wishlist />}
+          {tabActive === 'addresses' && <AddressBook />}
           {tabActive === 'security' && <Security />}
           {tabActive === 'loyalty' && <Loyalty />}
           {tabActive === 'vouchers' && <VoucherWarehouse />}

@@ -1,37 +1,19 @@
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Ticket, AlertCircle } from 'lucide-react'
-import { getMyCoupons } from '../../services/couponService'
+import { useState } from 'react'
+import { Ticket, AlertCircle, Store } from 'lucide-react'
+import { useMyVouchers } from '../../hooks/useVouchers'
+import {
+  VOUCHER_STATUS_LABEL,
+  voucherTerms,
+  voucherTitle,
+  voucherValidity
+} from '../../utils/voucherText'
 
-type VoucherFilter = 'all' | 'usable' | 'used_up' | 'expired'
+// "Usable" gom ca voucher sap dien ra: van con dung duoc sau nay
+const isUsableTab = (status: string) => status === 'active' || status === 'scheduled'
 
 export default function VoucherWarehouse() {
-  const [filter, setFilter] = useState<VoucherFilter>('all')
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['coupons', 'my'],
-    queryFn: getMyCoupons,
-    staleTime: 60 * 1000
-  })
-
-  const vouchers = useMemo(() => data?.coupons ?? [], [data])
-  const filterStats = useMemo(() => {
-    const usable = vouchers.filter(v => v.is_usable).length
-    const usedUp = vouchers.filter(v => v.is_exhausted).length
-    const expired = vouchers.filter(v => v.is_expired).length
-    return {
-      all: vouchers.length,
-      usable,
-      used_up: usedUp,
-      expired
-    }
-  }, [vouchers])
-
-  const filteredVouchers = useMemo(() => {
-    if (filter === 'usable') return vouchers.filter(v => v.is_usable)
-    if (filter === 'used_up') return vouchers.filter(v => v.is_exhausted)
-    if (filter === 'expired') return vouchers.filter(v => v.is_expired)
-    return vouchers
-  }, [filter, vouchers])
+  const [tab, setTab] = useState<'usable' | 'history'>('usable')
+  const { data, isLoading, isError } = useMyVouchers()
 
   if (isLoading) {
     return (
@@ -52,96 +34,72 @@ export default function VoucherWarehouse() {
     )
   }
 
+  const vouchers = data?.coupons ?? []
+  const usable = vouchers.filter(v => isUsableTab(v.status))
+  const history = vouchers.filter(v => !isUsableTab(v.status))
+  const shown = tab === 'usable' ? usable : history
+
+  const tabCls = (active: boolean) =>
+    `px-4 py-2 text-sm border-b-2 -mb-px ${
+      active
+        ? 'border-blue-600 text-blue-700 font-semibold'
+        : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`
+
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="font-semibold text-gray-900 text-sm mb-4">Voucher warehouse</h3>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <button
-          type="button"
-          onClick={() => setFilter('all')}
-          className={`px-3 py-1.5 text-xs rounded-full border ${
-            filter === 'all'
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          All ({filterStats.all})
+      <h3 className="font-semibold text-gray-900 text-sm mb-3">Voucher warehouse</h3>
+      <div className="flex border-b border-gray-200 mb-4" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === 'usable'} onClick={() => setTab('usable')} className={tabCls(tab === 'usable')}>
+          Usable ({usable.length})
         </button>
-        <button
-          type="button"
-          onClick={() => setFilter('usable')}
-          className={`px-3 py-1.5 text-xs rounded-full border ${
-            filter === 'usable'
-              ? 'bg-green-600 text-white border-green-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          Usable ({filterStats.usable})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('used_up')}
-          className={`px-3 py-1.5 text-xs rounded-full border ${
-            filter === 'used_up'
-              ? 'bg-amber-600 text-white border-amber-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          Used up ({filterStats.used_up})
-        </button>
-        <button
-          type="button"
-          onClick={() => setFilter('expired')}
-          className={`px-3 py-1.5 text-xs rounded-full border ${
-            filter === 'expired'
-              ? 'bg-red-600 text-white border-red-600'
-              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          Expired ({filterStats.expired})
+        <button type="button" role="tab" aria-selected={tab === 'history'} onClick={() => setTab('history')} className={tabCls(tab === 'history')}>
+          Expired / Used ({history.length})
         </button>
       </div>
-      {filteredVouchers.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl px-4 py-5 bg-gray-50/60">
-          No vouchers in this filter.
+          {tab === 'usable'
+            ? 'No usable vouchers. Collect vouchers on shop and product pages.'
+            : 'No expired or used vouchers.'}
         </p>
       ) : (
         <div className="space-y-2">
-          {filteredVouchers.map(v => (
+          {shown.map(v => (
             <div
               key={v.id}
-              className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
-                v.is_usable === false
-                  ? 'border-gray-200 bg-gray-50 opacity-80'
-                  : 'border-blue-100 bg-blue-50/30'
+              data-testid={`warehouse-voucher-${v.code}`}
+              className={`rounded-xl border px-4 py-3 flex items-start justify-between gap-3 ${
+                v.status === 'active'
+                  ? 'border-blue-100 bg-blue-50/30'
+                  : 'border-gray-200 bg-gray-50 opacity-80'
               }`}
             >
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <Ticket className="w-4 h-4 text-blue-600" />
-                  <p className="text-sm font-semibold text-blue-900 truncate">{v.code}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Ticket className="w-4 h-4 text-blue-600 shrink-0" />
+                  <p className="text-sm font-semibold text-blue-900">{voucherTitle(v)}</p>
+                  <span className="font-mono text-xs text-gray-600">{v.code}</span>
                 </div>
-                <p className="text-xs text-gray-600 mt-1">
-                  {v.discount_type === 'percent'
-                    ? `Discount ${v.discount_value}%`
-                    : `Discount $${Number(v.discount_value).toLocaleString('en-US')}`}
-                  {v.min_order
-                    ? ` • Min order $${Number(v.min_order).toLocaleString('en-US')}`
-                    : ''}
+                <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                  <Store className="w-3 h-3" />
+                  {v.shop ? v.shop.name : 'Platform voucher'}
+                  {' · '}
+                  {voucherTerms(v)}
                 </p>
-                {v.is_exhausted && (
-                  <p className="text-xs text-red-500 mt-1">Used up</p>
-                )}
-                {v.is_expired && (
-                  <p className="text-xs text-red-500 mt-1">Expired</p>
-                )}
+                <p className="text-xs text-gray-500 mt-0.5">{voucherValidity(v)}</p>
               </div>
-              <p className="text-xs text-gray-500 shrink-0">
-                Exp:{' '}
-                {v.expires_at
-                  ? new Date(v.expires_at).toLocaleDateString('en-GB')
-                  : 'No expiry'}
-              </p>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${
+                  v.status === 'active'
+                    ? 'bg-green-100 text-green-700'
+                    : v.status === 'scheduled'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {VOUCHER_STATUS_LABEL[v.status]}
+              </span>
             </div>
           ))}
         </div>

@@ -2,6 +2,7 @@ import axiosClient from '../../lib/axios'
 import {
   CouponListResponse,
   CouponResponse,
+  CouponScope,
   CreateCouponRequest,
   CreateCouponResponse,
   UpdateCouponRequest,
@@ -12,7 +13,7 @@ import {
 } from '../types'
 
 export const adminCouponService = {
-  list(params?: { page?: number; limit?: number; q?: string }) {
+  list(params?: { page?: number; limit?: number; q?: string; scope?: CouponScope }) {
     return axiosClient.get<CouponListResponse>('/coupons', { params })
   },
   getById(id: number) {

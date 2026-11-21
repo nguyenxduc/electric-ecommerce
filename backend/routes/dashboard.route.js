@@ -6,6 +6,7 @@ import {
   getShopTopProducts,
   getBehaviorAnalytics,
   getShopTodoCounts,
+  getShopFinance,
   getAdminTodoCounts,
 } from "../controllers/dashboard.controller.js";
 import {
@@ -26,5 +27,6 @@ router.get("/todo", protectRoute, adminRoute, getAdminTodoCounts);
 router.get("/shop/stats", protectRoute, sellerRoute, getShopDashboardStats);
 router.get("/shop/top-products", protectRoute, sellerRoute, getShopTopProducts);
 router.get("/shop/todo", protectRoute, sellerRoute, getShopTodoCounts);
+router.get("/shop/finance", protectRoute, sellerRoute, getShopFinance);
 
 export default router;

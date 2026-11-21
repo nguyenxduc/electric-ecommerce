@@ -118,6 +118,33 @@ hop le, no tra ve `{ ok: false, code: "COUPON_EXPIRED" }` chu khong tra
 toan bo quy tac tinh tien kiem thu duoc bang ham thuan, khong can dung mot
 request nao — xem `tests/15-pricing.test.mjs`.
 
+### Quy tac voucher (mot cho duy nhat)
+
+`resolveCouponDiscount` trong `services/pricing.service.js` la noi DUY NHAT
+quyet dinh voucher co dung duoc khong. `createOrder`, `POST /coupons/validate`,
+`POST /coupons/validate-my` va `POST /coupons/quote` deu goi vao no (ba endpoint
+xem truoc di qua `previewCouponDiscount`, nhan `amount` + `shop_amounts`).
+Thu tu kiem tra:
+
+1. `couponStatus`: `is_active=false` → `COUPON_PAUSED`; `starts_at` o tuong lai →
+   `COUPON_NOT_STARTED`; qua `expires_at` → `COUPON_EXPIRED`; het `usage_limit` →
+   `COUPON_LIMIT_REACHED`.
+2. Voucher ca nhan (`Coupon.users` khac rong) chi dung cho dung nguoi →
+   `COUPON_NOT_OWNED` (403).
+3. Pham vi: voucher shop chi tinh tren phan hang cua shop do (`COUPON_SHOP_MISSING`),
+   `min_order` so voi phan hang shop; voucher san so voi ca gio.
+4. Voucher phan tram bi chan boi `max_discount`, va khong bao gio vuot tien hang.
+
+`couponStatus` cung la nguon cho chip trang thai o kho voucher, trang seller va admin.
+
+**Luu voucher.** `services/coupon.service.js`: `POST /coupons/:id/claim` ghi
+`coupon_claims` (unique user+coupon, goi lai van mot ban ghi). Chi voucher cong
+khai (`users` rong), dang bat, chua het han/het luot. Kho voucher (`GET /coupons/my`)
+= voucher ca nhan + voucher da luu, kem `status` va `source`. `GET /coupons/claimable`
+va `GET /coupons/shop/:slug` tra them co `claimed` cho nguoi dang xem. Nhap tay ma
+cong khai o checkout van dung duoc ma khong can luu; luu chi de hien trong kho va
+de checkout tu chon voucher giam nhieu nhat trong kho.
+
 ---
 
 ## 2. Luong then chot: tach don khi thanh toan
@@ -399,6 +426,18 @@ trang thai. `in_transit` dua don sang `shipped`. Van don da thu COD cho doi
 soat (`CodSettlement`); job `shipper-fraud-scan` dung chinh lich su su kien nay
 de phat hien giao gia va giu COD.
 
+### Cong cu seller: xac nhan hang loat, xuat CSV, thu nhap
+
+| Endpoint | Viec |
+|---|---|
+| `POST /orders/shop/bulk-status` `{order_ids[], status:"processing"}` | toi da 100 id; loc `shop_id = req.shop.id` truoc (id shop khac -> skipped "Order not found"), roi goi `transitionOrderStatus` tung don voi `allowedFrom: [pending]` - van giu khoa compare-and-set va chan `UNPAID`. Tra `{updated[], skipped[{id, reason}]}` |
+| `GET /orders/shop/export.csv?status&q&from&to` | cung bo loc `applyOrderListFilters` (`lib/orderFilters.js`, dung chung admin/seller/finance); `lib/csv.js` boc ngoac kep moi o va them `'` truoc o bat dau bang `= + - @` (chong CSV injection); toi da 5000 dong |
+| `GET /dashboard/shop/finance?from&to` | `services/finance.service.js`: released = don `delivered`, pending = `processing`/`shipped`, phi san tren released. Ty le va cong thuc phi (`computeCommission`) dung chung voi "Platform fee / Net payout" cua dashboard seller |
+
+`PATCH /shops/me` nhan logo/banner multipart chi JPG/PNG/WebP <= 2MB (loi -> 400).
+Trang Shop Profile gui anh trong request rieng sau khi luu thong tin, nen upload
+loi (Cloudinary) khong lam mat cac truong khac (tests/40-seller-tools).
+
 ---
 
 ## 6. Vong doi gian hang
@@ -423,6 +462,23 @@ Tung san pham con co co `is_active` (nguoi ban bat/tat qua
 voi nguoi khong phai admin; chu shop van thay hang an trong
 `GET /products/shop/mine` (`?status=live|hidden`) va `GET /products/:id`.
 
+### Kiem duyet san pham (takedown)
+
+Admin go san pham vi pham bang `PATCH /products/:id/takedown { reason }` (ly do
+>= 5 ky tu): dat `is_active = false`, `takedown_reason`, `taken_down_at`, ghi
+audit `PRODUCT_TAKEDOWN` va bao chu shop. `PATCH /products/:id/restore` xoa ca
+ba truong va hien lai san pham (`PRODUCT_RESTORE`). Ca hai chi qua `adminRoute`.
+
+Khong can them dieu kien moi cho nguoi mua: hang bi go co `is_active = false`
+nen `buyerVisibilityWhere` da loc. Cho chan la cong tac cua nguoi ban:
+`setProductVisibility` them `taken_down_at: null` vao `where` cua
+`updateMany` khi nguoi goi khong phai admin bat san pham len, nen kiem tra va
+ghi la mot cau lenh (khong co khe chen ngang). Khong cap nhat duoc dong nao ma
+san pham con ton tai -> 403 kem ly do bi go.
+
+`GET /products?status=live|hidden|taken_down` (chi admin) loc danh sach o trang
+admin; `hidden` la nguoi ban tu an (`is_active = false`, chua bi go).
+
 Ho so mo shop (`POST /shops/apply`) gom thong tin shop, dia chi lay hang
 (`pickup_*`) va thue (`tax_entity_type`, `tax_code`). `validateTax` trong
 `shop.controller.js` bat buoc doanh nghiep co MST o ca ba duong: nop ho so,
@@ -435,7 +491,8 @@ Admin xem toan bo ho so truoc khi duyet; trang shop cong khai chi lo quan/tinh.
 `GET /dashboard/shop/todo` (seller: don cho xac nhan/giao/dang giao, yeu cau
 tra hang, tin nhan chua doc, san pham con <= `LOW_STOCK_THRESHOLD`) va
 `GET /dashboard/todo` (admin: shop cho duyet, chat ho tro chua doc, co gian lan
-dang mo). Moi o tren giao dien link toi danh sach da loc san qua `?status=`.
+dang mo, san pham dang bi go). Moi o tren giao dien link toi danh sach da loc
+san qua `?status=`.
 
 ---
 
@@ -466,3 +523,42 @@ Truoc ca ba lop, `middleware/scalarBody.middleware.js` bat `email`, `password`,
 `new_password`, `code`, `coupon_code` trong body phai la chuoi. Prisma hieu
 object trong `where` la bo loc, nen `{"email": {"contains": "@"}}` tung dang
 nhap duoc bang mat khau doan ma khong can biet email (tests/29-scalar-inputs).
+
+### Khoa tai khoan (suspension)
+
+Admin khoa qua `PATCH /customers/:id/suspend { reason }` va mo qua
+`PATCH /customers/:id/unsuspend` (audit `USER_SUSPEND` / `USER_UNSUSPEND`, bao
+nguoi dung). Khong khoa duoc chinh minh (400) hay admin khac (403).
+
+`users.suspended_at` duoc kiem tra o moi cua vao, khong them truy van nao vi
+cac cho nay von da doc ban ghi user:
+
+- `login`: sau khi dung mat khau -> 403 `code: "ACCOUNT_SUSPENDED"` (khong lo
+  trang thai khoa voi nguoi doan sai mat khau).
+- `protectRoute`: token cu cua tai khoan bi khoa bi tu choi ngay (403 cung ma
+  tren), khong doi JWT het han. Frontend (`lib/axios.ts`) thay ma nay thi xoa
+  token va ve trang chu.
+- `optionalAuth`: coi nhu khach vang lai. Socket.IO: tu choi ket noi.
+
+Xem `tests/39-moderation`.
+
+---
+
+## 8. So dia chi nguoi mua
+
+`routes/address.route.js` -> `controllers/address.controller.js` ->
+`services/address.service.js`, bang `user_addresses` (xoa mem qua `deleted_at`).
+Moi route deu `protectRoute`; moi thao tac theo `:id` tim ban ghi bang
+`user_id = req.user.id` nen dia chi cua nguoi khac tra 404 (khong lo su ton tai).
+
+| Endpoint | Viec |
+|---|---|
+| `GET /addresses` | danh sach cua minh, mac dinh dung dau |
+| `POST /addresses` | tao; toi da `MAX_ADDRESSES` = 10; dia chi dau tien tu la mac dinh |
+| `PATCH /addresses/:id` | sua mot phan truong |
+| `DELETE /addresses/:id` | xoa mem; neu la mac dinh thi day dia chi moi nhat con lai len |
+| `POST /addresses/:id/default` | dat mac dinh trong mot giao dich, luon chi mot mac dinh |
+
+SDT chuan hoa bang `normalizeVnPhone` (`lib/sms.js`). Checkout dien san tu dia
+chi mac dinh, cho doi qua picker, va co o "Save this address" luu dia chi nhap
+tay sau khi dat don thanh cong (tests/37-address-book).

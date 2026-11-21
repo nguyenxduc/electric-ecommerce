@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Download } from 'lucide-react'
 import {
+  useBulkConfirmShopOrders,
   useMyShopOrders,
   useMyShopOrderStats,
   useUpdateShopOrderStatus
 } from '../../../admin/hooks/useOrders'
+import adminOrderService from '../../../admin/services/orderService'
+import { apiErrorMessage } from '../../../lib/apiError'
 import SkeletonTable from '../../../admin/components/common/SkeletonTable'
 import AdminPagination from '../../../admin/components/common/AdminPagination'
 import { formatUsd } from '../../../client/utils/formatMoney'
@@ -44,6 +48,52 @@ export default function SellerOrdersList() {
           toast.error(e.response?.data?.message || 'Failed to confirm order')
       }
     )
+  // Chon nhieu don tren trang hien tai; doi trang/tab/tim kiem thi bo chon
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [selKey, setSelKey] = useState('')
+  const viewKey = `${page}|${status ?? ''}|${q}`
+  if (selKey !== viewKey) {
+    setSelKey(viewKey)
+    setSelected(new Set())
+  }
+  const toggle = (id: number) =>
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const bulkMut = useBulkConfirmShopOrders()
+  const confirmSelected = () =>
+    bulkMut.mutate([...selected], {
+      onSuccess: ({ data: r }) => {
+        setSelected(new Set())
+        if (r.updated.length) toast.success(`Confirmed ${r.updated.length} order(s)`)
+        if (r.skipped.length) {
+          // Gom theo ly do: "2 skipped: This online order has not been paid yet"
+          const reasons = [...new Set(r.skipped.map(x => x.reason))].join('; ')
+          toast.warning(`${r.skipped.length} skipped: ${reasons}`)
+        }
+      },
+      onError: e => toast.error(apiErrorMessage(e, 'Failed to confirm orders'))
+    })
+  const [exporting, setExporting] = useState(false)
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const { data: blob } = await adminOrderService.exportMineCsv({ status, q: q || undefined })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch (e) {
+      toast.error(apiErrorMessage(e, 'Failed to export orders'))
+    } finally {
+      setExporting(false)
+    }
+  }
   const pages = useMemo(
     () => Math.max(1, data?.data.pagination.total_pages || 1),
     [data]
@@ -57,6 +107,9 @@ export default function SellerOrdersList() {
     setStatus(undefined)
     setPage(1)
   }
+  const allSelected = orders.length > 0 && orders.every(o => selected.has(o.id))
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(orders.map(o => o.id)))
   const orderLabel = (o: (typeof orders)[number]) =>
     o.order_number ? `#${o.order_number}` : `#${String(o.id).padStart(6, '0')}`
   // Nut chinh theo trang thai, dung chung cho bang (desktop) va the (mobile)
@@ -83,7 +136,17 @@ export default function SellerOrdersList() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">My Orders</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">My Orders</h1>
+        <button
+          onClick={exportCsv}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border bg-white hover:bg-gray-50 disabled:opacity-50"
+        >
+          <Download className="w-4 h-4" />
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <KpiCard
           title="Total Orders"
@@ -138,6 +201,28 @@ export default function SellerOrdersList() {
           />
         </div>
 
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b bg-blue-50 text-sm">
+            <span className="font-medium">{selected.size} selected</span>
+            <button
+              onClick={confirmSelected}
+              disabled={bulkMut.isPending}
+              className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {bulkMut.isPending ? 'Confirming...' : 'Confirm selected'}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-3 py-1 text-xs rounded border bg-white hover:bg-gray-50"
+            >
+              Clear
+            </button>
+            <span className="text-xs text-gray-500">
+              Only pending COD or paid orders are confirmed; others are skipped.
+            </span>
+          </div>
+        )}
+
         {isLoading ? (
           <SkeletonTable rows={5} cols={7} />
         ) : error ? (
@@ -163,15 +248,25 @@ export default function SellerOrdersList() {
         ) : (
           <>
           {/* Mobile: the don thay cho bang de khong phai cuon ngang */}
+          <label className="md:hidden flex items-center gap-2 px-3 py-2 border-b text-sm text-gray-600">
+            <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+            Select all on page
+          </label>
           <ul className="md:hidden divide-y">
             {orders.map(o => {
               const first = o.order_items?.[0]
               return (
                 <li key={o.id} className="p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select order ${orderLabel(o)}`}
+                      checked={selected.has(o.id)}
+                      onChange={() => toggle(o.id)}
+                    />
                     <Link
                       to={`/seller/orders/${o.id}`}
-                      className="text-blue-600 font-medium truncate"
+                      className="text-blue-600 font-medium truncate mr-auto"
                     >
                       {orderLabel(o)}
                     </Link>
@@ -208,6 +303,14 @@ export default function SellerOrdersList() {
           <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm">
             <thead className="bg-blue-50">
               <tr>
+                <th className="p-2 w-8">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all orders on this page"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                  />
+                </th>
                 <th className="text-left p-2">No.</th>
                 <th className="text-left p-2">Order</th>
                 <th className="text-left p-2">Buyer</th>
@@ -220,7 +323,15 @@ export default function SellerOrdersList() {
             </thead>
             <tbody>
               {orders.map((o, idx) => (
-                <tr key={o.id} className="border-t">
+                <tr key={o.id} className={`border-t ${selected.has(o.id) ? 'bg-blue-50/50' : ''}`}>
+                  <td className="p-2">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select order ${orderLabel(o)}`}
+                      checked={selected.has(o.id)}
+                      onChange={() => toggle(o.id)}
+                    />
+                  </td>
                   <td className="p-2">{(page - 1) * limit + idx + 1}</td>
                   <td className="p-2">
                     <Link

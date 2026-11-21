@@ -10,10 +10,27 @@ export type ShopCoupon = {
   discount_type: 'percent' | 'fixed'
   discount_value: number | string
   min_order: number | string | null
+  max_discount: number | string | null
   usage_limit: number | null
   used_count: number | null
+  starts_at: string | null
   expires_at: string | null
+  is_active: boolean
+  status: 'active' | 'scheduled' | 'paused' | 'expired' | 'used_up'
   created_at: string
+}
+
+// "" / null = xoa gia tri (khong gioi han / khong lich)
+export type ShopCouponInput = {
+  description?: string
+  discount_type?: 'percent' | 'fixed'
+  discount_value?: number
+  min_order?: number | null
+  max_discount?: number | null
+  usage_limit?: number | null
+  starts_at?: string | null
+  expires_at?: string | null
+  is_active?: boolean
 }
 
 export const getMyShopCoupons = async (): Promise<ShopCoupon[]> => {
@@ -21,16 +38,14 @@ export const getMyShopCoupons = async (): Promise<ShopCoupon[]> => {
   return data.coupons || []
 }
 
-export const createShopCoupon = async (payload: {
-  code: string
-  description?: string
-  discount_type: 'percent' | 'fixed'
-  discount_value: number
-  min_order?: number
-  usage_limit?: number
-  expires_at?: string
-}) => {
+export const createShopCoupon = async (payload: ShopCouponInput & { code: string }) => {
   const { data } = await axiosClient.post('/coupons/shop', payload)
+  return data
+}
+
+// Sua / tam dung / bat lai voucher cua shop minh
+export const updateShopCoupon = async (id: number, payload: ShopCouponInput) => {
+  const { data } = await axiosClient.put(`/coupons/shop/${id}`, payload)
   return data
 }
 
@@ -79,6 +94,17 @@ export const resolveReturn = async (
 // ---- Shop settings (pickup address + tax) ----
 export const updateShopSettings = async (payload: Record<string, string>) => {
   const { data } = await axiosClient.patch('/shops/me', payload)
+  return data
+}
+
+// Logo/banner gui rieng (multipart) de loi upload anh khong lam mat cac truong khac
+export const uploadShopImages = async (files: { logo?: File | null; banner?: File | null }) => {
+  const fd = new FormData()
+  if (files.logo) fd.append('logo', files.logo)
+  if (files.banner) fd.append('banner', files.banner)
+  const { data } = await axiosClient.patch('/shops/me', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
   return data
 }
 

@@ -7,6 +7,8 @@ import {
   updateCustomerTier,
   updateCustomerPoints,
   deleteCustomer,
+  suspendCustomer,
+  unsuspendCustomer,
 } from "../controllers/customer.controller.js";
 
 import { registerIdParams } from "../middleware/validateId.middleware.js";
@@ -19,6 +21,8 @@ router.get("/:id", protectRoute, adminRoute, getCustomer);
 router.patch("/:id", protectRoute, adminRoute, updateCustomer);
 router.patch("/:id/tier", protectRoute, adminRoute, updateCustomerTier);
 router.patch("/:id/points", protectRoute, adminRoute, updateCustomerPoints);
+router.patch("/:id/suspend", protectRoute, adminRoute, suspendCustomer);
+router.patch("/:id/unsuspend", protectRoute, adminRoute, unsuspendCustomer);
 router.delete("/:id", protectRoute, adminRoute, deleteCustomer);
 
 export default router;

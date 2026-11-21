@@ -55,6 +55,7 @@ import SellerShopProfile from './seller/pages/shop/Profile'
 import SellerCouponsList from './seller/pages/coupons/List'
 import SellerTax from './seller/pages/tax/Tax'
 import SellerReturnsList from './seller/pages/returns/List'
+import SellerFinance from './seller/pages/finance/Finance'
 
 const queryClient = new QueryClient()
 
@@ -173,6 +174,7 @@ function App() {
             <Route path="chat" element={<AdminChatList scope="seller" />} />
             <Route path="shop" element={<SellerShopProfile />} />
             <Route path="tax" element={<SellerTax />} />
+            <Route path="finance" element={<SellerFinance />} />
           </Route>
           <Route
             path="/admin"

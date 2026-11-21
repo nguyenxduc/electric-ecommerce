@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getDashboardStats, getTopProducts, getBehaviorAnalytics, getAdminTodo, getShopTodo, type DashboardStatsResponse, type TopProductsResponse, type BehaviorAnalyticsResponse } from '../services/dashboardService'
+import { getDashboardStats, getTopProducts, getBehaviorAnalytics, getAdminTodo, getShopTodo, getShopFinance, type DashboardStatsResponse, type TopProductsResponse, type BehaviorAnalyticsResponse } from '../services/dashboardService'
 
 export const useAdminTodo = () =>
   useQuery({ queryKey: ['admin', 'dashboard', 'todo'], queryFn: getAdminTodo, staleTime: 30 * 1000 })
@@ -32,3 +32,10 @@ export const useBehaviorAnalytics = (days?: number) => {
   })
 }
 
+
+export const useShopFinance = (params: { from?: string; to?: string }) =>
+  useQuery({
+    queryKey: ['seller', 'dashboard', 'finance', params],
+    queryFn: () => getShopFinance(params),
+    staleTime: 30 * 1000
+  })

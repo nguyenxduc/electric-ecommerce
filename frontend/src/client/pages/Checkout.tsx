@@ -11,7 +11,8 @@ import {
   Copy,
   QrCode,
   Loader2,
-  Store
+  Store,
+  MapPin
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useCart, useClearCart, useRemoveCartItem } from '../hooks/useCart'
@@ -26,17 +27,17 @@ import {
   type ShippingQuote
 } from '../services/orderService'
 import PhoneVerification from '../components/profile/PhoneVerification'
+import { AddressPickerModal } from '../components/profile/AddressBook'
+import { useAddresses, useCreateAddress } from '../hooks/useAddresses'
+import { formatAddress, type Address } from '../services/addressService'
 import { toast } from 'sonner'
 import {
   createMomoPayment,
   type BankTransferQRResponse
 } from '../services/paymentService'
-import {
-  validateCoupon,
-  validateMyCoupon,
-  getMyCoupons,
-  type MyVoucher
-} from '../services/couponService'
+import { validateCoupon, type QuotedVoucher } from '../services/couponService'
+import { useVoucherQuote } from '../hooks/useVouchers'
+import VoucherPicker from '../components/checkout/VoucherPicker'
 import { formatUsd } from '../utils/formatMoney'
 import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
@@ -68,6 +69,30 @@ const Checkout = () => {
   const [province, setProvince] = useState('')
   const [district, setDistrict] = useState('')
   const [ward, setWard] = useState('')
+  // So dia chi: dien san tu dia chi mac dinh va thu gon o nhap tay thanh the "Deliver to"
+  const { data: savedAddresses = [] } = useAddresses()
+  const createAddressMutation = useCreateAddress()
+  const [addressId, setAddressId] = useState<number | null>(null)
+  const [editingAddress, setEditingAddress] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [saveAddress, setSaveAddress] = useState(false)
+  const showManualAddress = !savedAddresses.length || editingAddress
+  const applyAddress = (a: Address) => {
+    setAddressId(a.id)
+    setName(a.name)
+    setPhone(a.phone)
+    setProvince(a.province ?? '')
+    setDistrict(a.district ?? '')
+    setWard(a.ward ?? '')
+    setAddress(a.street)
+    setEditingAddress(false)
+  }
+  const prefilledRef = useRef(false)
+  useEffect(() => {
+    if (prefilledRef.current || !savedAddresses[0]) return
+    prefilledRef.current = true
+    applyAddress(savedAddresses[0])
+  }, [savedAddresses])
   const [wantInvoice, setWantInvoice] = useState(false)
   const [invoice, setInvoice] = useState({
     company_name: '',
@@ -102,8 +127,6 @@ const Checkout = () => {
   } | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
   const [showVoucherModal, setShowVoucherModal] = useState(false)
-  const [myVouchers, setMyVouchers] = useState<MyVoucher[]>([])
-  const [voucherLoading, setVoucherLoading] = useState(false)
   const clearCartMutation = useClearCart()
   const removeItemMutation = useRemoveCartItem()
   const loyaltyPoints = userData?.user?.loyalty_points ?? 0
@@ -177,7 +200,8 @@ const Checkout = () => {
   // Autofill receiver info from logged-in user
   useEffect(() => {
     const u = userData?.user
-    if (u) {
+    // Da dien tu so dia chi thi khong ghi de bang thong tin ho so
+    if (u && !prefilledRef.current) {
       if (!name && u.name) setName(u.name)
       if (!phone && u.phone) setPhone(u.phone)
       if (!address && u.address) setAddress(u.address)
@@ -271,6 +295,20 @@ const Checkout = () => {
 
     const result = await createOrder(orderPayload)
 
+    // Luu dia chi sau khi dat don thanh cong; loi luu khong anh huong don
+    if (saveAddress && showManualAddress) {
+      createAddressMutation
+        .mutateAsync({
+          name: name.trim(),
+          phone: phone.trim(),
+          street: address.trim(),
+          province: province.trim() || null,
+          district: district.trim() || null,
+          ward: ward.trim() || null
+        })
+        .catch(err => toast.warning(apiErrorMessage(err, 'Could not save the address to your address book')))
+    }
+
     if (clearCart) await clearCartAfterOrder()
 
     return result
@@ -309,6 +347,23 @@ const Checkout = () => {
   const amountAfterTierDiscount = Math.max(
     0,
     totals.merchandiseTotal - tierDiscountAmount
+  )
+  // Gio hang gui len de backend tinh voucher: tien hang sau uu dai hang, va
+  // tung shop de kiem pham vi voucher shop (cung cong thuc voi createOrder).
+  const voucherCart = useMemo(
+    () => ({
+      amount: round2(amountAfterTierDiscount),
+      shopAmounts: Object.fromEntries(
+        shopGroups
+          .filter(g => /^\d+$/.test(g.key))
+          .map(g => [g.key, round2(g.subtotal * (1 - tierDiscountRate))])
+      )
+    }),
+    [amountAfterTierDiscount, shopGroups, tierDiscountRate]
+  )
+  const voucherQuote = useVoucherQuote(
+    voucherCart,
+    !!userData?.user && items.length > 0
   )
   const displayTotal = round2(
     Math.max(0, amountAfterTierDiscount - (couponResult?.discount ?? 0)) +
@@ -472,41 +527,15 @@ const Checkout = () => {
     }
   }
 
-  // Shop vouchers only discount that shop's items - recompute the preview
-  // against the target shop group (the backend recomputes authoritatively).
-  const applyCouponPreview = (
-    res: Awaited<ReturnType<typeof validateCoupon>>,
-    code: string
-  ): boolean => {
-    const shop = res.coupon?.shop
-    if (shop) {
-      const group = shopGroups.find(g => String(g.key) === String(shop.id))
-      if (!group) {
-        toast.error(`Voucher only applies to items from ${shop.name}`)
-        return false
-      }
-      const groupAfterTier = round2(group.subtotal * (1 - tierDiscountRate))
-      if (
-        res.coupon.min_order &&
-        groupAfterTier < Number(res.coupon.min_order)
-      ) {
-        toast.error(`${shop.name} items do not meet the voucher minimum`)
-        return false
-      }
-      let discount =
-        res.coupon.discount_type === 'percent'
-          ? (groupAfterTier * Number(res.coupon.discount_value)) / 100
-          : Number(res.coupon.discount_value)
-      discount = round2(Math.min(discount, groupAfterTier))
-      setAppliedCoupon(code)
-      setCouponResult({ discount, finalAmount: 0, shopName: shop.name })
-      toast.success(`Shop voucher applied (${shop.name})`)
-      return true
-    }
+  // Backend da tinh muc giam theo pham vi shop + tran giam, chi viec hien
+  const setVoucher = (
+    code: string,
+    discount: number,
+    shopName?: string
+  ) => {
     setAppliedCoupon(code)
-    setCouponResult({ discount: res.discount, finalAmount: res.finalAmount })
-    toast.success('Voucher applied')
-    return true
+    setCouponInput(code)
+    setCouponResult({ discount, finalAmount: 0, shopName })
   }
 
   // Gio hang doi thi ban xem truoc giam gia khong con dung
@@ -515,6 +544,21 @@ const Checkout = () => {
     setCouponResult(null)
   }, [quoteKey])
 
+  // Tu chon voucher giam nhieu nhat trong kho, mot lan cho moi gio hang; nguoi
+  // dung bo chon thi khong chon lai. Chay sau effect reset o tren.
+  const autoPickedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!voucherQuote.data || autoPickedFor.current === quoteKey) return
+    autoPickedFor.current = quoteKey
+    const best = voucherQuote.data
+      .filter(v => v.claimed && v.applicable && v.discount > 0)
+      .sort((a, b) => b.discount - a.discount)[0]
+    if (!best) return
+    setAppliedCoupon(best.code)
+    setCouponInput(best.code)
+    setCouponResult({ discount: best.discount, finalAmount: 0, shopName: best.shop?.name })
+  }, [voucherQuote.data, quoteKey])
+
   const handleApplyCoupon = () => {
     const code = couponInput.trim()
     if (!code) {
@@ -522,47 +566,23 @@ const Checkout = () => {
       return
     }
     setCouponLoading(true)
-    validateCoupon(code, amountAfterTierDiscount)
+    validateCoupon(code, voucherCart)
       .then(res => {
-        if (!applyCouponPreview(res, code)) {
-          setAppliedCoupon(null)
-          setCouponResult(null)
-        }
+        setVoucher(code, res.discount, res.coupon.shop?.name)
+        toast.success('Voucher applied')
       })
       .catch(err => {
-        toast.error(err?.response?.data?.message || 'Invalid voucher')
+        toast.error(apiErrorMessage(err, 'Invalid voucher'))
         setAppliedCoupon(null)
         setCouponResult(null)
       })
       .finally(() => setCouponLoading(false))
   }
 
-  const openVoucherModal = async () => {
-    setShowVoucherModal(true)
-    setVoucherLoading(true)
-    try {
-      const res = await getMyCoupons()
-      setMyVouchers(res.coupons || [])
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Failed to load your vouchers'))
-    } finally {
-      setVoucherLoading(false)
-    }
-  }
-
-  const handleApplyMyVoucher = async (voucher: MyVoucher) => {
-    setCouponLoading(true)
-    try {
-      const res = await validateMyCoupon(voucher.code, amountAfterTierDiscount)
-      setCouponInput(voucher.code)
-      if (applyCouponPreview(res, voucher.code)) {
-        setShowVoucherModal(false)
-      }
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Voucher cannot be applied'))
-    } finally {
-      setCouponLoading(false)
-    }
+  const handleApplyMyVoucher = (voucher: QuotedVoucher) => {
+    setVoucher(voucher.code, voucher.discount, voucher.shop?.name)
+    setShowVoucherModal(false)
+    toast.success('Voucher applied')
   }
 
   if (isLoading) {
@@ -654,6 +674,35 @@ const Checkout = () => {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 sm:gap-8">
         <div className="space-y-6 min-w-0">
+          {pickerOpen && (
+            <AddressPickerModal selectedId={addressId} onPick={applyAddress} onClose={() => setPickerOpen(false)} />
+          )}
+          {!showManualAddress && (
+            <div className="bg-white rounded-lg shadow p-6" data-testid="deliver-to">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-blue-600" /> Deliver to
+                </h2>
+                <div className="flex gap-3 text-sm shrink-0">
+                  <button onClick={() => setEditingAddress(true)} className="text-gray-600 hover:underline">
+                    Edit
+                  </button>
+                  <button onClick={() => setPickerOpen(true)} className="font-medium text-blue-600 hover:underline">
+                    Change
+                  </button>
+                </div>
+              </div>
+              <div className="min-w-0">
+                <div className="font-medium text-gray-900 break-words">
+                  {name} <span className="text-gray-400">|</span> <span className="text-gray-600 font-normal">{phone}</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-1 break-words">
+                  {formatAddress({ street: address, ward, district, province })}
+                </p>
+              </div>
+            </div>
+          )}
+          {showManualAddress && (<>
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
               <User className="w-5 h-5" /> Contact
@@ -705,7 +754,24 @@ const Checkout = () => {
                 onChange={e => setAddress(e.target.value)}
               />
             </CheckoutField>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveAddress}
+                  onChange={e => setSaveAddress(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Save this address to my address book
+              </label>
+              {savedAddresses.length > 0 && (
+                <button onClick={() => setPickerOpen(true)} className="text-sm font-medium text-blue-600 hover:underline">
+                  Choose a saved address
+                </button>
+              )}
+            </div>
           </div>
+          </>)}
 
           {needPhoneVerify && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
@@ -889,7 +955,7 @@ const Checkout = () => {
               </button>
               <button
                 type="button"
-                onClick={openVoucherModal}
+                onClick={() => setShowVoucherModal(true)}
                 className="w-full px-3 py-2 text-sm border border-blue-200 text-blue-700 rounded hover:bg-blue-50"
               >
                 Vouchers
@@ -1156,99 +1222,18 @@ const Checkout = () => {
 
       {/* Voucher list modal */}
       {showVoucherModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full min-w-0 relative">
-            <button
-              onClick={() => setShowVoucherModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full p-1 hover:bg-gray-100 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                Choose voucher
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Order value after tier discount:{' '}
-                {formatUsd(amountAfterTierDiscount)}
-              </p>
-
-              {voucherLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map(i => (
-                    <div
-                      key={i}
-                      className="h-16 bg-gray-100 rounded-xl animate-pulse"
-                    />
-                  ))}
-                </div>
-              ) : myVouchers.length === 0 ? (
-                <p className="text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl px-4 py-5 bg-gray-50/60">
-                  No voucher in your warehouse.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {myVouchers.map(v => {
-                    const minOrder = Number(v.min_order || 0)
-                    const canUse =
-                      (v.is_usable ?? true) &&
-                      (!minOrder || amountAfterTierDiscount >= minOrder)
-                    return (
-                      <div
-                        key={v.id}
-                        className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
-                          canUse
-                            ? 'border-blue-100 bg-blue-50/30'
-                            : 'border-gray-200 bg-gray-50 opacity-70'
-                        }`}
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-blue-900">
-                            {v.code}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            {v.discount_type === 'percent'
-                              ? `Discount ${v.discount_value}%`
-                              : `Discount $${Number(v.discount_value).toLocaleString('en-US')}`}
-                            {minOrder
-                              ? ` · Min order $${minOrder.toLocaleString('en-US')}`
-                              : ''}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Exp:{' '}
-                            {v.expires_at
-                              ? new Date(v.expires_at).toLocaleDateString(
-                                  'en-GB'
-                                )
-                              : 'No expiry'}
-                          </p>
-                          {v.is_exhausted && (
-                            <p className="text-xs text-red-500 mt-1">
-                              Used up
-                            </p>
-                          )}
-                          {v.is_expired && (
-                            <p className="text-xs text-red-500 mt-1">
-                              Expired
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          disabled={!canUse || couponLoading}
-                          onClick={() => handleApplyMyVoucher(v)}
-                          className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40"
-                        >
-                          Choose
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <VoucherPicker
+          vouchers={voucherQuote.data ?? []}
+          loading={voucherQuote.isLoading}
+          amount={amountAfterTierDiscount}
+          appliedCode={appliedCoupon}
+          onApply={handleApplyMyVoucher}
+          onRemove={() => {
+            setAppliedCoupon(null)
+            setCouponResult(null)
+          }}
+          onClose={() => setShowVoucherModal(false)}
+        />
       )}
     </div>
   )

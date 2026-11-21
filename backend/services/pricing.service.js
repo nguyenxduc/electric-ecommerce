@@ -98,11 +98,50 @@ export const computeTierDiscount = (totalAmount, tierDiscountRate) => {
 };
 
 /**
+ * Trang thai hieu luc cua voucher tai thoi diem `now`, khong xet gio hang.
+ * Mot nguon cho checkout, validate, kho voucher, trang seller va admin.
+ *
+ * @returns {"paused"|"scheduled"|"expired"|"used_up"|"active"}
+ */
+export const couponStatus = (coupon, now = new Date()) => {
+  if (coupon.is_active === false) return "paused";
+  if (coupon.starts_at && now < new Date(coupon.starts_at)) return "scheduled";
+  if (coupon.expires_at && now > new Date(coupon.expires_at)) return "expired";
+  if (
+    coupon.usage_limit != null &&
+    coupon.used_count != null &&
+    coupon.used_count >= coupon.usage_limit
+  ) {
+    return "used_up";
+  }
+  return "active";
+};
+
+const STATUS_ERRORS = {
+  paused: { code: "COUPON_PAUSED", message: "Voucher is paused" },
+  scheduled: { code: "COUPON_NOT_STARTED", message: "Voucher is not active yet" },
+  expired: { code: "COUPON_EXPIRED", message: "Coupon has expired" },
+  used_up: { code: "COUPON_LIMIT_REACHED", message: "Coupon usage limit reached" },
+};
+
+/** Muc giam tho tren `base`, ap tran max_discount cho voucher phan tram. */
+const rawCouponDiscount = (coupon, base) => {
+  if (coupon.discount_type !== "percent") return Number(coupon.discount_value);
+  const raw = (Number(base) * Number(coupon.discount_value)) / 100;
+  return coupon.max_discount != null
+    ? Math.min(raw, Number(coupon.max_discount))
+    : raw;
+};
+
+/**
  * Tinh muc giam cua voucher.
  *
  * Tra ve ket qua co cau truc thay vi nem loi hay tra res.status(400): tang HTTP
  * la noi duy nhat biet ma trang thai la gi. Nho vay quy tac voucher kiem thu
  * duoc ma khong can dung request.
+ *
+ * Day la noi DUY NHAT quyet dinh voucher co dung duoc hay khong: createOrder,
+ * /coupons/validate, /coupons/validate-my va /coupons/quote deu goi vao day.
  *
  * @returns {{ok:true, couponDiscount:number, couponShopKey:string|null}
  *          | {ok:false, code:string, message:string}}
@@ -118,20 +157,8 @@ export const resolveCouponDiscount = ({
   if (!coupon) {
     return { ok: false, code: "COUPON_NOT_FOUND", message: "Invalid coupon code" };
   }
-  if (coupon.expires_at && now > coupon.expires_at) {
-    return { ok: false, code: "COUPON_EXPIRED", message: "Coupon has expired" };
-  }
-  if (
-    coupon.usage_limit !== null &&
-    coupon.used_count !== null &&
-    coupon.used_count >= coupon.usage_limit
-  ) {
-    return {
-      ok: false,
-      code: "COUPON_LIMIT_REACHED",
-      message: "Coupon usage limit reached",
-    };
-  }
+  const status = couponStatus(coupon, now);
+  if (status !== "active") return { ok: false, ...STATUS_ERRORS[status] };
   // Voucher ca nhan: phai thuoc dung nguoi dang dat.
   if (
     Array.isArray(coupon.users) &&
@@ -166,10 +193,7 @@ export const resolveCouponDiscount = ({
         message: `${coupon.shop?.name || "Shop"} items do not meet the voucher minimum`,
       };
     }
-    const raw =
-      coupon.discount_type === "percent"
-        ? (groupAfterTier * Number(coupon.discount_value)) / 100
-        : Number(coupon.discount_value);
+    const raw = rawCouponDiscount(coupon, groupAfterTier);
     return {
       ok: true,
       couponShopKey,
@@ -188,15 +212,37 @@ export const resolveCouponDiscount = ({
       message: "Order does not meet minimum amount",
     };
   }
-  const raw =
-    coupon.discount_type === "percent"
-      ? (Number(amountAfterTierDiscount) * Number(coupon.discount_value)) / 100
-      : Number(coupon.discount_value);
+  const raw = rawCouponDiscount(coupon, amountAfterTierDiscount);
   return {
     ok: true,
     couponShopKey: null,
     couponDiscount: round2(Math.min(raw, amountAfterTierDiscount)),
   };
+};
+
+/**
+ * Xem truoc voucher khi chua co don: `amount` la tien hang sau uu dai hang,
+ * `shopAmounts` ({shopId: tien hang shop do sau uu dai hang}) cho phep kiem tra
+ * voucher shop dung pham vi. Thieu shopAmounts thi coi ca `amount` la hang cua
+ * shop so huu voucher (hanh vi cu cua /coupons/validate).
+ */
+export const previewCouponDiscount = ({ coupon, amount, shopAmounts, userId, now }) => {
+  const shopGroups = new Map();
+  if (shopAmounts && typeof shopAmounts === "object") {
+    for (const [shopId, subtotal] of Object.entries(shopAmounts)) {
+      shopGroups.set(String(shopId), { subtotal: Number(subtotal) || 0 });
+    }
+  } else if (coupon?.shop_id) {
+    shopGroups.set(coupon.shop_id.toString(), { subtotal: Number(amount) || 0 });
+  }
+  return resolveCouponDiscount({
+    coupon,
+    shopGroups,
+    tierDiscountRate: 0,
+    amountAfterTierDiscount: Number(amount) || 0,
+    userId,
+    now,
+  });
 };
 
 /**
