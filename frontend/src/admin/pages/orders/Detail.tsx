@@ -72,7 +72,15 @@ function StatusTimeline({ status }: { status: string }) {
   )
 }
 
-function ShipmentPanel({ orderId, status }: { orderId: number; status: string }) {
+function ShipmentPanel({
+  orderId,
+  status,
+  awaitingPayment
+}: {
+  orderId: number
+  status: string
+  awaitingPayment: boolean
+}) {
   const qc = useQueryClient()
   const { data: sh } = useQuery({
     queryKey: ['shipment', orderId],
@@ -98,13 +106,16 @@ function ShipmentPanel({ orderId, status }: { orderId: number; status: string })
         {canCreate && (
           <button
             className="px-3 py-1 bg-blue-600 text-white rounded disabled:opacity-60"
-            disabled={run.isPending}
+            disabled={run.isPending || awaitingPayment}
             onClick={() => run.mutate(() => createShipment(orderId))}
           >
             Create shipment
           </button>
         )}
       </div>
+      {canCreate && awaitingPayment && (
+        <p className="text-xs text-gray-500">Available after the buyer pays</p>
+      )}
       {sh && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
@@ -364,7 +375,11 @@ export default function AdminOrderDetail() {
           {region && <div className="text-gray-600">{region}</div>}
         </div>
       </div>
-      <ShipmentPanel orderId={oid} status={order.status} />
+      <ShipmentPanel
+        orderId={oid}
+        status={order.status}
+        awaitingPayment={awaitingPayment}
+      />
       <InvoicePanel orderId={oid} status={order.status} />
       <div className="bg-white rounded border">
         <div className="overflow-x-auto">

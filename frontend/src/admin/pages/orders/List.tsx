@@ -90,7 +90,7 @@ export default function AdminOrdersList() {
               { label: 'Shipped', value: 'shipped' },
               { label: 'Completed', value: 'delivered' },
               { label: 'Returned', value: 'returned' },
-              { label: 'Canceled', value: 'cancelled' }
+              { label: 'Cancelled', value: 'cancelled' }
             ].map(t => (
               <button
                 key={t.label}

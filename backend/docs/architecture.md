@@ -316,6 +316,13 @@ Buoc tinh lai chu ky la **bat buoc**: neu bo qua, bat ky ai doan duoc
 `requestId` cung co the gui callback gia de danh dau don da thanh toan ma
 khong tra dong nao. Suite `09-payment-security` khoa lai dung truong hop nay.
 
+Thanh toan lai ("Pay now" o trang don hang): `POST /payments/momo/retry
+{order_group_id}` chi chay khi checkout thuoc nguoi goi, moi don con song deu
+`pending` va khong phai COD, chua co Payment `paid`, va chua qua
+`order_payment_timeout_minutes` (cung moc voi job `expire-unpaid-orders`).
+Payment `pending` cu bi chuyen `canceled` roi tao giao dich moi qua dung code
+`createMomoPayment`. Suite `36-momo-retry` kiem cac nhanh tu choi.
+
 ---
 
 ## 5. May trang thai don hang

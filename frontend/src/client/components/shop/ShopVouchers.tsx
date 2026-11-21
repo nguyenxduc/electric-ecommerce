@@ -16,11 +16,11 @@ const ShopVouchers = ({ slug, className = '' }: { slug: string; className?: stri
       <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
         <Ticket className="w-4 h-4 text-rose-500" /> Shop vouchers
       </h2>
-      <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="flex flex-wrap gap-3">
         {vouchers.map(v => (
           <div
             key={v.id}
-            className="shrink-0 flex items-center gap-3 border border-dashed border-rose-300 bg-rose-50/60 rounded-lg px-3 py-2"
+            className="max-w-full flex items-center gap-3 border border-dashed border-rose-300 bg-rose-50/60 rounded-lg px-3 py-2"
           >
             <div>
               <p className="text-sm font-bold text-rose-600">

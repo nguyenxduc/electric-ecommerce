@@ -67,3 +67,12 @@ test('mobile: cart and checkout have no horizontal scroll', async ({ page }) => 
   }
   await clearCart(page, token)
 })
+
+test('mobile: admin list pages have no horizontal scroll', async ({ page }) => {
+  await loginAs(page, 'admin@example.com')
+  for (const p of ['shops', 'products', 'customers', 'coupons', 'categories', 'settings']) {
+    await page.goto(`/admin/${p}`)
+    await page.waitForLoadState('networkidle')
+    expect(await overflowX(page), p).toBeLessThanOrEqual(0)
+  }
+})

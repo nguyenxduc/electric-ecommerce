@@ -51,7 +51,7 @@ export default function AdminDashboard() {
           prev={`Previous 7 days (${stats?.orders.formattedPrev || '0'})`}
         />
         <KpiSplitCard
-          title="Pending & Canceled"
+          title="Pending & Cancelled"
           subtitle="Last 7 days"
           left={{
             label: 'Pending',
@@ -59,7 +59,7 @@ export default function AdminDashboard() {
             delta: stats?.pending.delta || '0%'
           }}
           right={{
-            label: 'Canceled',
+            label: 'Cancelled',
             value: stats?.cancelled.formatted || '0',
             delta: stats?.cancelled.delta || '0%'
           }}

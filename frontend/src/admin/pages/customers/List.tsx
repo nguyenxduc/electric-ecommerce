@@ -47,9 +47,9 @@ export default function AdminCustomersList() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Customers</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Link
             to="/admin/customers/tiers"
             className="px-3 py-2 border border-blue-200 text-blue-700 rounded text-sm hover:bg-blue-50"
@@ -59,7 +59,7 @@ export default function AdminCustomersList() {
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
+            className="border rounded px-3 py-2 text-sm flex-1 min-w-0"
             placeholder="Search name/email/phone"
           />
           <button

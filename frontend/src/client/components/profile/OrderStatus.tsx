@@ -121,7 +121,7 @@ const DeliveredIcon = () => (
   </svg>
 )
 
-const OrderStatus = ({ status }: { status: string }) => {
+const OrderStatus = ({ status, awaitingPayment }: { status: string; awaitingPayment?: boolean }) => {
   const steps = [
     { index: 0, label: 'Order Placed', id: 'placed', icon: <OrderIcon /> },
     { index: 1, label: 'Processing', id: 'processing', icon: <ProcessingIcon /> },
@@ -185,7 +185,9 @@ const OrderStatus = ({ status }: { status: string }) => {
         <p className="font-light mb-1">
           {stepId === 'delivered'
             ? 'Your order has been delivered.'
-            : 'Please wait, we are still processing your order.'}
+            : awaitingPayment
+              ? 'Waiting for payment'
+              : 'Please wait, we are still processing your order.'}
         </p>
         <p className="text-sm text-gray-500 font-thin">
           We will notify you for any changes in your order.

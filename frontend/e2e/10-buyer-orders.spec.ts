@@ -73,3 +73,13 @@ test('buyer: orders tab fits a 390px screen', async ({ page }) => {
   const width = await page.evaluate(() => document.documentElement.scrollWidth)
   expect(width).toBeLessThanOrEqual(390)
 })
+
+// Link "Write review" (/product/<slug>#reviews) phai dung o muc danh gia, ke ca khi
+// the shop / "More from" tai sau va day noi dung xuong
+test('buyer: #reviews deep link lands on the reviews section', async ({ page }) => {
+  const p = (await (await page.request.get(`${API}/products?search=Xiaomi%2014&limit=1`)).json()).products[0]
+  await page.goto(`/product/xiaomi-14-p${p.id}#reviews`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(1500)
+  await expect(page.locator('#reviews')).toBeInViewport()
+})

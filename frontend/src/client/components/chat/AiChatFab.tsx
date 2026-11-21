@@ -8,7 +8,10 @@ type Props = {
 export default function AiChatFab({ onClick }: Props) {
   // Mobile: nut noi che tom tat gio hang/thanh toan nen an o 2 trang nay
   const { pathname } = useLocation()
-  const hideOnMobile = /^\/(cart|checkout)/.test(pathname) ? 'max-lg:hidden ' : ''
+  // Mobile: nut noi che nut hanh dong o hau het trang (don hang, gio, san pham co thanh
+  // mua rieng) nen chi hien o trang duyet hang; chat voi shop van co trong the shop
+  const browsing = pathname === '/' || /^\/(collection|shop)\//.test(pathname)
+  const hideOnMobile = browsing ? '' : 'max-lg:hidden '
   return (
     <button
       type="button"

@@ -24,7 +24,7 @@ interface Product {
   slug?: string
   name: string
   image?: string
-  color?: string
+  color?: { name: string; code: string }
   quantity?: number
   price?: number
   originalPrice?: number
@@ -37,6 +37,8 @@ interface OrderDetail {
   onContact?: () => void
   onBuyAgain?: () => void
   buyingAgain?: boolean
+  onPayNow?: () => void
+  paying?: boolean
 }
 
 // Nhan trang thai theo ngon ngu nguoi mua (giong tab "To ship / Shipping" cua app san)
@@ -51,7 +53,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 const isUrl = (v?: string) => typeof v === 'string' && /^https?:\/\//.test(v)
 
-const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain }: OrderDetail) => {
+const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain, onPayNow, paying }: OrderDetail) => {
   // Don online pending la dang cho thanh toan
   const st =
     order.status === 'pending' && order.paymentType && order.paymentType !== 'cod'
@@ -148,6 +150,15 @@ const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain }: Order
             className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-60"
           >
             {buyingAgain ? 'Adding...' : 'Buy again'}
+          </button>
+        )}
+        {onPayNow && (
+          <button
+            onClick={onPayNow}
+            disabled={paying}
+            className="px-3 py-1.5 text-sm font-medium text-white bg-rose-600 rounded-lg hover:bg-rose-700 disabled:opacity-60"
+          >
+            {paying ? 'Redirecting...' : 'Pay now'}
           </button>
         )}
         {onClick && (

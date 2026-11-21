@@ -27,11 +27,11 @@ export default function AdminProductsList() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-xl font-semibold">Products</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <input
-            className="border rounded px-3 py-2 text-sm w-56"
+            className="border rounded px-3 py-2 text-sm w-full sm:w-56 min-w-0"
             placeholder="Search by ID or name"
             value={query}
             onChange={e => setQuery(e.target.value)}

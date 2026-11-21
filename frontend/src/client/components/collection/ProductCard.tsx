@@ -3,6 +3,7 @@ import { Star, Store } from 'lucide-react'
 import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
 import ProductImage from '../products/ProductImage'
+import { makeProductSlug } from '../../utils/productSlug'
 
 interface ProductCardProps {
   product: Product
@@ -52,7 +53,7 @@ const ProductCard = ({
       className="group relative flex flex-col bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md hover:border-gray-200 transition cursor-pointer"
       onClick={() => {
         trackBehavior('click', product.id, { source: 'product_card' })
-        navigate(`/product/${slug || product.id}`)
+        navigate(`/product/${slug || makeProductSlug(product.name, product.id)}`)
       }}
     >
       {onCompareToggle && (

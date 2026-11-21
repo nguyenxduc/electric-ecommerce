@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { apiErrorResponse } from '../../lib/apiError'
 import {
   fetchNewProducts,
   fetchPopularProducts,
@@ -80,7 +81,9 @@ export const useProductById = (productId: number) =>
     queryKey: ['product', productId],
     queryFn: () => fetchProductById(productId),
     enabled: !!productId,
-    staleTime: 10 * 60 * 1000
+    staleTime: 10 * 60 * 1000,
+    // 404 = san pham khong con, thu lai chi keo dai skeleton
+    retry: (count, err) => apiErrorResponse(err).status !== 404 && count < 3
   })
 
 export const useCompareProducts = (ids: number[], enabled: boolean = true) =>

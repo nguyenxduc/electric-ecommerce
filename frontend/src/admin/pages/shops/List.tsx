@@ -134,21 +134,75 @@ export default function AdminShopsList() {
     setReason('')
   }
 
+  const renderActions = (shop: AdminShop) => (
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          title="Review application"
+          className="text-gray-700 flex items-center gap-1"
+          onClick={() => setReviewShop(shop)}
+        >
+          <FileText className="w-4 h-4" /> Review
+        </button>
+        {shop.status !== 'active' && (
+          <button
+            title="Approve"
+            className="text-green-600 flex items-center gap-1"
+            onClick={() => setApproveShopTarget(shop)}
+          >
+            <BadgeCheck className="w-4 h-4" /> Approve
+          </button>
+        )}
+        {shop.status === 'pending' && (
+          <button
+            title="Reject"
+            className="text-red-600 flex items-center gap-1"
+            onClick={() =>
+              setReasonAction({ type: 'reject', shop })
+            }
+          >
+            <CircleSlash className="w-4 h-4" /> Reject
+          </button>
+        )}
+        <button
+          title="Tax info"
+          className="text-blue-600 flex items-center gap-1"
+          onClick={() => {
+            setTaxShop(shop)
+            setTaxCode(shop.tax_code || '')
+            setTaxType(shop.tax_entity_type || 'household')
+          }}
+        >
+          <Receipt className="w-4 h-4" /> Tax
+        </button>
+        {shop.status === 'active' && (
+          <button
+            title="Suspend"
+            className="text-orange-600 flex items-center gap-1"
+            onClick={() =>
+              setReasonAction({ type: 'suspend', shop })
+            }
+          >
+            <Ban className="w-4 h-4" /> Suspend
+          </button>
+        )}
+      </div>
+  )
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold flex items-center gap-2">
           <Store className="w-5 h-5" /> Shops
         </h1>
         <input
-          className="border rounded px-3 py-2 text-sm w-64"
+          className="border rounded px-3 py-2 text-sm w-full sm:w-64 min-w-0"
           placeholder="Search by name, slug or owner email"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
       </div>
 
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b overflow-x-auto whitespace-nowrap">
         {STATUS_TABS.map(tab => (
           <button
             key={tab.key}
@@ -176,7 +230,37 @@ export default function AdminShopsList() {
           <SkeletonTable rows={5} cols={7} />
         ) : (
           <>
-            <div className="overflow-x-auto"><table className="w-full text-sm">
+            {/* Mobile: moi shop la 1 the, hanh dong luon hien */}
+            <div className="md:hidden divide-y">
+              {shops.length === 0 && (
+                <div className="p-6 text-center text-gray-500">No shops found</div>
+              )}
+              {shops.map(shop => (
+                <div key={shop.id} className="p-3 space-y-2 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium break-words">{shop.name}</div>
+                      <div className="text-xs text-gray-500 break-all">{shop.owner?.email}</div>
+                    </div>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        STATUS_BADGE[shop.status] || 'bg-gray-100'
+                      }`}
+                    >
+                      {shop.status}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {shop._count?.products ?? 0} products · {shop._count?.orders ?? 0} orders · {fmtDate(shop.created_at)}
+                  </div>
+                  {shop.rejection_reason && (
+                    <div className="text-xs text-red-600">Reason: {shop.rejection_reason}</div>
+                  )}
+                  {renderActions(shop)}
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Shop</th>
@@ -244,57 +328,7 @@ export default function AdminShopsList() {
                       {fmtDate(shop.created_at)}
                     </td>
                     <td className="p-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          title="Review application"
-                          className="text-gray-700 flex items-center gap-1"
-                          onClick={() => setReviewShop(shop)}
-                        >
-                          <FileText className="w-4 h-4" /> Review
-                        </button>
-                        {shop.status !== 'active' && (
-                          <button
-                            title="Approve"
-                            className="text-green-600 flex items-center gap-1"
-                            onClick={() => setApproveShopTarget(shop)}
-                          >
-                            <BadgeCheck className="w-4 h-4" /> Approve
-                          </button>
-                        )}
-                        {shop.status === 'pending' && (
-                          <button
-                            title="Reject"
-                            className="text-red-600 flex items-center gap-1"
-                            onClick={() =>
-                              setReasonAction({ type: 'reject', shop })
-                            }
-                          >
-                            <CircleSlash className="w-4 h-4" /> Reject
-                          </button>
-                        )}
-                        <button
-                          title="Tax info"
-                          className="text-blue-600 flex items-center gap-1"
-                          onClick={() => {
-                            setTaxShop(shop)
-                            setTaxCode(shop.tax_code || '')
-                            setTaxType(shop.tax_entity_type || 'household')
-                          }}
-                        >
-                          <Receipt className="w-4 h-4" /> Tax
-                        </button>
-                        {shop.status === 'active' && (
-                          <button
-                            title="Suspend"
-                            className="text-orange-600 flex items-center gap-1"
-                            onClick={() =>
-                              setReasonAction({ type: 'suspend', shop })
-                            }
-                          >
-                            <Ban className="w-4 h-4" /> Suspend
-                          </button>
-                        )}
-                      </div>
+                      {renderActions(shop)}
                     </td>
                   </tr>
                 ))}

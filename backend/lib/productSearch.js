@@ -160,8 +160,8 @@ export const searchSubstring = async (
      LEFT JOIN categories c ON c.id = p.category_id
      WHERE p.deleted_at IS NULL
        AND (SELECT bool_and(
-              immutable_unaccent(lower(coalesce(p.name, '') || ' ' || coalesce(c.name, '')))
-                LIKE '%' || t.tok || '%')
+              immutable_unaccent(lower(coalesce(p.name, ''))) LIKE '%' || t.tok || '%'
+              OR immutable_unaccent(lower(coalesce(c.name, ''))) LIKE '%' || t.tok || '%')
             FROM unnest($1::text[]) AS t(tok))
      ORDER BY (immutable_unaccent(lower(coalesce(p.name, ''))) LIKE '%' || $3 || '%') DESC, p.id
      LIMIT $2`,

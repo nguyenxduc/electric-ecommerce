@@ -123,11 +123,6 @@ const Footer = () => {
             {copyrightYear} {companyName}.
           </p>
         </div>
-        <div className="inline-flex flex-wrap gap-x-6 gap-y-1 sm:mr-[100px]">
-          <p>cookie settings</p>
-          <p>Privacy Policy</p>
-          <p>Terms and Conditions</p>
-        </div>
       </div>
     </footer>
   )

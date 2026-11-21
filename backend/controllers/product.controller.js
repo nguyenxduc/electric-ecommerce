@@ -251,10 +251,11 @@ export const createProduct = asyncHandler(async (req, res) => {
 
   const numericPrice = Number(price);
   const numericDiscount = Number(discount);
-  if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+  // Gia 0 tao duoc nhung khong dat hang duoc ("Invalid price") -> chan tu dau
+  if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
     return res
       .status(400)
-      .json({ message: "Price must be a non-negative number" });
+      .json({ message: "Price must be greater than 0" });
   }
   if (
     !Number.isFinite(numericDiscount) ||
@@ -563,10 +564,11 @@ export const updateProduct = asyncHandler(async (req, res) => {
     data.discount !== undefined
       ? Number(data.discount)
       : Number(currentProduct.discount);
-  if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+  // Gia 0 tao duoc nhung khong dat hang duoc ("Invalid price") -> chan tu dau
+  if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
     return res
       .status(400)
-      .json({ message: "Price must be a non-negative number" });
+      .json({ message: "Price must be greater than 0" });
   }
   if (
     !Number.isFinite(numericDiscount) ||
@@ -628,12 +630,21 @@ export const updateProduct = asyncHandler(async (req, res) => {
         data: { quantity: sumQty },
       });
       updated.quantity = sumQty;
-    } else if (data.quantity !== undefined) {
-      await tx.product.update({
-        where: { id: BigInt(req.params.id) },
-        data: { quantity: Number(data.quantity) },
-      });
-      updated.quantity = Number(data.quantity);
+    } else {
+      // Form gui product_colors: [] khi seller xoa het mau -> xoa mau cu,
+      // neu khong buyer van chon duoc mau khong con ton.
+      if (data.product_colors !== undefined) {
+        await tx.productColor.deleteMany({
+          where: { product_id: BigInt(req.params.id) },
+        });
+      }
+      if (data.quantity !== undefined) {
+        await tx.product.update({
+          where: { id: BigInt(req.params.id) },
+          data: { quantity: Number(data.quantity) },
+        });
+        updated.quantity = Number(data.quantity);
+      }
     }
 
     if (variantsInput !== undefined) {
@@ -666,12 +677,16 @@ export const setProductVisibility = asyncHandler(async (req, res) => {
   if (typeof is_active !== "boolean") {
     return res.status(400).json({ message: "is_active must be a boolean" });
   }
-  const product = await prisma.product.update({
-    where: { id: BigInt(req.params.id) },
+  // San pham da xoa mem khong duoc bat lai
+  const { count } = await prisma.product.updateMany({
+    where: { id: BigInt(req.params.id), deleted_at: null },
     data: { is_active },
-    select: { id: true, is_active: true },
   });
-  res.json({ message: is_active ? "Product is live" : "Product hidden", product });
+  if (count === 0) return res.status(404).json({ message: "Product not found" });
+  res.json({
+    message: is_active ? "Product is live" : "Product hidden",
+    product: { id: Number(req.params.id), is_active },
+  });
 });
 
 export const deleteProduct = asyncHandler(async (req, res) => {

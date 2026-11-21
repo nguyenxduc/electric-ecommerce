@@ -9,6 +9,8 @@ import { ShopChatPanel } from '../chat/ChatWidget'
 import { useUserOrders } from '../../hooks/useUserOrders'
 import { useAddToCart } from '../../hooks/useCart'
 import { cancelMyOrder, requestReturn } from '../../services/orderService'
+import { retryMomoPayment } from '../../services/paymentService'
+import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiErrorMessage } from '../../../lib/apiError'
 import { makeProductSlug } from '../../utils/productSlug'
@@ -45,6 +47,16 @@ const TABS: Array<{
   { key: 'returns', label: 'Return/Refund', match: o => o.status === 'returned' || !!o.returnRequest }
 ]
 
+const parseOrderColor = (raw?: string | null): { name: string; code: string } | undefined => {
+  if (!raw) return undefined
+  try {
+    const c = JSON.parse(raw) as { name?: string; code?: string }
+    return c?.name || c?.code ? { name: c.name ?? '', code: c.code ?? '' } : undefined
+  } catch {
+    return { name: raw, code: '' }
+  }
+}
+
 const Order = () => {
   const ordersQuery = useUserOrders()
   const orders = ordersQuery.data
@@ -71,6 +83,7 @@ const Order = () => {
       shopId: o.shop?.id,
       shopName: o.shop?.name,
       shopSlug: o.shop?.slug,
+      groupId: o.order_group?.id,
       groupNumber: o.order_group?.group_number,
       returnRequest: o.return_request || null,
       invoice: o.invoice || null,
@@ -87,7 +100,8 @@ const Order = () => {
         productId: oi.product_id,
         slug: makeProductSlug(oi.product?.name || 'product', oi.product_id),
         variantId: oi.variant_id ?? undefined,
-        color: oi.color || undefined,
+        // order_items.color luu chuoi JSON {"name","code"}: tach ra de hien ten va gui lai gio
+        color: parseOrderColor(oi.color),
         name: oi.product?.name || 'Product',
         quantity: oi.quantity,
         price: Number(oi.unit_price),
@@ -131,20 +145,27 @@ const Order = () => {
 
   // Them lai dung san pham + bien the + mau vao gio roi sang trang gio hang
   const handleBuyAgain = async (order: MappedOrder) => {
-    try {
-      setBuyingAgain(order.id)
-      for (const p of order.products) {
-        await addToCart.mutateAsync({
+    setBuyingAgain(order.id)
+    // Them tung mon doc lap: mot mon het hang/bi an khong chan cac mon con lai
+    const results = await Promise.allSettled(
+      order.products.map(p =>
+        addToCart.mutateAsync({
           productId: p.productId,
           payload: { quantity: p.quantity, variant_id: p.variantId, color: p.color ?? null }
         })
-      }
-      navigate('/cart')
-    } catch (err) {
-      toast.error(apiErrorMessage(err, 'Some items could not be added to your cart'))
-    } finally {
-      setBuyingAgain(null)
+      )
+    )
+    setBuyingAgain(null)
+    const failed = order.products.filter((_, i) => results[i].status === 'rejected')
+    if (failed.length === order.products.length) {
+      const first = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+      toast.error(apiErrorMessage(first?.reason, 'These items are no longer available'))
+      return
     }
+    if (failed.length) {
+      toast.warning(`Could not add: ${failed.map(p => p.name).join(', ')}`)
+    }
+    navigate('/cart')
   }
 
   const handleRequestReturn = async () => {
@@ -167,7 +188,23 @@ const Order = () => {
     }
   }
 
+  // Tao lai link MoMo cho ca checkout roi chuyen sang cong thanh toan
+  const payNow = useMutation({
+    mutationFn: (groupId: number) => retryMomoPayment(groupId),
+    onSuccess: data => {
+      const target = data.payUrl || data.deeplink
+      if (target) window.location.href = target
+      else toast.error('Could not start payment, please try again')
+    },
+    onError: err => toast.error(apiErrorMessage(err, 'Could not start payment'))
+  })
+  const payAction = (order: MappedOrder) =>
+    isUnpaidOnline(order) && order.groupId ? () => payNow.mutate(order.groupId!) : undefined
+  const paying = (order: MappedOrder) => payNow.isPending && payNow.variables === order.groupId
+
   const cardActions = (order: MappedOrder) => ({
+    onPayNow: payAction(order),
+    paying: paying(order),
     onContact: order.shopId ? () => setChatShopId(order.shopId!) : undefined,
     onBuyAgain: order.status === 'delivered' ? () => handleBuyAgain(order) : undefined,
     buyingAgain: buyingAgain === order.id
@@ -193,7 +230,9 @@ const Order = () => {
           >
             ← Back to orders
           </button>
-          {selectedOrder.status && <OrderStatus status={selectedOrder.status} />}
+          {selectedOrder.status && (
+            <OrderStatus status={selectedOrder.status} awaitingPayment={isUnpaidOnline(selectedOrder)} />
+          )}
           {selectedOrder.returnRequest && (
             <div
               className={`mb-4 border rounded-lg px-4 py-3 text-sm ${
@@ -215,6 +254,15 @@ const Order = () => {
             </div>
           )}
           <div className="flex flex-wrap justify-end gap-2 mb-4">
+            {payAction(selectedOrder) && (
+              <button
+                onClick={payAction(selectedOrder)}
+                disabled={paying(selectedOrder)}
+                className="px-4 py-2 bg-rose-600 text-white rounded hover:bg-rose-700 disabled:opacity-60"
+              >
+                {paying(selectedOrder) ? 'Redirecting...' : 'Pay now'}
+              </button>
+            )}
             {selectedOrder.shopId && (
               <button
                 onClick={() => setChatShopId(selectedOrder.shopId!)}

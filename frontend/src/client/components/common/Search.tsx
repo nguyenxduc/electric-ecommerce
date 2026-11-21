@@ -200,7 +200,7 @@ function Modal({
             <input
               autoFocus
               type="text"
-              placeholder="Search products, categories or keywords..."
+              placeholder="Search products or categories"
               className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={searchTerm}
               onChange={e => onChange(e.target.value)}

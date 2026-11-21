@@ -124,7 +124,7 @@ export default function SettingsList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Settings</h1>
         <button
           onClick={() => setShowAddModal(true)}
@@ -136,7 +136,7 @@ export default function SettingsList() {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 border-b">
+      <div className="flex gap-2 border-b overflow-x-auto whitespace-nowrap">
         {CATEGORIES.map(cat => {
           const Icon = cat.icon
           return (
@@ -603,8 +603,8 @@ function OperationsSection() {
           const value = draft[def.key] ?? existing(def.key)?.value ?? def.fallback
           const set = (v: string) => setDraft(d => ({ ...d, [def.key]: v }))
           return (
-            <div key={def.key} className="p-4 flex items-center gap-4">
-              <div className="flex-1">
+            <div key={def.key} className="p-4 flex flex-wrap items-center gap-3 sm:gap-4">
+              <div className="flex-1 min-w-[12rem]">
                 <div className="text-sm font-medium">{def.label}</div>
                 <div className="text-xs font-mono text-gray-500">
                   {def.key}
@@ -612,7 +612,7 @@ function OperationsSection() {
                 </div>
               </div>
               {def.type === 'select' || def.type === 'boolean' ? (
-                <select value={value} onChange={e => set(e.target.value)} className="w-48 px-3 py-2 border rounded-lg">
+                <select value={value} onChange={e => set(e.target.value)} className="w-40 sm:w-48 min-w-0 px-3 py-2 border rounded-lg">
                   {(def.options ?? ['true', 'false']).map(o => (
                     <option key={o} value={o}>
                       {o}
@@ -625,7 +625,7 @@ function OperationsSection() {
                   step="any"
                   value={value}
                   onChange={e => set(e.target.value)}
-                  className="w-48 px-3 py-2 border rounded-lg"
+                  className="w-40 sm:w-48 min-w-0 px-3 py-2 border rounded-lg"
                 />
               )}
               <button

@@ -4,6 +4,7 @@ import { Camera, LogOut, X, Loader2, Ticket, Store } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
+import Login from '../components/common/Login'
 
 import ProfileIcon from '../../assets/profile2-icon.svg'
 import OrderIcon from '../../assets/order-icon.svg'
@@ -80,7 +81,8 @@ function Profile() {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(false)
   const navigate = useNavigate()
 
-  const { data: userData } = useValidateToken()
+  const { data: userData, isLoading: userLoading, refetch: refetchUser } = useValidateToken()
+  const [authOpen, setAuthOpen] = useState(false)
   const logoutMutation = useLogout()
   const uploadAvatarMutation = useUploadAvatar()
   const deleteAvatarMutation = useDeleteAvatar()
@@ -156,6 +158,33 @@ function Profile() {
     name: userData?.user?.name || 'Guest',
     email: userData?.user?.email || '',
     avatarUrl
+  }
+
+  // Khach chua dang nhap (hoac token het han): khong render cac tab, tranh goi API can xac thuc
+  if (!userData) {
+    if (userLoading) return <div className="min-h-screen bg-gray-50" />
+    return (
+      <div className="min-h-[60vh] bg-gray-50 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-md w-full text-center">
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Please log in to view your account</h1>
+          <p className="text-gray-500 mb-6">Sign in to see your orders, wishlist and rewards.</p>
+          <button
+            onClick={() => setAuthOpen(true)}
+            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Log in
+          </button>
+        </div>
+        <Login
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onSuccess={() => {
+            setAuthOpen(false)
+            refetchUser()
+          }}
+        />
+      </div>
+    )
   }
 
   return (

@@ -8,6 +8,7 @@ import {
 import crypto from "crypto";
 import { writeAuditLog } from "../services/audit.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { getSettingNumber } from "../lib/settings.js";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
 
@@ -165,6 +166,14 @@ export const createMomoPayment = async (req, res) => {
     if (orderGroup.user_id.toString() !== req.user.id) {
       return res.status(403).json({ message: "Not authorized" });
     }
+    // Checkout da tra roi thi khong tao link thu tien lan hai
+    const alreadyPaid = await prisma.payment.findFirst({
+      where: { order_group_id: orderGroup.id, status: PAYMENT_STATUS.PAID },
+      select: { id: true },
+    });
+    if (alreadyPaid) {
+      return res.status(400).json({ message: "This checkout is already paid" });
+    }
 
     // Amount = sum of the checkout's still-active suborders (a cancelled
     // suborder must not be charged).
@@ -318,6 +327,63 @@ export const createMomoPayment = async (req, res) => {
     });
   }
 };
+
+// Nguoi mua bam "Pay now" cho checkout MoMo chua tra. createMomoPayment chi chan
+// don da huy, nen o day kiem them: con pending, chua co payment paid, chua qua
+// han giu cho (cung quy tac voi jobs/expireUnpaidOrders.js) roi moi tao lai.
+export const retryMomoPayment = asyncHandler(async (req, res) => {
+  const rawId = String(req.body?.order_group_id ?? "");
+  if (!/^\d+$/.test(rawId)) {
+    return res.status(400).json({ message: "order_group_id is required" });
+  }
+  const group = await prisma.orderGroup.findFirst({
+    where: { id: BigInt(rawId), deleted_at: null },
+    select: {
+      id: true,
+      user_id: true,
+      orders: {
+        where: { deleted_at: null },
+        select: { status: true, payment_method: true, created_at: true },
+      },
+      payments: { where: { status: PAYMENT_STATUS.PAID }, select: { id: true } },
+    },
+  });
+  if (!group) {
+    return res.status(404).json({ message: "Order group not found" });
+  }
+  if (group.user_id.toString() !== req.user.id) {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+  const live = group.orders.filter(
+    o => o.status !== ORDER_STATUS.CANCELLED && o.status !== ORDER_STATUS.RETURNED
+  );
+  if (
+    !live.length ||
+    group.payments.length ||
+    live.some(o => o.status !== ORDER_STATUS.PENDING || o.payment_method === "cod")
+  ) {
+    return res
+      .status(400)
+      .json({ message: "This order is no longer awaiting payment" });
+  }
+  const minutes = await getSettingNumber("order_payment_timeout_minutes", 30);
+  const cutoff = Date.now() - minutes * 60 * 1000;
+  if (live.some(o => o.created_at.getTime() < cutoff)) {
+    return res
+      .status(400)
+      .json({ message: "The payment window for this order has expired" });
+  }
+
+  // Huy link cu de chi con mot link dang cho. Neu khach van tra qua link cu,
+  // IPN van ghi PAID vi chi bo qua ban ghi da paid.
+  await prisma.payment.updateMany({
+    where: { order_group_id: group.id, status: PAYMENT_STATUS.PENDING },
+    data: { status: PAYMENT_STATUS.CANCELED },
+  });
+  // Bo cac truong client khac (orderNumber...), so tien tinh lai tu server.
+  req.body = { order_group_id: rawId };
+  return createMomoPayment(req, res);
+});
 
 // Backward-compatible alias for old frontend clients.
 export const createBankTransferQR = createMomoPayment;

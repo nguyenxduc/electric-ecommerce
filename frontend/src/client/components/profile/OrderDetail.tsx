@@ -31,7 +31,7 @@ interface Product {
   slug?: string
   name: string
   image?: string
-  color?: string
+  color?: { name: string; code: string }
   variant?: string
   quantity?: number
   price?: number
@@ -42,8 +42,15 @@ interface OrderDetail {
   order: Order
 }
 
-// Ma phuong thuc thanh toan -> nhan cho nguoi mua
-const PAYMENT_LABEL: Record<string, string> = { cod: 'Cash on delivery', momo: 'MoMo' }
+// Ma phuong thuc thanh toan -> nhan cho nguoi mua; ma la thi viet hoa tung tu
+const PAYMENT_LABEL: Record<string, string> = {
+  cod: 'Cash on delivery',
+  momo: 'MoMo',
+  credit_card: 'Card',
+  bank_transfer: 'Bank transfer'
+}
+const paymentLabel = (m?: string) =>
+  m ? PAYMENT_LABEL[m] || m.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : undefined
 
 // Trang thai van don (ma carrier) -> nhan de hieu cho nguoi mua
 const SHIPMENT_LABEL: Record<string, string> = {
@@ -87,7 +94,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
               ['Placed on', order.placedOn],
               ['Shop', order.shopName],
               ['Recipient', [order.sentTo, order.address].filter(Boolean).join(' · ')],
-              ['Payment method', PAYMENT_LABEL[order.paymentType || ''] || order.paymentType],
+              ['Payment method', paymentLabel(order.paymentType)],
               ['Order total', formatUsd(order.amountPaid ?? order.total)]
             ] as [string, string | undefined][]
           )
@@ -237,8 +244,8 @@ const OrderDetails = ({ order }: OrderDetail) => {
                   {product.variant && (
                     <p className="text-sm text-gray-500">{product.variant}</p>
                   )}
-                  {product.color && (
-                    <p className="text-sm text-gray-500">{product.color}</p>
+                  {product.color?.name && (
+                    <p className="text-sm text-gray-500">{product.color.name}</p>
                   )}
                   {product.quantity && (
                     <p className="text-sm text-gray-500">

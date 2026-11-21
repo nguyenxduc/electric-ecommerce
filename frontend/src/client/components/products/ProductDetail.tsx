@@ -49,8 +49,25 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
   useEffect(() => {
     // Scroll to top only when the product changes, not on every render or tab switch
     if (window.location.hash === '#reviews') {
-      document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })
-      return
+      const toReviews = () => document.getElementById('reviews')?.scrollIntoView()
+      toReviews()
+      // The shop / "More from" tai sau va day muc danh gia xuong: cuon lai moi
+      // lan trang doi chieu cao trong 10s dau, dung ngay khi nguoi dung tu cuon
+      const ro = new ResizeObserver(toReviews)
+      // body cao co dinh bang viewport; noi dung lon dan nam trong #root
+      ro.observe(document.getElementById('root') ?? document.body)
+      const stop = () => {
+        ro.disconnect()
+        window.removeEventListener('wheel', stop)
+        window.removeEventListener('touchstart', stop)
+      }
+      window.addEventListener('wheel', stop, { once: true })
+      window.addEventListener('touchstart', stop, { once: true })
+      const timer = setTimeout(stop, 10000)
+      return () => {
+        clearTimeout(timer)
+        stop()
+      }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [product?.id])

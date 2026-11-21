@@ -52,3 +52,11 @@ export const createMomoPayment = async (payload: CreateMomoPaymentPayload) => {
   return data
 }
 
+
+// "Pay now" cho checkout MoMo chua tra: server tu tinh so tien va kiem quyen so huu
+export const retryMomoPayment = async (orderGroupId: number) => {
+  const { data } = await axiosClient.post<BankTransferQRResponse>('/payments/momo/retry', {
+    order_group_id: orderGroupId
+  })
+  return data
+}
