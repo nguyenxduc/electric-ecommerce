@@ -356,8 +356,11 @@ io.on("connection", (socket) => {
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Rate limit: ${rateLimitStatus()}`);
-  startStartupTasks();
-  startDailyJobsScheduler();
+  // SKIP_BACKGROUND_JOBS=1: server phu (test song song) khong chay job nen trung voi server chinh
+  if (process.env.SKIP_BACKGROUND_JOBS !== "1") {
+    startStartupTasks();
+    startDailyJobsScheduler();
+  }
 });
 
 // Docker cho 10s truoc SIGKILL: doi job con chay toi da 8s, dong HTTP roi thoat.
