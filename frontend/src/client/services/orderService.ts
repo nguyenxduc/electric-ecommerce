@@ -30,6 +30,7 @@ export type Order = {
   id: number
   order_number: string
   total_amount: number
+  shipping_fee?: number | string | null
   status: string
   shipping_address: CreateOrderPayload['shipping_address'] | null
   payment_method: string | null

@@ -90,6 +90,7 @@ const Order = () => {
       invoice: o.invoice || null,
       placedOn: o.created_at ? new Date(o.created_at).toLocaleDateString() : '',
       total: Number(o.total_amount || 0),
+      shippingFee: Number(o.shipping_fee || 0),
       delivered: o.status === 'delivered' ? 'Delivered' : undefined,
       sentTo: o.shipping_address?.name || 'You',
       address: o.shipping_address?.address,

@@ -14,6 +14,7 @@ import ProfileIcon from '../../../assets/profile-icon.svg'
 import { useValidateToken } from '../../hooks/useAuth'
 import { useCart } from '../../hooks/useCart'
 import { getTierInfo } from '../../hooks/useLoyalty'
+import { OPEN_LOGIN_EVENT } from '../../utils/loginModal'
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false)
@@ -31,6 +32,12 @@ const Navbar = () => {
   useEffect(() => {
     setUserLoggedIn(isLoggedIn)
   }, [isLoggedIn])
+
+  useEffect(() => {
+    const open = () => setOpenAuth(true)
+    window.addEventListener(OPEN_LOGIN_EVENT, open)
+    return () => window.removeEventListener(OPEN_LOGIN_EVENT, open)
+  }, [])
 
   const handleAuthSuccess = () => {
     refetchUser()

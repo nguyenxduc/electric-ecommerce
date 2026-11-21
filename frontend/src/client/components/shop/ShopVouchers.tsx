@@ -2,6 +2,7 @@ import { toast } from 'sonner'
 import { Ticket, Check } from 'lucide-react'
 import { useClaimVoucher, useShopVouchers } from '../../hooks/useVouchers'
 import { apiErrorMessage } from '../../../lib/apiError'
+import { openLoginModal } from '../../utils/loginModal'
 import { voucherTerms, voucherTitle, voucherValidity } from '../../utils/voucherText'
 
 // Voucher cua shop: bam "Collect" de luu vao kho, dung lai o checkout
@@ -13,6 +14,7 @@ const ShopVouchers = ({ slug, className = '' }: { slug: string; className?: stri
   const collect = (id: number) => {
     if (!localStorage.getItem('accessToken')) {
       toast.error('Please login to collect vouchers')
+      openLoginModal()
       return
     }
     claim.mutate(id, {

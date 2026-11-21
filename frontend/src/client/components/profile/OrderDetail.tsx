@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiErrorMessage } from '../../../lib/apiError'
 import { formatUsd } from '../../utils/formatMoney'
+import { orderDiscount, orderSubtotal } from '../../utils/orderMoney'
 import {
   fetchShipment,
   openInvoiceHtml,
@@ -15,6 +16,7 @@ interface Order {
   orderNumber?: string
   placedOn: string
   total: number
+  shippingFee?: number
   delivered?: string
   sentTo: string
   shopName?: string
@@ -73,6 +75,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
   })
   // Hoa don di kem danh sach don (GET /orders/user/orders), khong goi rieng nua
   const invoice = order.invoice
+  const discount = orderDiscount(order)
   const [note, setNote] = useState('')
   const [reported, setReported] = useState(false)
   const report = useMutation({
@@ -281,6 +284,27 @@ const OrderDetails = ({ order }: OrderDetail) => {
           )
         })}
       </div>
+
+      <dl className="mt-6 ml-auto max-w-xs space-y-1 text-sm">
+        <div className="flex justify-between">
+          <dt className="text-gray-500">Items subtotal</dt>
+          <dd>{formatUsd(orderSubtotal(order))}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-gray-500">Shipping</dt>
+          <dd>{formatUsd(order.shippingFee ?? 0)}</dd>
+        </div>
+        {discount > 0 && (
+          <div className="flex justify-between text-green-600">
+            <dt>Discount (voucher/tier)</dt>
+            <dd>−{formatUsd(discount)}</dd>
+          </div>
+        )}
+        <div className="flex justify-between border-t pt-2 font-semibold">
+          <dt>Total</dt>
+          <dd>{formatUsd(order.total)}</dd>
+        </div>
+      </dl>
     </div>
   )
 }

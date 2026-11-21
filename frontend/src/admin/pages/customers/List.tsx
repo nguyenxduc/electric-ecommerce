@@ -71,6 +71,45 @@ export default function AdminCustomersList() {
     [data]
   )
 
+  const renderActions = (u: AdminCustomer) => (
+    <div className="flex items-center gap-3">
+      {u.suspended_at ? (
+        <button
+          title="Unsuspend"
+          aria-label={`Unsuspend ${u.email}`}
+          className="text-green-700"
+          disabled={unsuspend.isPending}
+          onClick={() =>
+            unsuspend.mutate(u.id, {
+              onSuccess: () => toast.success('Account unsuspended'),
+              onError: err => toast.error(apiErrorMessage(err, 'Failed to unsuspend'))
+            })
+          }
+        >
+          <RotateCcw size={16} />
+        </button>
+      ) : (
+        // Admin khong khoa duoc admin (backend cung chan)
+        u.role !== 'admin' && (
+          <button
+            title="Suspend"
+            aria-label={`Suspend ${u.email}`}
+            className="text-orange-600"
+            onClick={() => setSuspendTarget(u)}
+          >
+            <Ban size={16} />
+          </button>
+        )
+      )}
+      <button title="Edit" className="text-blue-600" onClick={() => setEditId(u.id)}>
+        <Edit3 size={16} />
+      </button>
+      <button title="Delete" className="text-red-600" onClick={() => setConfirmId(u.id)}>
+        <Trash2 size={16} />
+      </button>
+    </div>
+  )
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -114,7 +153,38 @@ export default function AdminCustomersList() {
           <SkeletonTable rows={5} cols={9} />
         ) : (
           <>
-            <div className="overflow-x-auto"><table className="w-full text-sm">
+            {/* Mobile: moi khach la 1 the, hanh dong luon hien */}
+            <div className="md:hidden divide-y">
+              {!data?.data.users.length && (
+                <div className="p-6 text-center text-gray-500">No customers found</div>
+              )}
+              {data?.data.users.map(u => (
+                <div key={u.id} className="p-3 space-y-2 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium break-words">{u.name || '-'}</div>
+                      <div className="text-xs text-gray-500 break-all">{u.email || '-'}</div>
+                    </div>
+                    <span
+                      className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        u.suspended_at ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {u.suspended_at ? 'Suspended' : 'Active'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {u.role || 'user'} · {(u.loyalty_points ?? 0).toLocaleString()} pts · {u.phone || '-'}
+                    {u.created_at ? ` · ${fmtDate(u.created_at)}` : ''}
+                  </div>
+                  {u.suspended_at && u.suspend_reason && (
+                    <div className="text-xs text-red-600">{u.suspend_reason}</div>
+                  )}
+                  {renderActions(u)}
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto"><table className="w-full text-sm">
               <thead className="bg-green-50">
                 <tr>
                   <th className="text-left p-2">Name</th>
@@ -171,52 +241,7 @@ export default function AdminCustomersList() {
                           ? fmtDate(u.created_at)
                           : '-'}
                       </td>
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          {u.suspended_at ? (
-                            <button
-                              title="Unsuspend"
-                              aria-label={`Unsuspend ${u.email}`}
-                              className="text-green-700"
-                              disabled={unsuspend.isPending}
-                              onClick={() =>
-                                unsuspend.mutate(u.id, {
-                                  onSuccess: () => toast.success('Account unsuspended'),
-                                  onError: err => toast.error(apiErrorMessage(err, 'Failed to unsuspend'))
-                                })
-                              }
-                            >
-                              <RotateCcw size={16} />
-                            </button>
-                          ) : (
-                            // Admin khong khoa duoc admin (backend cung chan)
-                            u.role !== 'admin' && (
-                              <button
-                                title="Suspend"
-                                aria-label={`Suspend ${u.email}`}
-                                className="text-orange-600"
-                                onClick={() => setSuspendTarget(u)}
-                              >
-                                <Ban size={16} />
-                              </button>
-                            )
-                          )}
-                          <button
-                            title="Edit"
-                            className="text-blue-600"
-                            onClick={() => setEditId(u.id)}
-                          >
-                            <Edit3 size={16} />
-                          </button>
-                          <button
-                            title="Delete"
-                            className="text-red-600"
-                            onClick={() => setConfirmId(u.id)}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      <td className="p-2">{renderActions(u)}</td>
                     </tr>
                   )
                 })}

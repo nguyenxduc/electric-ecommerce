@@ -7,7 +7,9 @@
     "dev": "node scripts/dev.js",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "seed": "npm --prefix backend run seed"
+    "seed": "npm --prefix backend run seed",
+    "demo:reset": "npm --prefix backend run seed:full",
+    "demo:record": "npm --prefix frontend run demo:record"
   },
   "keywords": [],
   "author": "",

@@ -62,59 +62,88 @@ cd backend && npm run seed:full
 |---|---|---|---|
 | **Admin sàn** | `admin@example.com` | `password123` | Quản trị `/admin` |
 | **Seller 1** | `seller1@example.com` | `password123` | Chủ shop **Tech World** (điện thoại/laptop/tablet) |
-| **Seller 2** | `seller2@example.com` | `password123` | Chủ shop **Gadget Hub** (âm thanh/wearable/camera/gaming) — có phí ship riêng $4.99, freeship từ $150 |
-| **Người mua** | `john@example.com` | `password123` | Khách hàng thường |
-| **Người chờ duyệt** | `seller3@example.com` | `password123` | Đã nộp đơn mở shop "New Corner Store" (pending) |
+| **Seller 2** | `seller2@example.com` | `password123` | Chủ shop **Gadget Hub** (âm thanh/wearable/camera/gaming) — phí ship riêng $4.99, freeship từ $150 |
+| **Người mua** | `john@example.com`, `jane@example.com` | `password123` | Khách hàng thường (jane có sẵn đơn đã giao để demo đánh giá / trả hàng) |
+| **Người chờ duyệt** | `seller3@example.com` | `password123` | Đã nộp hồ sơ mở shop "New Corner Store" (pending) |
 
 **Voucher demo có sẵn**: `TECHWORLD10` (giảm 10% hàng Tech World, đơn tối thiểu $50),
 `GADGET5` (giảm $5 hàng Gadget Hub, đơn tối thiểu $30), `WELCOME10`/`FLAT50` (voucher sàn).
 
 ---
 
-## 3. Kịch bản demo (7–10 phút, đủ 3 vai trò + AI)
+## 3. Quay video demo
 
-### Màn 1 — Người mua (john@example.com)
+### 3.1. Chuẩn bị (5 phút trước khi quay)
 
-1. **AI chatbot**: mở bong bóng chat AI, hỏi *"Tư vấn cho tôi điện thoại chụp
-   ảnh đẹp tầm $1000"* → AI trả lời kèm card sản phẩm, nêu tên gian hàng bán.
-2. **Tìm bằng ảnh**: bấm icon camera trên thanh tìm kiếm, thả ảnh một chiếc
-   iPhone/tai nghe → hệ thống nhận diện và trả sản phẩm khớp.
-3. **So sánh AI**: tick chọn 2 điện thoại → bấm Compare → bảng so sánh do AI
-   sinh, có khuyến nghị "nên mua cái nào".
-4. **Trang gian hàng**: vào chi tiết sản phẩm → bấm "Sold by Tech World" →
-   trang shop có banner, đánh giá, **voucher của shop** (copy mã `TECHWORLD10`),
-   nút **Chat with shop** (nhắn thử một câu — seller sẽ nhận được ở Màn 2).
-5. **Giỏ hàng nhiều shop**: thêm 1 điện thoại (Tech World) + 1 tai nghe
-   (Gadget Hub) → giỏ hàng nhóm theo shop.
-6. **Checkout tách đơn**: trang thanh toán hiển thị **phí ship riêng từng shop**
-   (Gadget Hub rẻ hơn vì shop tự đặt phí), dán mã `TECHWORLD10` → giảm giá chỉ
-   áp cho phần hàng Tech World. Đặt COD → trang kết quả hiện **2 mã đơn**
-   (mỗi shop một đơn, chung một mã checkout GRP-...).
-   - *Tuỳ chọn*: demo thanh toán **MoMo** hoặc **VNPay** sandbox thay vì COD.
+1. Mở **Docker Desktop** (sau khi khởi động lại máy nó không tự chạy) → `docker compose up -d db`.
+2. Reset dữ liệu demo về trạng thái đẹp (xoá đơn/người dùng sinh ra lúc thử, sinh lại embedding cho AI):
+   ```bash
+   npm run demo:reset
+   ```
+3. Chạy app: `npm run dev` (gốc repo) → mở http://localhost:5173.
+   Nên đặt `RATE_LIMIT_ENABLED=false` trong `backend/.env` khi quay để không bị chặn đăng nhập
+   nếu phải làm lại nhiều lần.
+4. Trình duyệt: zoom 100%, cửa sổ 1440×900 hoặc toàn màn hình, tắt thông báo hệ thống,
+   dùng cửa sổ ẩn danh để không lẫn phiên đăng nhập cũ.
 
-### Màn 2 — Seller (seller1@example.com)
+### 3.2. Hai cách quay
 
-1. Đăng nhập → chuông thông báo hiện **"New order 🛒"** → vào Seller Dashboard.
-2. **Dashboard**: doanh thu 7 ngày, đơn chờ xử lý, top sản phẩm, và khối
-   **"Doanh thu − 5% phí sàn = thực nhận"** (trả lời câu hỏi dòng tiền).
-3. **My Orders**: thấy đúng đơn con của shop mình (không thấy đơn shop khác) →
-   chuyển trạng thái sang *processing* → *shipped* → *delivered*.
-4. **Buyer Chat**: trả lời tin nhắn người mua đã gửi ở Màn 1.
-5. **Shop Vouchers**: tạo nhanh một voucher mới cho shop.
-6. **Returns**: (sau khi đơn delivered, quay lại vai người mua bấm "Request
-   Return" trong lịch sử đơn) → seller vào tab Returns → **Approve** → hàng tự
-   nhập kho lại, đơn chuyển "returned", người mua nhận thông báo.
+- **Tự động (khuyên dùng để có bản dự phòng)**: Playwright tự đi qua toàn bộ kịch bản
+  bên dưới, có chú thích tiếng Việt trên màn hình, và xuất video `.webm`:
+  ```bash
+  npm run demo:reset          # luôn reset trước khi quay
+  npm run demo:record         # chạy ẩn, video ở frontend/demo-videos/
+  npm --prefix frontend run demo:record:headed   # xem trực tiếp trong lúc quay
+  ```
+  Video `.webm` mở được bằng trình duyệt/VLC; muốn ra `.mp4` thì kéo vào
+  https://handbrake.fr hoặc dùng `ffmpeg -i demo.webm demo.mp4`.
+- **Tự thao tác + thuyết minh**: dùng **OBS Studio** (miễn phí) hoặc **Xbox Game Bar**
+  có sẵn trên Windows (`Win + Alt + R` bắt đầu/dừng quay, video lưu ở `Videos\Captures`).
+  Làm theo kịch bản 3.3, nói rõ mình đang demo vai trò nào.
 
-### Màn 3 — Đăng ký shop + Admin duyệt
+### 3.3. Kịch bản (8–10 phút, đủ 3 vai trò + AI)
 
-1. Đăng nhập user thường bất kỳ (vd `jane@example.com`) → Profile → tab
-   **"Sell on Marketplace"** → điền đơn mở shop → trạng thái *pending*.
-2. Đăng nhập **admin** → `/admin` → mục **Shops** → hàng chờ có đơn mới +
-   "New Corner Store" seed sẵn → bấm **Approve** (hoặc Reject kèm lý do).
-3. Người nộp đơn nhận thông báo duyệt, role tự chuyển thành **seller**, vào
-   được Seller Dashboard ngay; shop xuất hiện công khai tại `/shop/<slug>`.
-4. (Điểm cộng demo) Admin bấm **Suspend** một shop → toàn bộ sản phẩm của shop
-   biến mất khỏi trang chủ, tìm kiếm, gợi ý AI và không thể thêm vào giỏ.
+**Màn 1 — Người mua (john@example.com)**
+
+1. **Trang chủ**: banner, danh mục, *Top deals*, *Featured shops* → thấy đây là sàn nhiều người bán.
+2. **Tìm kiếm**: gõ `lap` → ra laptop (tìm theo một phần từ, không dấu vẫn ra).
+   Tuỳ chọn: bấm icon camera để **tìm bằng ảnh**.
+3. **Chi tiết sản phẩm** (Xiaomi 14): chọn biến thể 512GB (giá đổi theo), bấm **Collect**
+   voucher `TECHWORLD10` của shop, xem thẻ shop + "More from Tech World" → **Add to cart**.
+4. Thêm một sản phẩm Gadget Hub → **giỏ hàng nhóm theo shop**, có ô chọn từng sản phẩm/shop.
+5. **Checkout**: địa chỉ lấy từ **sổ địa chỉ** (hoặc nhập mới + "Save this address"),
+   **phí ship riêng từng shop**, mở **voucher picker** (hiện lý do voucher không dùng được,
+   tự chọn voucher có lợi nhất) → đặt **COD** → trang thành công → **View order**.
+6. **Đơn hàng của tôi**: tab To pay / To ship / To receive / Completed..., chi tiết đơn có
+   timeline vận chuyển, tổng tiền tách rõ giảm giá. Với đơn đã giao (đăng nhập jane): **Buy again**,
+   **Write review**, **Request return**.
+7. **AI**: mở trợ lý AI, hỏi *"Tư vấn điện thoại chụp ảnh đẹp tầm 1000 đô"* → trả lời kèm thẻ sản phẩm.
+   Tuỳ chọn: tick 2 sản phẩm → **Compare** → bảng so sánh do AI sinh.
+
+**Màn 2 — Seller (seller1@example.com)**
+
+1. **Seller dashboard**: khối **To-do** (chờ xác nhận / chờ giao / trả hàng / tin nhắn / sắp hết hàng).
+2. **My Orders**: bấm *To confirm* → **Confirm** ngay trên dòng (hoặc chọn nhiều đơn → *Confirm selected*),
+   **Export CSV**. Đơn MoMo chưa trả tiền hiện *Awaiting payment* (không cho giao).
+3. **Chi tiết đơn**: **Create shipment** → **Print label** → giả lập vận chuyển (Demo) → delivered.
+4. **My income**: đã giải ngân / đang chờ / phí sàn 5% / thực nhận.
+5. **Products**: form có kiểm tra lỗi, **ma trận biến thể** (Color × Storage tự sinh dòng),
+   bật/tắt **Live/Hidden**. **Shop Vouchers**: sửa / tạm dừng / hẹn giờ voucher.
+
+**Màn 3 — Đăng ký bán hàng + Admin**
+
+1. Đăng nhập `charlie@example.com` (user thường, chưa có shop — đăng ký tài khoản mới thì
+   phải nhập mã gửi qua email) → Profile → **Sell on Marketplace** → wizard 4 bước
+   (thông tin shop → địa chỉ lấy hàng → thuế → xác nhận) → trạng thái *Under review*.
+2. **Admin** (`/admin`): To-do → *Shop applications* → **Review** hồ sơ → **Approve**
+   (Reject bắt buộc ghi lý do). User được chuyển thành seller ngay.
+3. **Kiểm duyệt**: Products → **Take down** một sản phẩm kèm lý do → người mua không thấy nữa,
+   seller không tự bật lại được → **Restore**.
+4. **Customers**: **Suspend** một tài khoản → người đó bị đăng xuất ngay và thấy lý do; khoá seller
+   thì shop của họ cũng tạm ngừng bán → **Unsuspend**.
+
+> Mẹo: quay từng màn thành file riêng rồi ghép, lỡ sai thì chỉ quay lại một màn.
+> Trước mỗi lần quay lại toàn bộ, chạy `npm run demo:reset`.
 
 ---
 

@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "demo:record": "playwright test -c playwright.demo.config.ts && node e2e-demo/copy-video.mjs",
+    "demo:record:headed": "playwright test -c playwright.demo.config.ts --headed && node e2e-demo/copy-video.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.5",

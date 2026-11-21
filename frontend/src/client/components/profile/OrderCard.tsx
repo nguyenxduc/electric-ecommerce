@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Store, ChevronRight, MessageCircle } from 'lucide-react'
 import { formatUsd } from '../../utils/formatMoney'
+import { orderDiscount } from '../../utils/orderMoney'
 
 interface Order {
   id: number
@@ -10,6 +11,7 @@ interface Order {
   groupNumber?: string
   placedOn: string
   total: number
+  shippingFee?: number
   delivered?: string
   sentTo: string
   address?: string
@@ -63,6 +65,7 @@ const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain, onPayNo
   const shown = order.products.slice(0, 2)
   const more = order.products.length - shown.length
   const itemCount = order.products.reduce((n, p) => n + (p.quantity || 1), 0)
+  const discount = orderDiscount(order)
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 overflow-hidden">
@@ -122,6 +125,7 @@ const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain, onPayNo
           {order.orderNumber || `#${order.id}`} · {order.placedOn}
         </span>
         <span className="text-sm text-gray-600">
+          {discount > 0 && <span className="mr-2 text-green-600">Discount −{formatUsd(discount)}</span>}
           {itemCount} item{itemCount > 1 ? 's' : ''}:{' '}
           <span className="font-semibold text-rose-600">{formatUsd(order.total)}</span>
         </span>

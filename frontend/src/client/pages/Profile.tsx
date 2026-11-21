@@ -4,7 +4,7 @@ import { Camera, LogOut, X, Loader2, Ticket, Store, MapPin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
-import Login from '../components/common/Login'
+import { openLoginModal } from '../utils/loginModal'
 
 import ProfileIcon from '../../assets/profile2-icon.svg'
 import OrderIcon from '../../assets/order-icon.svg'
@@ -84,8 +84,7 @@ function Profile() {
   const [deleteConfirmModal, setDeleteConfirmModal] = useState(false)
   const navigate = useNavigate()
 
-  const { data: userData, isLoading: userLoading, refetch: refetchUser } = useValidateToken()
-  const [authOpen, setAuthOpen] = useState(false)
+  const { data: userData, isLoading: userLoading } = useValidateToken()
   const logoutMutation = useLogout()
   const uploadAvatarMutation = useUploadAvatar()
   const deleteAvatarMutation = useDeleteAvatar()
@@ -172,20 +171,12 @@ function Profile() {
           <h1 className="text-xl font-semibold text-gray-900 mb-2">Please log in to view your account</h1>
           <p className="text-gray-500 mb-6">Sign in to see your orders, wishlist and rewards.</p>
           <button
-            onClick={() => setAuthOpen(true)}
+            onClick={openLoginModal}
             className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Log in
           </button>
         </div>
-        <Login
-          open={authOpen}
-          onClose={() => setAuthOpen(false)}
-          onSuccess={() => {
-            setAuthOpen(false)
-            refetchUser()
-          }}
-        />
       </div>
     )
   }
