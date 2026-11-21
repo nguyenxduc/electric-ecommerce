@@ -121,7 +121,8 @@ app.use(
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    // CORS_ORIGIN="http://a,http://b" cho moi truong khac (deploy, frontend chay port khac)
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : "http://localhost:5173",
     credentials: true,
   })
 );
@@ -182,7 +183,8 @@ app.use(errorHandler);
 // Setup Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    // CORS_ORIGIN="http://a,http://b" cho moi truong khac (deploy, frontend chay port khac)
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : "http://localhost:5173",
     credentials: true,
     methods: ["GET", "POST"],
   },
