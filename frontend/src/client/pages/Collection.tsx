@@ -188,10 +188,10 @@ const Collection = () => {
   }, [categoriesData])
 
   const sortOptions = [
-    { value: 'featured', label: 'featured' },
-    { value: 'price-asc', label: 'Price: ascending' },
-    { value: 'price-desc', label: 'Price: descending' },
-    { value: 'newest', label: 'New Arrivals' },
+    { value: 'featured', label: 'Featured' },
+    { value: 'price-asc', label: 'Price: low to high' },
+    { value: 'price-desc', label: 'Price: high to low' },
+    { value: 'newest', label: 'Newest' },
     { value: 'discount', label: 'Biggest discount' }
   ]
 
