@@ -48,6 +48,8 @@ export type Product = {
   available_colors?: ProductColor[]
   variants?: ProductVariant[]
   shop?: ProductShop | null
+  // true khi nguoi xem la chu shop (chi co o GET /products/:id)
+  is_owner?: boolean
   category_id: number
   sub_category_id: number
   description: string

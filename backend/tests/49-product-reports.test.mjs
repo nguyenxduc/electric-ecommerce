@@ -71,6 +71,22 @@ test('dismiss closes open reports without notifying', async () => {
   assert.equal((await req(`/product-reports/${p.id}/dismiss`, { method: 'POST', token: admin })).status, 404)
 })
 
+test('sau khi bi bo qua: bao cao lai duoc (mo lai), lan nua van 409', async () => {
+  const again = await report(buyer, { reason: 'misleading', detail: 'still wrong specs' })
+  assert.equal(again.status, 200, JSON.stringify(again.json))
+  assert.equal(again.json.data.status, 'open')
+  const r = await row('open')
+  assert.equal(r.count, 1)
+  assert.equal(r.reasons.misleading, 1)
+  assert.equal((await report(buyer, { reason: 'offensive' })).status, 409)
+})
+
+test('is_owner chi true voi chu shop', async () => {
+  assert.equal((await req(`/products/${p.id}`, { token: seller2 })).json.is_owner, true)
+  assert.equal((await req(`/products/${p.id}`, { token: buyer })).json.is_owner, false)
+  assert.equal((await req(`/products/${p.id}`)).json.is_owner, false)
+})
+
 test('resolve takes the product down and thanks the reporter', async () => {
   await prisma.productReport.deleteMany({ where: { product_id: pid } })
   assert.equal((await report(buyer, { reason: 'prohibited' })).status, 200)

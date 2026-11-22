@@ -107,7 +107,12 @@ export default function SellerDashboard() {
           { label: 'Return requests', count: todo?.returns_pending, to: '/seller/returns?status=pending' },
           { label: 'Unread messages', count: todo?.unread_messages, to: '/seller/chat' },
           { label: 'Low stock', count: todo?.low_stock, to: '/seller/products?stock=low', hint: '5 or fewer left' },
-          { label: 'Unreplied reviews', count: todo?.unreplied_reviews, to: '/seller/reviews?filter=unreplied' }
+          { label: 'Unreplied reviews', count: todo?.unreplied_reviews, to: '/seller/reviews?filter=unreplied' },
+          {
+            label: 'Unanswered questions',
+            count: todo?.unanswered_questions,
+            to: '/seller/questions?filter=unanswered'
+          }
         ]}
       />
 

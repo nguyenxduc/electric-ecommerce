@@ -21,15 +21,21 @@ import RecentlyViewed from './RecentlyViewed'
 import { addRecentlyViewed } from '../../utils/recentlyViewed'
 import ShopVouchers from '../shop/ShopVouchers'
 import ReportProduct from './ReportProduct'
+import ProductQuestions from './ProductQuestions'
 
 interface ProductDetailProps {
   product: Product
 }
 
 const ProductDetail = ({ product }: ProductDetailProps) => {
-  // /product/<slug>#reviews (nut "Write review" o don hang) mo thang tab danh gia
+  // /product/<slug>#reviews (nut "Write review" o don hang) mo thang tab danh gia;
+  // #questions (thong bao shop da tra loi) mo tab hoi dap
   const [selectedInfo, setSelectedInfo] = useState(() =>
-    window.location.hash === '#reviews' ? 'comment' : 'description'
+    window.location.hash === '#reviews'
+      ? 'comment'
+      : window.location.hash === '#questions'
+        ? 'questions'
+        : 'description'
   )
   const [mainImage, setMainImage] = useState(
     PLACEHOLDER_IMAGE
@@ -269,7 +275,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 variants={variants}
                 selectedVariant={selectedVariant}
               />
-              <ReportProduct productId={product.id} />
+              {!product.is_owner && <ReportProduct productId={product.id} />}
             </div>
           </div>
         </div>
@@ -323,6 +329,16 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
               >
                 Reviews & Comments
               </button>
+              <button
+                onClick={() => setSelectedInfo('questions')}
+                className={`pb-4 px-1 text-base font-medium transition-colors ${
+                  selectedInfo === 'questions'
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Questions
+              </button>
             </div>
           </nav>
           <div className="mt-8">
@@ -353,6 +369,9 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
             )}
             {selectedInfo === 'comment' && (
               <ReviewComponent productId={Number(product.id)} shopName={product.shop?.name} />
+            )}
+            {selectedInfo === 'questions' && (
+              <ProductQuestions productId={Number(product.id)} isOwner={!!product.is_owner} />
             )}
           </div>
         </div>

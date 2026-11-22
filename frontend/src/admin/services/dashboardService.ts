@@ -151,6 +151,7 @@ export type ShopTodo = {
   unread_messages: number
   low_stock: number
   unreplied_reviews: number
+  unanswered_questions: number
 }
 export type AdminTodo = {
   shops_pending: number

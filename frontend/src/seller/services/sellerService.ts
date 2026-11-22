@@ -1,6 +1,7 @@
 import { toast } from 'sonner'
 import { apiErrorResponse } from '../../lib/apiError'
 import axiosClient from '../../lib/axios'
+import type { ProductQuestion } from '../../client/services/productQuestionService'
 
 // ---- Shop vouchers ----
 export type ShopCoupon = {
@@ -236,3 +237,17 @@ export const replyToReview = async (id: string, reply: string) =>
 
 export const deleteReviewReply = async (id: string) =>
   (await axiosClient.delete(`/reviews/${id}/reply`)).data
+
+// Hoi dap san pham cua shop minh
+export type ShopQuestion = ProductQuestion & {
+  product: { id: string; name: string; img: string[] }
+}
+
+export const getShopQuestions = async (params: { filter?: 'unanswered'; page?: number }) =>
+  (await axiosClient.get('/product-questions/shop/mine', { params })).data.data as {
+    questions: ShopQuestion[]
+    pagination: { current_page: number; total_pages: number; total_count: number }
+  }
+
+export const answerQuestion = async (id: string, answer: string) =>
+  (await axiosClient.put(`/product-questions/${id}/answer`, { answer })).data

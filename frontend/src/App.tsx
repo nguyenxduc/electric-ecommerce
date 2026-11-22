@@ -58,6 +58,7 @@ import SellerTax from './seller/pages/tax/Tax'
 import SellerReturnsList from './seller/pages/returns/List'
 import SellerFinance from './seller/pages/finance/Finance'
 import SellerReviewsList from './seller/pages/reviews/List'
+import SellerQuestionsList from './seller/pages/questions/List'
 
 const queryClient = new QueryClient()
 
@@ -187,6 +188,7 @@ function App() {
             <Route path="coupons" element={<SellerCouponsList />} />
             <Route path="returns" element={<SellerReturnsList />} />
             <Route path="reviews" element={<SellerReviewsList />} />
+            <Route path="questions" element={<SellerQuestionsList />} />
             <Route path="chat" element={<AdminChatList scope="seller" />} />
             <Route path="shop" element={<SellerShopProfile />} />
             <Route path="tax" element={<SellerTax />} />

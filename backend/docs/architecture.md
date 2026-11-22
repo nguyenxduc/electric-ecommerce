@@ -546,13 +546,25 @@ san qua `?status=`.
 
 Nguoi mua `POST /products/:id/report { reason, detail? }` (reason: counterfeit |
 prohibited | misleading | offensive | other; `other` bat buoc detail; moi nguoi
-mot bao cao moi san pham, trung -> 409 `ALREADY_REPORTED`; khong bao cao duoc
+mot bao cao moi san pham, trung khi con mo -> 409 `ALREADY_REPORTED`; bao cao cu da
+xu ly thi bao lai se mo lai chinh dong do; khong bao cao duoc
 san pham shop minh). Admin xu ly o `/product-reports` (`services/productReport.service.js`):
 `GET ?status=open|resolved|dismissed` gom theo san pham; `POST /:productId/resolve
 { reason }` go san pham qua `productModeration.service.js` (dung chung voi
 `PATCH /products/:id/takedown`, bao seller), dong moi bao cao dang mo va
 thong bao nguoi bao cao; `POST /:productId/dismiss` chi dong bao cao, khong
 thong bao. Ca hai ghi audit log.
+
+### Hoi dap san pham
+
+`GET /products/:id/questions` cong khai (cau da tra loi len truoc). Nguoi mua
+`POST /products/:id/questions { question }` (5-500 ky tu, san pham dang ban, khong
+hoi san pham shop minh, toi da 3 cau chua tra loi moi nguoi moi san pham -> 429),
+bao chu shop. Shop tra loi `PUT /product-questions/:id/answer` (sua duoc, chi lan
+dau bao nguoi hoi, link `#questions`), hop thu `GET /product-questions/shop/mine?filter=unanswered`,
+dem vao to-do `unanswered_questions`. `DELETE /product-questions/:id`: nguoi hoi hoac
+admin. Service: `services/productQuestion.service.js`. `GET /products/:id` tra them
+`is_owner` de frontend an nut Report/o hoi voi chu shop.
 
 ---
 

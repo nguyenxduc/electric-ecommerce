@@ -579,7 +579,8 @@ export const getProductById = asyncHandler(async (req, res) => {
     shop: publicShop,
   });
   const in_stock = Number(productWithCalculations.quantity) > 0;
-  res.json({ ...productWithCalculations, in_stock });
+  // is_owner: frontend an nut Report/hoi dap tren san pham cua chinh shop minh
+  res.json({ ...productWithCalculations, in_stock, is_owner: !!isShopOwner });
 });
 
 export const updateProduct = asyncHandler(async (req, res) => {

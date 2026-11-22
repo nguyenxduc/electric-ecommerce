@@ -53,6 +53,25 @@ export const createReport = async (userId, productId, { reason, detail }) => {
     return report;
   } catch (err) {
     if (err.code === "P2002") {
+      // Bao cao cu da duoc admin xu ly (resolved/dismissed): mo lai voi ly do moi.
+      // updateMany co dieu kien status de hai request cung luc chi mo lai mot lan.
+      const reopened = await prisma.productReport.updateMany({
+        where: { product_id: productId, reporter_id: userId, status: { not: REPORT_STATUS.OPEN } },
+        data: {
+          reason,
+          detail: text || null,
+          status: REPORT_STATUS.OPEN,
+          resolved_by: null,
+          resolved_at: null,
+          created_at: new Date(),
+        },
+      });
+      if (reopened.count === 1) {
+        return prisma.productReport.findUnique({
+          where: { product_id_reporter_id: { product_id: productId, reporter_id: userId } },
+          select: { id: true, reason: true, status: true },
+        });
+      }
       throw new ProductReportError(409, "You already reported this product", "ALREADY_REPORTED");
     }
     throw err;

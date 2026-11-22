@@ -104,6 +104,7 @@ model Product {
   filter_values   ProductFilterValue[]
   variants        ProductVariant[]
   reports         ProductReport[]
+  questions       ProductQuestion[]
 
   @@index([flash_ends_at])
   @@index([name])
@@ -273,7 +274,8 @@ model User {
 
   shop_follows ShopFollow[]
 
-  product_reports ProductReport[] @relation("ReportReporter")
+  product_reports   ProductReport[]   @relation("ReportReporter")
+  product_questions ProductQuestion[] @relation("QuestionAsker")
 
   @@map("users")
 }
@@ -1046,4 +1048,21 @@ model ProductReport {
   @@unique([product_id, reporter_id])
   @@index([status, created_at])
   @@map("product_reports")
+}
+
+// Hoi dap san pham: nguoi mua hoi, chu shop tra loi; hien cong khai tren trang san pham.
+model ProductQuestion {
+  id          BigInt    @id @default(autoincrement())
+  product_id  BigInt
+  user_id     BigInt
+  question    String
+  answer      String?
+  answered_at DateTime?
+  created_at  DateTime  @default(now())
+  product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user        User      @relation("QuestionAsker", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([product_id, created_at])
+  @@index([answered_at])
+  @@map("product_questions")
 }

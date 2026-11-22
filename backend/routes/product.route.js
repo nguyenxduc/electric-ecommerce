@@ -34,6 +34,7 @@ import { optionalAuth } from "../middleware/optionalAuth.middleware.js";
 import { requireShopOwnership } from "../lib/authz.js";
 import { upload, uploadMemory } from "../middleware/upload.middleware.js";
 import { reportProduct } from "../controllers/productReport.controller.js";
+import { getProductQuestions, postProductQuestion } from "../controllers/productQuestion.controller.js";
 import { compareProductsByAi } from "../controllers/productComparison.controller.js";
 
 import { aiLimiter } from "../middleware/rateLimit.middleware.js";
@@ -70,6 +71,8 @@ router.get("/:id", optionalAuth, getProductById);
 
 // Nguoi mua bao cao san pham vi pham (vao hang doi kiem duyet cua admin)
 router.post("/:id/report", protectRoute, reportProduct);
+router.get("/:id/questions", getProductQuestions);
+router.post("/:id/questions", protectRoute, postProductQuestion);
 
 // Product CRUD - sellers manage their own shop's products; admins manage any
 router.post(
