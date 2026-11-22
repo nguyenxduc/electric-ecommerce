@@ -10,6 +10,7 @@ import {
   useDeleteAddress,
   useSetDefaultAddress
 } from '../../hooks/useAddresses'
+import { VN_PROVINCES } from '../../utils/vnProvinces'
 import { formatAddress, type Address, type AddressInput } from '../../services/addressService'
 
 const MAX_ADDRESSES = 10
@@ -108,13 +109,14 @@ export function AddressFormModal({
     }
   }
 
-  const field = (key: keyof FormState, label: string, placeholder: string) => (
+  const field = (key: keyof FormState, label: string, placeholder: string, listId?: string) => (
     <label className="block">
       <span className="block text-sm font-medium text-gray-700 mb-1">{label}</span>
       <input
         className={`${inputCls} ${errors[key] ? 'border-red-400' : 'border-gray-200'}`}
         placeholder={placeholder}
         aria-label={label}
+        list={listId}
         value={form[key]}
         onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
       />
@@ -137,10 +139,15 @@ export function AddressFormModal({
           {field('phone', 'Phone number', 'Phone number')}
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          {field('province', 'Province / City', 'Province / City')}
-          {field('district', 'District', 'District')}
+          {field('province', 'Province / City', 'Province / City', 'vn-provinces')}
+          {field('district', 'District (optional)', 'District (optional)')}
           {field('ward', 'Ward', 'Ward')}
         </div>
+        <datalist id="vn-provinces">
+          {VN_PROVINCES.map(p => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
         {field('street', 'Street address', 'House number, street')}
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">

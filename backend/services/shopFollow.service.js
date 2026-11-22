@@ -58,7 +58,41 @@ export const unfollowShop = async (userId, slug) => {
   return { is_following: false, follower_count: await countFollowers(shop.id) };
 };
 
-export const listFollowedShops = async (userId, { skip, take }) => {
+// Bao cho nguoi theo doi shop (1 thong bao/nguoi, type PROMO). Fire-and-forget:
+// loi chi ghi log, khong bao gio lam hong request cua seller; khong bao chu shop.
+const PROMO_DEDUPE_MS = 24 * 3600 * 1000;
+
+export const notifyFollowers = (shopId, { title, message, link = null }) =>
+  (async () => {
+    const shop = await prisma.shop.findUnique({
+      where: { id: BigInt(shopId) },
+      select: { owner_id: true, status: true, deleted_at: true },
+    });
+    // shop bi khoa/xoa: nguoi mua khong vao duoc, khong bao
+    if (!shop || shop.deleted_at || shop.status !== SHOP_STATUS.ACTIVE) return;
+    // Chong spam: moi nguoi nhan toi da 1 thong bao PROMO cung link trong 24h
+    // (seller luu lai san pham, tao nhieu voucher lien tiep...)
+    const since = new Date(Date.now() - PROMO_DEDUPE_MS);
+    const recent = link
+      ? await prisma.notification.findMany({
+          where: { type: "PROMO", link, created_at: { gte: since } },
+          select: { user_id: true },
+        })
+      : [];
+    const skip = new Set(recent.map((n) => String(n.user_id)));
+    const followers = (
+      await prisma.shopFollow.findMany({
+        where: { shop_id: BigInt(shopId), user_id: { not: shop.owner_id } },
+        select: { user_id: true },
+      })
+    ).filter((f) => !skip.has(String(f.user_id)));
+    if (followers.length === 0) return;
+    await prisma.notification.createMany({
+      data: followers.map((f) => ({ user_id: f.user_id, title, message, type: "PROMO", link })),
+    });
+  })().catch((err) => console.error("notifyFollowers error:", err));
+
+export const listFollowedShops =async (userId, { skip, take }) => {
   const where = {
     user_id: userId,
     shop: { deleted_at: null, status: SHOP_STATUS.ACTIVE },

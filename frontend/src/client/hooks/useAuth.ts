@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { clearRecentlyViewed } from '../utils/recentlyViewed'
 import {
   login as loginSvc,
   register as registerSvc,
@@ -16,15 +17,24 @@ import {
 } from '../services/authService'
 import type { AuthReq, AuthRes, AuthUser } from '../types/auth'
 
-export const useLogin = () =>
-  useMutation<AuthRes, Error, AuthReq>({
-    mutationFn: payload => loginSvc(payload)
+// Dang nhap/dang ky xoa cache: du lieu cua nguoi truoc (theo doi shop, gio...) khong duoc lo sang nguoi moi
+export const useLogin = () => {
+  const qc = useQueryClient()
+  return useMutation<AuthRes, Error, AuthReq>({
+    mutationFn: payload => loginSvc(payload),
+    // resetQueries: bo du lieu nguoi cu va tai lai query dang hien (clear lam component dang mo dung hinh)
+    onSuccess: () => qc.resetQueries()
   })
+}
 
-export const useRegister = () =>
-  useMutation<unknown, Error, RegisterReq>({
-    mutationFn: payload => registerSvc(payload)
+export const useRegister = () => {
+  const qc = useQueryClient()
+  return useMutation<unknown, Error, RegisterReq>({
+    mutationFn: payload => registerSvc(payload),
+    // resetQueries: bo du lieu nguoi cu va tai lai query dang hien (clear lam component dang mo dung hinh)
+    onSuccess: () => qc.resetQueries()
   })
+}
 
 export const useValidateToken = () => {
   const hasToken = !!localStorage.getItem('accessToken')
@@ -49,6 +59,7 @@ export const useLogout = () => {
       // Xoa het cache cua nguoi dung truoc (so dia chi, voucher, gio, don hang):
       // nguoi khac dang nhap cung tab khong duoc thay du lieu ca nhan cu
       qc.clear()
+      clearRecentlyViewed()
     }
   })
 }

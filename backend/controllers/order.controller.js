@@ -67,10 +67,16 @@ export const createOrder = async (req, res) => {
       payment_method,
       coupon_code,
       invoice_request,
+      expected_total,
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "No order items provided" });
+    }
+    const expectedTotal =
+      expected_total == null || expected_total === "" ? null : Number(expected_total);
+    if (expectedTotal !== null && !Number.isFinite(expectedTotal)) {
+      return res.status(400).json({ message: "expected_total must be a number" });
     }
 
     let totalAmount = 0;
@@ -207,6 +213,18 @@ export const createOrder = async (req, res) => {
         productName: product.name,
         shop: product.shop,
         weightGrams: (product.weight_grams || 0) * Number(it.quantity),
+      });
+    }
+
+    // Chan gia tang giua luc xem gio va luc dat (flash sale het, shop doi gia).
+    // So sanh tien hang sau giam gia san pham, truoc tier/voucher/ship - dung con so gio hang hien.
+    // Chay truoc moi thao tac ghi nen khong can rollback. Gia giam thi cu tinh gia thap.
+    if (expectedTotal !== null && round2(totalAmount) - expectedTotal > 0.01) {
+      return res.status(409).json({
+        code: "PRICE_CHANGED",
+        message: "Prices changed. Please review your order.",
+        expected: expectedTotal,
+        actual: round2(totalAmount),
       });
     }
 

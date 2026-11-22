@@ -19,6 +19,7 @@ import {
   addRating,
   getSimilarProducts,
   getFlashSaleProducts,
+  getProductsByIds,
 } from "../controllers/product.controller.js";
 import {
   searchProductsByImage,
@@ -54,6 +55,7 @@ router.get("/", optionalAuth, getAllProducts);
 router.get("/search", optionalAuth, searchProducts);
 router.get("/suggest", optionalAuth, suggestSearch);
 router.get("/flash-sale", optionalAuth, getFlashSaleProducts);
+router.get("/by-ids", optionalAuth, getProductsByIds);
 router.post("/compare-ai", aiLimiter, compareProductsByAi);
 router.post("/search-by-image", aiLimiter, uploadMemory.single("image"), searchProductsByImage);
 router.post("/search-by-image/overview", aiLimiter, getImageSearchOverview);

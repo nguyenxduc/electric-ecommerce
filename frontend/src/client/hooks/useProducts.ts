@@ -8,6 +8,7 @@ import {
   fetchCollectionProducts,
   fetchProductById,
   fetchProductsByIds,
+  fetchProductsByIdsBatch,
   fetchSimilarProducts,
   fetchSimilarProductsByCategory,
   fetchReview,
@@ -174,4 +175,12 @@ export const useSearchSuggest = (q: string) =>
     queryFn: () => fetchSearchSuggest(q),
     staleTime: 60 * 1000,
     placeholderData: prev => prev
+  })
+
+export const useRecentlyViewedProducts = (ids: number[]) =>
+  useQuery<Product[]>({
+    queryKey: ['recentlyViewed', ids],
+    queryFn: () => fetchProductsByIdsBatch(ids),
+    enabled: ids.length > 0,
+    staleTime: 60 * 1000
   })

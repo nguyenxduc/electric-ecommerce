@@ -189,3 +189,11 @@ export const fetchSearchSuggest = async (q: string): Promise<SearchSuggestRes> =
   })
   return data
 }
+
+// Nhieu san pham theo id (giu thu tu yeu cau, id an/khong co bi bo)
+export const fetchProductsByIdsBatch = async (ids: number[]): Promise<Product[]> => {
+  const { data } = await axiosClient.get<{ products: Product[] }>('/products/by-ids', {
+    params: { ids: ids.join(',') }
+  })
+  return data.products
+}

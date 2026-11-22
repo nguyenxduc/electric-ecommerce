@@ -481,7 +481,9 @@ shop minh), `PUT /reviews/:id/reply {reply}` (1-1000 ky tu, sua duoc) va
 San pham co 3 cot `flash_discount`, `flash_starts_at`, `flash_ends_at`. Khi `now` thuoc `[starts, ends)` va `flash_discount > 0`, giam gia hieu dung la `flash_discount` THAY cho `discount`. Quy tac nam o MOT cho: `isFlashActive` / `effectiveDiscount` trong `lib/productQuery.js`.
 
 - Di qua `effectiveDiscount`: `calculateProductPrices` (tra them `flash_sale {active, ends_at, original_discount}`), gio hang (dong + `summarizeCart`), **tao don** (gia chot `unit_price` tren order item), bao gia van chuyen, top san pham dashboard. Cac select/raw SQL (`productSearch`, similar, suggest, AI tools) lay them 3 cot flash de tinh dung.
-- Co y KHONG di qua: sap xep/loc theo `price`, `discount` (`SORT_ORDER_BY`, `?discount=true`, bo loc discount) dung cot luu trong DB, khong tinh flash (co comment `shortcut:`).
+- `?discount=true` va bo loc discount `>=` gom ca san pham dang flash (OR voi `discount`). Co y KHONG di qua: sap xep/loc theo `price` va `SORT_ORDER_BY` dung cot luu trong DB, khong tinh flash (co comment `shortcut:`).
+- Seller dat/doi flash sale (chua het han) hoac tao voucher shop dang chay -> `notifyFollowers(shopId, {title,message,link})` (`shopFollow.service.js`) ghi 1 thong bao `PROMO`/nguoi theo doi bang `createMany`, fire-and-forget (loi chi log), khong bao chu shop.
+- Chan gia tang luc dat: `POST /orders` nhan `expected_total` (tuy chon) = tien hang sau giam gia san pham, truoc tier/voucher/ship (bang `summarizeItems().total` o gio hang). Server tinh lai, neu lon hon `expected_total` qua 0.01 -> 409 `{code:"PRICE_CHANGED", expected, actual}` TRUOC moi thao tac ghi; gia giam thi tinh gia thap; khong gui thi nhu cu.
 - Seller/admin dat qua `PATCH /products/:id` (`flash_discount`, `flash_starts_at`, `flash_ends_at`): end > start, toi da 7 ngay, 0 < giam < gia, end o tuong lai; gui `flash_discount` rong de xoa. Chi dat duoc khi sua san pham da co, khong dat luc tao.
 - `GET /products/flash-sale?limit=` tra san pham dang chay (qua `buyerVisibilityWhere`), het som nhat truoc. Frontend: dai Flash Sale o Home, banner o trang chi tiet, `Countdown` tu invalidate query khi ve 0.
 
@@ -632,3 +634,11 @@ dan noi bo bat dau bang `/` (link ngoai hoac `//...` bi bo qua, luu `null`).
   `navigate(link)`. `Order.tsx` doc `?order=<id>` de mo chi tiet don roi xoa param.
 - Gioi han da biet: trang thai da doc nam tren chinh dong thong bao, nen broadcast
   bi danh dau da doc cho moi nguoi khi mot user danh dau.
+
+### Da xem gan day (recently viewed)
+
+Danh sach id luu o `localStorage` (khoa `recentlyViewed`, toi da 20, moi nhat dau, khong trung) - theo trinh duyet, khong co bang DB. Home hien dai "Recently viewed" (co nut Clear), trang chi tiet hien dai nho (bo san pham hien tai). Du lieu lay qua `GET /products/by-ids?ids=1,2,3` (`getProductsByIds`): toi da 20 id so, sai -> 400; chi san pham buyer thay duoc (`buyerVisibilityWhere`), gia qua `calculateProductPrices`, tra dung thu tu yeu cau, id an/khong ton tai bi bo.
+
+### Chon tinh/thanh trong form dia chi
+
+`AddressFormModal` dung `input + datalist` voi 34 tinh/thanh sau sap nhap 2025 (`frontend/src/client/utils/vnProvinces.ts`); van nhan chuoi tu do cu. Quan/huyen da bo nen o "District (optional)".

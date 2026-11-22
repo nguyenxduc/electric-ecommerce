@@ -87,11 +87,19 @@ export const resolveFilteredProductIds = async (filterParams) => {
           queryValueMap.get(singleValue.toLowerCase()) || singleValue;
 
         if (queryValue.startsWith(">=")) {
-          // shortcut: loc theo discount luu trong DB, khong tinh flash sale.
           const minDiscount = parseFloat(queryValue.substring(2));
+          const now = new Date();
           const discountProducts = await prisma.product.findMany({
             where: {
-              discount: { gte: minDiscount },
+              // Flash sale dang chay cung tinh (gia tri flash thay the giam gia thuong)
+              OR: [
+                { discount: { gte: minDiscount } },
+                {
+                  flash_discount: { gte: minDiscount },
+                  flash_starts_at: { lte: now },
+                  flash_ends_at: { gt: now },
+                },
+              ],
               deleted_at: null,
             },
             select: { id: true },

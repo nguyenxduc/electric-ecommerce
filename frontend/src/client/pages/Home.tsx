@@ -2,6 +2,7 @@ import Hero from '../components/layout/Hero'
 import Categories from '../components/products/Categories'
 import FeaturedShops from '../components/layout/FeaturedShops'
 import FlashSale from '../components/layout/FlashSale'
+import RecentlyViewed from '../components/products/RecentlyViewed'
 import TopDeals from '../components/layout/TopDeals'
 import ListProduct from '../components/products/ListProduct'
 import { useHomeRecommendations, useNewProducts, usePopularProducts } from '../hooks/useProducts'
@@ -33,6 +34,9 @@ const Home = () => {
       <FlashSale />
       <TopDeals />
       <FeaturedShops />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-8">
+        <RecentlyViewed canClear />
+      </div>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
         <ListProduct
           title="Recommended for you"

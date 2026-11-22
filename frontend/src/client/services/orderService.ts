@@ -24,6 +24,7 @@ export type CreateOrderPayload = {
   }
   payment_method: string
   coupon_code?: string
+  expected_total?: number
 }
 
 export type Order = {

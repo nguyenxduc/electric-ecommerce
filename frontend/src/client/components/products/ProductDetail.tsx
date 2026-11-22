@@ -17,6 +17,8 @@ import VariantPicker from './VariantPicker'
 import ShopCard from './ShopCard'
 import Countdown from '../common/Countdown'
 import MoreFromShop from './MoreFromShop'
+import RecentlyViewed from './RecentlyViewed'
+import { addRecentlyViewed } from '../../utils/recentlyViewed'
 import ShopVouchers from '../shop/ShopVouchers'
 
 interface ProductDetailProps {
@@ -72,6 +74,10 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
       }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [product?.id])
+
+  useEffect(() => {
+    if (product?.id) addRecentlyViewed(Number(product.id))
   }, [product?.id])
 
   useEffect(() => {
@@ -347,6 +353,9 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
               <ReviewComponent productId={Number(product.id)} shopName={product.shop?.name} />
             )}
           </div>
+        </div>
+        <div className="mt-8">
+          <RecentlyViewed key={product.id} excludeId={Number(product.id)} />
         </div>
       </div>
     </div>

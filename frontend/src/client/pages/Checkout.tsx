@@ -41,6 +41,7 @@ import VoucherPicker from '../components/checkout/VoucherPicker'
 import { formatUsd } from '../utils/formatMoney'
 import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
+import { VN_PROVINCES } from '../utils/vnProvinces'
 
 const fieldCls =
   'w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -54,7 +55,7 @@ const CheckoutField = ({ label, children }: { label: string; children: React.Rea
 
 const Checkout = () => {
   const navigate = useNavigate()
-  const { data: cartData, isLoading } = useCart()
+  const { data: cartData, isLoading, refetch: refetchCart } = useCart()
   const { data: userData } = useValidateToken()
   const { data: settingsData } = usePublicSettings('shipping')
 
@@ -254,6 +255,11 @@ const Checkout = () => {
       toast.error((data.message as string) || 'Please verify your phone number to continue')
       return
     }
+    if (status === 409 && data?.code === 'PRICE_CHANGED') {
+      toast.error('Prices changed - please review your order')
+      void refetchCart()
+      return
+    }
     toast.error(apiErrorMessage(err, fallback))
   }
 
@@ -290,7 +296,9 @@ const Checkout = () => {
             }
           : undefined,
       payment_method: paymentMethod,
-      coupon_code: appliedCoupon || undefined
+      coupon_code: appliedCoupon || undefined,
+      // Tien hang sau giam gia san pham (truoc tier/voucher/ship): server tu choi neu gia tang
+      expected_total: totals.merchandiseTotal
     }
 
     const result = await createOrder(orderPayload)
@@ -754,7 +762,10 @@ const Checkout = () => {
             </h2>
             <div className="grid gap-4 md:grid-cols-3 mb-4">
               <CheckoutField label="Province / City">
-                <input className={fieldCls} placeholder="Province / City" value={province} onChange={e => setProvince(e.target.value)} />
+                <input className={fieldCls} placeholder="Province / City" list="checkout-vn-provinces" value={province} onChange={e => setProvince(e.target.value)} />
+                <datalist id="checkout-vn-provinces">
+                  {VN_PROVINCES.map(p => <option key={p} value={p} />)}
+                </datalist>
               </CheckoutField>
               <CheckoutField label="District">
                 <input className={fieldCls} placeholder="District" value={district} onChange={e => setDistrict(e.target.value)} />

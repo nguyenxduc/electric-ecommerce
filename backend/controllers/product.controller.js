@@ -21,8 +21,10 @@ import {
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { writeAuditLog, auditContext } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
+import { notifyFollowers } from "../services/shopFollow.service.js";
 import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
+import { createSlug } from "../lib/slug.js";
 import { suggest, getTrending, MAX_SUGGEST_QUERY } from "../services/searchSuggest.service.js";
 import { resolveFilteredProductIds } from "../services/productFilter.service.js";
 
@@ -471,8 +473,15 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   if (sub_category_id) where.sub_category_id = BigInt(sub_category_id);
   if (shop_id) where.shop_id = BigInt(shop_id);
   if (in_stock === "true") where.quantity = { gt: 0 };
-  // shortcut: loc/sap theo price, discount luu trong DB, khong tinh flash sale; nang cap neu can loc theo gia flash.
-  if (discount === "true") where.discount = { gt: 0 };
+  // Giam gia thuong HOAC flash sale dang chay. Dung OR (where chua dung key OR nao khac).
+  // shortcut: loc/sap theo price van theo gia luu trong DB, khong tinh gia flash; nang cap neu can.
+  if (discount === "true") {
+    const now = new Date();
+    where.OR = [
+      { discount: { gt: 0 } },
+      { flash_discount: { gt: 0 }, flash_starts_at: { lte: now }, flash_ends_at: { gt: now } },
+    ];
+  }
   if (price_min || price_max) {
     where.price = {};
     if (price_min) where.price.gte = Number(price_min);
@@ -781,6 +790,25 @@ export const updateProduct = asyncHandler(async (req, res) => {
   } catch (err) {
     if (respondVariantError(err, res)) return;
     throw err;
+  }
+
+  // Flash sale moi/doi sang khung chua het han -> bao nguoi theo doi shop
+  const flashChanged =
+    updatedProduct.flash_discount != null &&
+    new Date(updatedProduct.flash_ends_at) > new Date() &&
+    (Number(updatedProduct.flash_discount) !== Number(currentProduct.flash_discount) ||
+      updatedProduct.flash_starts_at?.getTime() !== currentProduct.flash_starts_at?.getTime() ||
+      updatedProduct.flash_ends_at?.getTime() !== currentProduct.flash_ends_at?.getTime());
+  // san pham dang an/bi go thi nguoi mua mo link se 404: khong bao
+  if (flashChanged && updatedProduct.is_active !== false && !updatedProduct.taken_down_at) {
+    const upcoming = new Date(updatedProduct.flash_starts_at) > new Date();
+    notifyFollowers(updatedProduct.shop_id, {
+      title: "Flash sale",
+      message: upcoming
+        ? `${updatedProduct.name} goes on flash sale soon: ${Number(updatedProduct.flash_discount)} off`
+        : `${updatedProduct.name} is on flash sale: ${Number(updatedProduct.flash_discount)} off`,
+      link: `/product/${createSlug(updatedProduct.name) || "product"}-p${updatedProduct.id}`,
+    });
   }
 
   res.json({
@@ -1343,4 +1371,21 @@ export const getSimilarProducts = asyncHandler(async (req, res) => {
     similarity_method: "description_based",
     similarity_threshold: 0.1,
   });
+});
+
+// GET /api/products/by-ids?ids=1,2,3 - toi da 20 id, giu dung thu tu yeu cau; id an/khong co bi bo
+export const getProductsByIds = asyncHandler(async (req, res) => {
+  const ids = String(req.query.ids ?? "").split(",").map((s) => s.trim());
+  if (!ids.length || ids.length > 20 || ids.some((s) => !/^\d{1,15}$/.test(s))) {
+    return res.status(400).json({ message: "ids must be 1-20 comma-separated numeric ids" });
+  }
+  const { products } = await fetchPaginatedProducts(
+    { id: { in: ids.map(BigInt) }, deleted_at: null, ...buyerVisibilityWhere(req) },
+    { id: "asc" },
+    0,
+    20
+  );
+  const byId = new Map(products.map((p) => [String(p.id), p]));
+  const ordered = [...new Set(ids)].map((id) => byId.get(id)).filter(Boolean);
+  res.json({ products: ordered.map(calculateProductPrices) });
 });

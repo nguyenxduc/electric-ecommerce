@@ -2,6 +2,7 @@ import { prisma } from "../lib/db.js";
 import { parsePagination } from "../lib/pagination.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { couponStatus, previewCouponDiscount } from "../services/pricing.service.js";
+import { notifyFollowers } from "../services/shopFollow.service.js";
 import {
   listWarehouse,
   listClaimable,
@@ -387,6 +388,14 @@ export const createShopCoupon = async (req, res) => {
         shop_id: req.shop.id,
       },
     });
+    // Voucher cong khai (khong gioi han nguoi dung) va dang chay -> bao nguoi theo doi shop
+    if (couponStatus(savedCoupon) === "active") {
+      notifyFollowers(req.shop.id, {
+        title: "New shop voucher",
+        message: `${req.shop.name || "A shop you follow"} has a new voucher: ${savedCoupon.code}`,
+        link: `/shop/${req.shop.slug}`,
+      });
+    }
     res.status(201).json({
       message: "Shop voucher created successfully",
       coupon: savedCoupon,
