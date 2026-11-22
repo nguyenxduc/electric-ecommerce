@@ -125,8 +125,9 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_340px] gap-8 lg:gap-10">
             {/* Image Gallery */}
             <div className="lg:col-span-1 space-y-4">
-              {/* Anh chinh: vien rat manh + bong mo de noi nhe khoi nen */}
-              <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#f3f1ec] shadow-[0_24px_60px_-32px_rgb(23_24_27/0.35)] ring-1 ring-inset ring-black/[0.05]">
+              {/* Anh chinh: vien xam nhat + bong mo. Ring ve ngoai (khong inset): lop
+                  animation ben trong co nen rieng se che mat ring inset. */}
+              <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#f3f1ec] shadow-[0_24px_60px_-32px_rgb(23_24_27/0.35)] ring-1 ring-gray-200">
                 {/* Lop animation (transform/opacity) tao nhom ve rieng: mix-blend-multiply
                     cua anh chi hoa voi nen cua chinh lop nay. Thieu bg thi nen trang cua
                     anh san pham lo ra o anh lon (anh nho van hoa vao nen be). */}
