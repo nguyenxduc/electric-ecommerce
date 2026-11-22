@@ -7,6 +7,7 @@ import {
   listClaimable,
   listShopPublicCoupons,
   listCheckoutCandidates,
+  countUserCouponUses,
   claimCoupon as claimCouponService,
   unclaimCoupon as unclaimCouponService,
   findWarehouseCouponByCode,
@@ -33,7 +34,7 @@ const couponFieldsFromBody = (body) => {
     data.discount_type = body.discount_type;
   }
   if (body.discount_value !== undefined) data.discount_value = Number(body.discount_value);
-  for (const k of ["min_order", "max_discount", "usage_limit"]) {
+  for (const k of ["min_order", "max_discount", "usage_limit", "per_user_limit"]) {
     if (body[k] !== undefined) data[k] = nullableNum(body[k]);
   }
   for (const k of ["starts_at", "expires_at"]) {
@@ -53,6 +54,12 @@ const couponFieldsFromBody = (body) => {
     if (data[k] != null && !(Number.isFinite(data[k]) && data[k] >= 0)) {
       return { error: `${k} must be a non-negative number` };
     }
+  }
+  if (
+    data.per_user_limit != null &&
+    !(Number.isInteger(data.per_user_limit) && data.per_user_limit >= 1)
+  ) {
+    return { error: "per_user_limit must be an integer >= 1" };
   }
   for (const k of ["starts_at", "expires_at"]) {
     if (data[k] && Number.isNaN(data[k].getTime())) {
@@ -109,12 +116,17 @@ export const createCoupon = asyncHandler(async (req, res) => {
 
 // Xem truoc voucher. Body: { code, amount, shop_amounts? } - amount la tien hang
 // sau uu dai hang; shop_amounts ({shopId: tien}) de kiem pham vi voucher shop.
-const respondPreview = (res, coupon, { amount, shop_amounts }, userId) => {
+const respondPreview = async (res, coupon, { amount, shop_amounts }, userId) => {
+  const uses =
+    coupon && userId && coupon.per_user_limit != null
+      ? await countUserCouponUses(prisma, userId, [coupon.id])
+      : new Map();
   const outcome = previewCouponDiscount({
     coupon,
     amount,
     shopAmounts: shop_amounts,
     userId,
+    userUses: coupon ? uses.get(coupon.id.toString()) ?? 0 : 0,
   });
   if (!outcome.ok) {
     return res
@@ -161,12 +173,18 @@ export const quoteCoupons = asyncHandler(async (req, res) => {
       : {};
   const shopIds = Object.keys(shopAmounts).filter((id) => /^\d+$/.test(id));
   const candidates = await listCheckoutCandidates({ userId: req.user.id, shopIds });
+  const uses = await countUserCouponUses(
+    prisma,
+    req.user.id,
+    candidates.filter((c) => c.per_user_limit != null).map((c) => c.id)
+  );
   const coupons = candidates.map((coupon) => {
     const outcome = previewCouponDiscount({
       coupon,
       amount,
       shopAmounts,
       userId: req.user.id,
+      userUses: uses.get(coupon.id.toString()) ?? 0,
     });
     return {
       ...coupon,

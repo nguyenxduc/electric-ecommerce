@@ -40,5 +40,6 @@ export const VOUCHER_STATUS_LABEL = {
   scheduled: 'Not started',
   paused: 'Paused',
   expired: 'Expired',
-  used_up: 'Used up'
+  used_up: 'Used up',
+  used_by_you: 'Used'
 } as const

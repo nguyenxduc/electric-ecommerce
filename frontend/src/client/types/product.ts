@@ -143,3 +143,17 @@ export type ImageSearchRes = {
   data: ImageSearchData
   message?: string
 }
+
+export type SearchSuggestProduct = {
+  id: number
+  name: string
+  img: string | null
+  final_price: number
+}
+
+export type SearchSuggestRes = {
+  products?: SearchSuggestProduct[]
+  categories?: { id: number; name: string; slug: string }[]
+  shops?: { name: string; slug: string; logo_url: string | null }[]
+  trending?: string[]
+}

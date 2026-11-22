@@ -51,7 +51,8 @@ test('admin search by receiver phone', async () => {
 })
 
 test('admin filters by shop and date range', async () => {
-  const today = new Date().toISOString().slice(0, 10)
+  // Server hieu YYYY-MM-DD theo gio Viet Nam: lay "hom nay" theo gio VN, khong theo UTC
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
   const res = await req(`/orders?q=${PHONE}&shop_id=${shopId}&from=${today}&to=${today}`, { token: admin })
   assert.deepEqual(res.json.orders.map(o => String(o.id)), [orderId])
   const otherShop = await req(`/orders?q=${PHONE}&shop_id=999999`, { token: admin })

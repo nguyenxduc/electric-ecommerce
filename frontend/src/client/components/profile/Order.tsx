@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import EmptyState from './EmptyStatus'
 import OrderStatus from './OrderStatus'
 import OrderDetails from './OrderDetail'
@@ -119,6 +119,24 @@ const Order = () => {
       }))
     }))
   }, [orders])
+
+  // ?order=<id> (link tu thong bao): mo chi tiet don do khi da co trong danh sach,
+  // roi xoa param de nut quay lai khong mo lai don nay
+  const [searchParams, setSearchParams] = useSearchParams()
+  const linkedOrderId = searchParams.get('order')
+  useEffect(() => {
+    if (!linkedOrderId) return
+    const hit = mappedOrders.find(o => String(o.id) === linkedOrderId)
+    if (!hit) return
+    setSelectedOrder(hit)
+    setSearchParams(
+      p => {
+        p.delete('order')
+        return p
+      },
+      { replace: true }
+    )
+  }, [linkedOrderId, mappedOrders, setSearchParams])
 
   const counts = useMemo(
     () => Object.fromEntries(TABS.map(t => [t.key, mappedOrders.filter(t.match).length])),

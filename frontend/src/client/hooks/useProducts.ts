@@ -11,6 +11,7 @@ import {
   fetchSimilarProductsByCategory,
   fetchReview,
   searchProducts,
+  fetchSearchSuggest,
   fetchProductsByCategory,
   fetchHomeRecommendations
 } from '../services/productService'
@@ -19,7 +20,8 @@ import type {
   AiProductComparison,
   ListProductRes,
   Product,
-  RecommendationRes
+  RecommendationRes,
+  SearchSuggestRes
 } from '../types/product'
 import type { ReviewRes } from '../types/review'
 
@@ -155,4 +157,13 @@ export const useProductsByCategory = (categoryId: number) =>
     queryFn: () => fetchProductsByCategory(categoryId),
     enabled: !!categoryId,
     staleTime: 5 * 60 * 1000
+  })
+
+// q rong -> trending; giu du lieu cu khi dang go de dropdown khong nhay
+export const useSearchSuggest = (q: string) =>
+  useQuery<SearchSuggestRes>({
+    queryKey: ['searchSuggest', q.trim()],
+    queryFn: () => fetchSearchSuggest(q),
+    staleTime: 60 * 1000,
+    placeholderData: prev => prev
   })

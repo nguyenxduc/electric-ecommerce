@@ -9,7 +9,7 @@ export const LOW_STOCK_THRESHOLD = 5;
 // ownerId de khong dem tin nhan cua chinh seller la "chua doc".
 export const getShopTodo = async (shopId, ownerId) => {
   const order = { shop_id: shopId, deleted_at: null };
-  const [to_confirm, to_ship, shipping, returns_pending, unread_messages, low_stock] =
+  const [to_confirm, to_ship, shipping, returns_pending, unread_messages, low_stock, unreplied_reviews] =
     await Promise.all([
       prisma.order.count({ where: { ...order, status: ORDER_STATUS.PENDING } }),
       prisma.order.count({ where: { ...order, status: ORDER_STATUS.PROCESSING } }),
@@ -26,8 +26,9 @@ export const getShopTodo = async (shopId, ownerId) => {
       prisma.product.count({
         where: { shop_id: shopId, deleted_at: null, quantity: { lte: LOW_STOCK_THRESHOLD } },
       }),
+      prisma.review.count({ where: { seller_reply: null, product: { shop_id: shopId } } }),
     ]);
-  return { to_confirm, to_ship, shipping, returns_pending, unread_messages, low_stock };
+  return { to_confirm, to_ship, shipping, returns_pending, unread_messages, low_stock, unreplied_reviews };
 };
 
 // Viec can xu ly cua admin san: duyet shop, chat ho tro, canh bao gian lan, hang bi go

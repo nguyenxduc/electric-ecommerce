@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getNotifications,
-  markRead as markReadSvc
+  markRead as markReadSvc,
+  markAllRead,
+  type NotificationTab
 } from '../services/notificationService'
 
 const notifKeys = {
@@ -14,6 +16,7 @@ export const useNotifications = (params?: {
   page?: number
   limit?: number
   unreadOnly?: boolean
+  type?: NotificationTab
 }) =>
   useQuery({
     queryKey: notifKeys.list(params),
@@ -21,12 +24,12 @@ export const useNotifications = (params?: {
     staleTime: 30 * 1000
   })
 
-// Only fetch unread count (used by the bell badge)
+// Unread counts per tab (used by the bell badge and tab badges)
 export const useUnreadCount = () =>
   useQuery({
     queryKey: notifKeys.unread(),
     queryFn:  () => getNotifications({ unreadOnly: true, limit: 1 }),
-    select:   data => data.pagination.total,
+    select:   data => data.unread,
     staleTime: 30 * 1000,
     refetchInterval: 60 * 1000  // poll every 60s
   })
@@ -35,6 +38,16 @@ export const useMarkRead = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: markReadSvc,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: notifKeys.all })
+    }
+  })
+}
+
+export const useMarkAllRead = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: markAllRead,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: notifKeys.all })
     }

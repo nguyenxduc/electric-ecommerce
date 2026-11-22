@@ -7,7 +7,8 @@ import type {
   ImageSearchRes,
   ListProductRes,
   Product,
-  RecommendationRes
+  RecommendationRes,
+  SearchSuggestRes
 } from '../types/product'
 
 export const COLLECTION_PAGE_SIZE = 9
@@ -171,5 +172,12 @@ export const fetchImageSearchOverview = async (payload: {
     '/products/search-by-image/overview',
     payload
   )
+  return data
+}
+
+export const fetchSearchSuggest = async (q: string): Promise<SearchSuggestRes> => {
+  const { data } = await axiosClient.get<SearchSuggestRes>('/products/suggest', {
+    params: { q: q.trim().slice(0, 100) }
+  })
   return data
 }

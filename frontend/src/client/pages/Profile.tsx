@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { apiErrorResponse } from '../../lib/apiError'
 import { Camera, LogOut, X, Loader2, Ticket, Store, MapPin } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
 import { openLoginModal } from '../utils/loginModal'
@@ -76,6 +76,12 @@ function Profile() {
     const t = new URLSearchParams(window.location.search).get('tab')
     return NAV.some(n => n.key === t && t !== 'logout') ? (t as ProfileTabKey) : 'profile'
   })
+  // Profile van mounted khi bam link thong bao (vd. ?tab=orders&order=1): dong bo lai tab
+  const { search } = useLocation()
+  useEffect(() => {
+    const t = new URLSearchParams(search).get('tab')
+    if (NAV.some(n => n.key === t && t !== 'logout')) setTabActive(t as ProfileTabKey)
+  }, [search])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [errorModal, setErrorModal] = useState<{
     title: string

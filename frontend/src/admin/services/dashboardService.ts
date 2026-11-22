@@ -149,6 +149,7 @@ export type ShopTodo = {
   returns_pending: number
   unread_messages: number
   low_stock: number
+  unreplied_reviews: number
 }
 export type AdminTodo = {
   shops_pending: number

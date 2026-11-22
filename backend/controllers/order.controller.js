@@ -36,6 +36,7 @@ import {
   allocateMerchandise,
   merchandiseTotalAfterDiscounts,
 } from "../services/pricing.service.js";
+import { countUserCouponUses } from "../services/coupon.service.js";
 import { parsePagination } from "../lib/pagination.js";
 import { applyOrderListFilters } from "../lib/orderFilters.js";
 import { toCsv } from "../lib/csv.js";
@@ -267,12 +268,16 @@ export const createOrder = async (req, res) => {
         },
       });
 
+      const uses = coupon
+        ? await countUserCouponUses(prisma, userId, [coupon.id])
+        : new Map();
       const outcome = resolveCouponDiscount({
         coupon,
         shopGroups,
         tierDiscountRate,
         amountAfterTierDiscount,
         userId,
+        userUses: coupon ? uses.get(coupon.id.toString()) ?? 0 : 0,
       });
       if (!outcome.ok) {
         const status = outcome.code === "COUPON_NOT_OWNED" ? 403 : 400;
@@ -451,6 +456,15 @@ export const createOrder = async (req, res) => {
         if (claimed.count === 0) {
           throw new Error(`COUPON_EXHAUSTED:${appliedCoupon.code}`);
         }
+        // Lenh updateMany tren giu khoa dong voucher den khi commit, nen hai
+        // checkout cung nguoi mua dung chung voucher bi xep hang tai day: dem
+        // lai (da gom checkout hien tai) de chan vuot per_user_limit.
+        if (appliedCoupon.per_user_limit != null) {
+          const mine = await countUserCouponUses(tx, userId, [appliedCoupon.id]);
+          if ((mine.get(appliedCoupon.id.toString()) ?? 0) > appliedCoupon.per_user_limit) {
+            throw new Error(`COUPON_USED_BY_USER:${appliedCoupon.code}`);
+          }
+        }
       }
 
       return { orderGroup, orders: createdOrders };
@@ -484,7 +498,9 @@ export const createOrder = async (req, res) => {
         },
       });
     }
-    for (const group of groups) {
+    // created.orders cung thu tu voi groups (moi group tao dung mot don con)
+    groups.forEach((group, i) => {
+      const order = created.orders[i];
       notifyUser({
         userId: group.shopOwnerId,
         title: "New order 🛒",
@@ -492,8 +508,16 @@ export const createOrder = async (req, res) => {
           group.items.length > 1 ? "s" : ""
         }).`,
         type: "ORDER",
+        link: `/seller/orders/${order.id}`,
       });
-    }
+      notifyUser({
+        userId,
+        title: "Order placed",
+        message: `Order ${order.order_number || `#${order.id}`} from ${group.shopName} has been placed.`,
+        type: "ORDER",
+        link: `/profile?tab=orders&order=${order.id}`,
+      });
+    });
 
     res.status(201).json({
       message: "Order created successfully",
@@ -518,6 +542,9 @@ export const createOrder = async (req, res) => {
     }
     // Raised by the conditional voucher claim when a concurrent checkout took
     // the last remaining use first.
+    if (String(error?.message || "").startsWith("COUPON_USED_BY_USER:")) {
+      return res.status(400).json({ message: "You have already used this voucher" });
+    }
     if (String(error?.message || "").startsWith("COUPON_EXHAUSTED:")) {
       const code = error.message.slice("COUPON_EXHAUSTED:".length);
       return res.status(400).json({
@@ -942,6 +969,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         reason ? ` Reason: ${reason}` : ""
       }`,
       type: "ORDER",
+      link: `/seller/orders/${order.id}`,
     });
   }
 

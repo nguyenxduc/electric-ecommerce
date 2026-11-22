@@ -16,7 +16,8 @@ import {
   PackageX,
   MessageCircle,
   Receipt,
-  Wallet
+  Wallet,
+  Star
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -38,6 +39,7 @@ const sections: NavSection[] = [
       { to: '/seller', label: 'Dashboard', icon: Home, end: true },
       { to: '/seller/orders', label: 'My Orders', icon: ShoppingCart },
       { to: '/seller/returns', label: 'Returns', icon: PackageX, end: true },
+      { to: '/seller/reviews', label: 'Reviews', icon: Star, end: true },
       {
         to: '/seller/coupons',
         label: 'Shop Vouchers',

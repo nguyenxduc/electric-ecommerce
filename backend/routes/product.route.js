@@ -10,6 +10,7 @@ import {
   takedownProduct,
   restoreProduct,
   searchProducts,
+  suggestSearch,
   getProductsByCategory,
   getMyShopProducts,
   uploadProductImages,
@@ -50,6 +51,7 @@ const resolveProductShop = async (req) => {
 // Public routes (optionalAuth: admins/owners see non-active shops' products)
 router.get("/", optionalAuth, getAllProducts);
 router.get("/search", optionalAuth, searchProducts);
+router.get("/suggest", optionalAuth, suggestSearch);
 router.post("/compare-ai", aiLimiter, compareProductsByAi);
 router.post("/search-by-image", aiLimiter, uploadMemory.single("image"), searchProductsByImage);
 router.post("/search-by-image/overview", aiLimiter, getImageSearchOverview);

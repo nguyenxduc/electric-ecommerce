@@ -12,7 +12,7 @@
 // file nay chi doc/ghi DB va khong biet req/res.
 
 import { prisma } from "../lib/db.js";
-import { SHOP_STATUS } from "../constants/status.js";
+import { ORDER_STATUS, SHOP_STATUS } from "../constants/status.js";
 import { couponStatus } from "./pricing.service.js";
 
 const shopSelect = { id: true, name: true, slug: true };
@@ -25,8 +25,31 @@ const publicLiveWhere = (now) => ({
   OR: [{ expires_at: null }, { expires_at: { gt: now } }],
 });
 
-const withStatus = (coupon, now) => {
-  const status = couponStatus(coupon, now);
+/**
+ * So lan nguoi mua da dung moi voucher: dem checkout (order_group) con it nhat
+ * mot don chua huy, nen checkout nhieu shop chi tinh mot lan va huy don tra luot.
+ * `client` la prisma hoac tx (de dem trong cung giao dich khi dat don).
+ *
+ * @returns {Promise<Map<string, number>>} couponId -> so lan
+ */
+export const countUserCouponUses = async (client, userId, couponIds) => {
+  const uses = new Map();
+  if (!couponIds.length) return uses;
+  const rows = await client.orderGroup.groupBy({
+    by: ["coupon_id"],
+    where: {
+      user_id: BigInt(userId),
+      coupon_id: { in: couponIds.map((id) => BigInt(id)) },
+      orders: { some: { status: { not: ORDER_STATUS.CANCELLED } } },
+    },
+    _count: { _all: true },
+  });
+  for (const r of rows) uses.set(r.coupon_id.toString(), r._count._all);
+  return uses;
+};
+
+const withStatus = (coupon, now, userUses = 0) => {
+  const status = couponStatus(coupon, now, userUses);
   return {
     ...coupon,
     status,
@@ -50,8 +73,13 @@ export const listWarehouse = async (userId, now = new Date()) => {
     },
     orderBy: { created_at: "desc" },
   });
+  const uses = await countUserCouponUses(
+    prisma,
+    userId,
+    coupons.filter((c) => c.per_user_limit != null).map((c) => c.id)
+  );
   return coupons.map(({ claims, ...c }) => ({
-    ...withStatus(c, now),
+    ...withStatus(c, now, uses.get(c.id.toString()) ?? 0),
     source: claims.length ? "claimed" : "assigned",
     claimed_at: claims[0]?.claimed_at ?? null,
   }));

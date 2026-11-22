@@ -238,6 +238,7 @@ export const transitionOrderStatus = async ({
         STATUS_LABEL[status] || `status changed to ${status}`
       }`,
       type: "ORDER",
+      link: `/profile?tab=orders&order=${order.id}`,
     });
   }
 

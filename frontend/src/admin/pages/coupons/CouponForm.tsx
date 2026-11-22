@@ -11,6 +11,7 @@ type Fields = Record<
   | 'min_order'
   | 'max_discount'
   | 'usage_limit'
+  | 'per_user_limit'
   | 'starts_at'
   | 'expires_at',
   string
@@ -27,6 +28,7 @@ const fromCoupon = (c?: AdminCoupon): Fields => ({
   min_order: c?.min_order != null ? String(Number(c.min_order)) : '',
   max_discount: c?.max_discount != null ? String(Number(c.max_discount)) : '',
   usage_limit: str(c?.usage_limit),
+  per_user_limit: str(c?.per_user_limit),
   starts_at: day(c?.starts_at),
   expires_at: day(c?.expires_at),
   is_active: c?.is_active ?? true
@@ -68,6 +70,7 @@ export default function CouponForm({
           min_order: num(f.min_order),
           max_discount: isPercent ? num(f.max_discount) : null,
           usage_limit: num(f.usage_limit),
+          per_user_limit: num(f.per_user_limit),
           starts_at: f.starts_at || null,
           expires_at: f.expires_at || null,
           is_active: f.is_active
@@ -111,6 +114,10 @@ export default function CouponForm({
         <label className="block text-sm text-gray-600">
           <span className="block mb-1">Usage Limit</span>
           <input name="usage_limit" type="number" min="1" value={f.usage_limit} onChange={onChange} placeholder="Unlimited" className={input} />
+        </label>
+        <label className="block text-sm text-gray-600">
+          <span className="block mb-1">Uses per buyer</span>
+          <input name="per_user_limit" type="number" min="1" step="1" value={f.per_user_limit} onChange={onChange} placeholder="Unlimited" className={input} />
         </label>
         <label className="block text-sm text-gray-600">
           <span className="block mb-1">Starts At</span>

@@ -3,7 +3,7 @@ import axiosClient from '../../lib/axios'
 export type VoucherShop = { id: number | string; name: string; slug: string }
 
 // Trang thai hieu luc do backend tinh (pricing.service couponStatus)
-export type VoucherStatus = 'active' | 'scheduled' | 'paused' | 'expired' | 'used_up'
+export type VoucherStatus = 'active' | 'scheduled' | 'paused' | 'expired' | 'used_up' | 'used_by_you'
 
 export type ValidateCouponResponse = {
   valid: boolean

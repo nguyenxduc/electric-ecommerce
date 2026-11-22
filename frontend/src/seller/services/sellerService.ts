@@ -12,6 +12,7 @@ export type ShopCoupon = {
   min_order: number | string | null
   max_discount: number | string | null
   usage_limit: number | null
+  per_user_limit?: number | null
   used_count: number | null
   starts_at: string | null
   expires_at: string | null
@@ -28,6 +29,7 @@ export type ShopCouponInput = {
   min_order?: number | null
   max_discount?: number | null
   usage_limit?: number | null
+  per_user_limit?: number | null
   starts_at?: string | null
   expires_at?: string | null
   is_active?: boolean
@@ -203,3 +205,34 @@ export const getMyTaxSummary = async (year: number) => {
   })
   return data.data as { year: number; months: TaxMonth[] }
 }
+
+// ---- Reviews (danh gia san pham cua shop + tra loi) ----
+export type ShopReview = {
+  id: string
+  rating: number | null
+  comment: string | null
+  images: string[]
+  seller_reply: string | null
+  seller_reply_at: string | null
+  created_at: string
+  user: { id: string; name: string }
+  product: { id: string; name: string; img: string[] }
+}
+
+export const getShopReviews = async (params: {
+  filter?: 'unreplied'
+  rating?: number
+  page?: number
+}) => {
+  const { data } = await axiosClient.get('/reviews/shop/mine', { params })
+  return data as {
+    reviews: ShopReview[]
+    pagination: { current_page: number; total_pages: number; total_count: number }
+  }
+}
+
+export const replyToReview = async (id: string, reply: string) =>
+  (await axiosClient.put(`/reviews/${id}/reply`, { reply })).data
+
+export const deleteReviewReply = async (id: string) =>
+  (await axiosClient.delete(`/reviews/${id}/reply`)).data

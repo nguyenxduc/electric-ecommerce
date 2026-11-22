@@ -21,6 +21,7 @@ type FormState = {
   min_order: string
   max_discount: string
   usage_limit: string
+  per_user_limit: string
   starts_at: string
   expires_at: string
 }
@@ -33,6 +34,7 @@ const EMPTY_FORM: FormState = {
   min_order: '',
   max_discount: '',
   usage_limit: '100',
+  per_user_limit: '1',
   starts_at: '',
   expires_at: ''
 }
@@ -46,6 +48,7 @@ const toForm = (c: ShopCoupon): FormState => ({
   min_order: c.min_order != null ? String(Number(c.min_order)) : '',
   max_discount: c.max_discount != null ? String(Number(c.max_discount)) : '',
   usage_limit: c.usage_limit != null ? String(c.usage_limit) : '',
+  per_user_limit: c.per_user_limit != null ? String(c.per_user_limit) : '',
   starts_at: toInputDate(c.starts_at),
   expires_at: toInputDate(c.expires_at)
 })
@@ -57,6 +60,7 @@ const toPayload = (f: FormState) => ({
   min_order: f.min_order ? Number(f.min_order) : null,
   max_discount: f.discount_type === 'percent' && f.max_discount ? Number(f.max_discount) : null,
   usage_limit: f.usage_limit ? Number(f.usage_limit) : null,
+  per_user_limit: f.per_user_limit ? Number(f.per_user_limit) : null,
   starts_at: f.starts_at || null,
   expires_at: f.expires_at || null
 })
@@ -214,7 +218,10 @@ export default function SellerCouponsList() {
               <span className="block mb-1">Usage limit</span>
               <input type="number" min="1" className={field} placeholder="Unlimited" value={form.usage_limit} onChange={set('usage_limit')} />
             </label>
-            <div />
+            <label className="block text-sm">
+              <span className="block mb-1">Uses per buyer</span>
+              <input type="number" min="1" step="1" className={field} placeholder="Unlimited" value={form.per_user_limit} onChange={set('per_user_limit')} />
+            </label>
             <label className="block text-sm">
               <span className="block mb-1">Starts at</span>
               <input type="date" className={field} value={form.starts_at} onChange={set('starts_at')} />

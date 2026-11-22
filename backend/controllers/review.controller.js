@@ -1,8 +1,37 @@
 import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
 import { moderateReviewComment } from "../ai/reviewModeration.js";
-import { parsePagination } from "../lib/pagination.js";
+import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import cloudinary from "../lib/cloudinary.js";
+import { notifyUser } from "../lib/notify.js";
+import { createSlug } from "../lib/slug.js";
+
+const MAX_REVIEW_IMAGES = 5;
+const MAX_REPLY_LENGTH = 1000;
+
+// multer da loc dinh dang/kich thuoc; o day chi day len Cloudinary
+const uploadReviewImages = (files = []) =>
+  Promise.all(
+    files.map((f) =>
+      cloudinary.uploader
+        .upload(f.path, { folder: "reviews" })
+        .then((r) => r.secure_url)
+    )
+  );
+
+// Body multipart gui so duoi dang chuoi; "" / thieu = khong gui
+const toRating = (v) => (v === undefined || v === "" ? undefined : Number(v));
+const badRating = (r) => !Number.isInteger(r) || r < 1 || r > 5;
+
+// Loc danh sach danh gia: ?rating=1..5, ?has_images=true
+const reviewFilter = (query) => {
+  const rating = Number(query.rating);
+  return {
+    ...(Number.isInteger(rating) && rating >= 1 && rating <= 5 && { rating }),
+    ...(query.has_images === "true" && { images: { isEmpty: false } }),
+  };
+};
 
 const validateCommentByAi = async (comment) => {
   const text = String(comment || "").trim();
@@ -23,7 +52,8 @@ const validateCommentByAi = async (comment) => {
 };
 
 export const createReview = asyncHandler(async (req, res) => {
-  const { productId, rating, comment } = req.body;
+  const { productId, comment } = req.body;
+  const rating = toRating(req.body.rating);
   const userId = req.user.id;
 
   const product = await prisma.product.findUnique({
@@ -60,7 +90,7 @@ export const createReview = asyncHandler(async (req, res) => {
       .json({ message: "You have already reviewed this product" });
   }
 
-  if (rating < 1 || rating > 5) {
+  if (badRating(rating)) {
     return res
       .status(400)
       .json({ message: "Rating must be between 1 and 5" });
@@ -74,12 +104,15 @@ export const createReview = asyncHandler(async (req, res) => {
     });
   }
 
+  const images = await uploadReviewImages(req.files);
+
   const savedReview = await prisma.review.create({
     data: {
       user_id: BigInt(userId),
       product_id: BigInt(productId),
       rating,
       comment,
+      images,
       client_ip: req.ip || null,
       device_id: String(req.headers["x-device-id"] || "").slice(0, 100) || null,
     },
@@ -106,10 +139,11 @@ export const getReviewsByProduct = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
   const pid = BigInt(req.params.productId);
   const { skip, take } = parsePagination(page, limit);
-  const [total, reviews, agg] = await Promise.all([
-    prisma.review.count({ where: { product_id: pid } }),
+  const where = { product_id: pid, ...reviewFilter(req.query) };
+  const [total, reviews, agg, allCount] = await Promise.all([
+    prisma.review.count({ where }),
     prisma.review.findMany({
-      where: { product_id: pid },
+      where,
       orderBy: { created_at: "desc" },
       include: { user: { select: { id: true, name: true } } },
       skip,
@@ -119,6 +153,7 @@ export const getReviewsByProduct = asyncHandler(async (req, res) => {
       where: { product_id: pid },
       _avg: { rating: true },
     }),
+    prisma.review.count({ where: { product_id: pid } }),
   ]);
 
   res.json({
@@ -129,7 +164,7 @@ export const getReviewsByProduct = asyncHandler(async (req, res) => {
       total_count: total,
       total_pages: Math.ceil(total / take),
     },
-    summary: { average_rating: agg._avg.rating || 0, total_reviews: total },
+    summary: { average_rating: agg._avg.rating || 0, total_reviews: allCount },
   });
 });
 
@@ -146,7 +181,8 @@ export const getReviewsByUser = asyncHandler(async (req, res) => {
 });
 
 export const updateReview = asyncHandler(async (req, res) => {
-  const { rating, comment } = req.body;
+  const { comment } = req.body;
+  const rating = toRating(req.body.rating);
   const userId = req.user.id;
 
   const review = await prisma.review.findUnique({
@@ -162,7 +198,7 @@ export const updateReview = asyncHandler(async (req, res) => {
       .json({ message: "Not authorized to update this review" });
   }
 
-  if (rating && (rating < 1 || rating > 5)) {
+  if (rating !== undefined && badRating(rating)) {
     return res
       .status(400)
       .json({ message: "Rating must be between 1 and 5" });
@@ -178,9 +214,31 @@ export const updateReview = asyncHandler(async (req, res) => {
     }
   }
 
+  // keep_images: anh cu muon giu (mang, hoac chuoi JSON khi gui multipart);
+  // khong gui = giu het. Chi nhan URL von thuoc review nay.
+  let keep = review.images;
+  if (req.body.keep_images !== undefined) {
+    let raw = req.body.keep_images;
+    if (typeof raw === "string") {
+      try {
+        raw = JSON.parse(raw);
+      } catch {
+        raw = [raw];
+      }
+    }
+    keep = review.images.filter((u) => [].concat(raw).includes(u));
+  }
+  const files = req.files || [];
+  if (keep.length + files.length > MAX_REVIEW_IMAGES) {
+    return res
+      .status(400)
+      .json({ message: `At most ${MAX_REVIEW_IMAGES} images per review` });
+  }
+  const images = [...keep, ...(await uploadReviewImages(files))];
+
   const updatedReview = await prisma.review.update({
     where: { id: BigInt(req.params.id) },
-    data: { rating: rating ?? undefined, comment: comment ?? undefined },
+    data: { rating: rating ?? undefined, comment: comment ?? undefined, images },
   });
 
   const agg = await prisma.review.aggregate({
@@ -261,7 +319,7 @@ export const getProductReviewStats = asyncHandler(async (req, res) => {
   const { productId } = req.params;
   const pid = BigInt(productId);
 
-  const [agg, recentReviews] = await Promise.all([
+  const [agg, recentReviews, withImages] = await Promise.all([
     prisma.review.aggregate({
       where: { product_id: pid },
       _avg: { rating: true },
@@ -272,6 +330,9 @@ export const getProductReviewStats = asyncHandler(async (req, res) => {
       orderBy: { created_at: "desc" },
       take: 5,
       include: { user: { select: { id: true, name: true } } },
+    }),
+    prisma.review.count({
+      where: { product_id: pid, images: { isEmpty: false } },
     }),
   ]);
 
@@ -291,6 +352,82 @@ export const getProductReviewStats = asyncHandler(async (req, res) => {
     totalReviews: agg._count.rating || 0,
     averageRating: agg._avg.rating || 0,
     ratingDistribution,
+    withImages,
     recentReviews,
   });
+});
+
+// GET /api/reviews/shop/mine?filter=unreplied&rating=5 - danh gia san pham cua shop minh
+export const getShopReviews = asyncHandler(async (req, res) => {
+  const { page = 1, limit = 20 } = req.query;
+  const { skip, take, currentPage, perPage } = parsePagination(page, limit);
+  // Admin khong co req.shop: shop_id undefined = khong loc theo shop
+  const where = {
+    product: { shop_id: req.shop?.id },
+    ...reviewFilter(req.query),
+    ...(req.query.filter === "unreplied" && { seller_reply: null }),
+  };
+  const [total, reviews] = await Promise.all([
+    prisma.review.count({ where }),
+    prisma.review.findMany({
+      where,
+      orderBy: { created_at: "desc" },
+      include: {
+        user: { select: { id: true, name: true } },
+        product: { select: { id: true, name: true, img: true } },
+      },
+      skip,
+      take,
+    }),
+  ]);
+  res.json({ reviews, pagination: buildPaginationMeta(currentPage, perPage, total) });
+});
+
+// Review thuoc san pham cua shop dang dang nhap; khong thi null (404, khong lo su ton tai)
+const findOwnShopReview = (req) =>
+  req.shop
+    ? prisma.review.findFirst({
+        where: { id: BigInt(req.params.id), product: { shop_id: req.shop.id } },
+        include: { product: { select: { id: true, name: true } } },
+      })
+    : null;
+
+// PUT /api/reviews/:id/reply { reply } - seller tra loi cong khai (sua duoc)
+export const replyReview = asyncHandler(async (req, res) => {
+  const reply = String(req.body?.reply ?? "").trim();
+  if (!reply || reply.length > MAX_REPLY_LENGTH) {
+    return res
+      .status(400)
+      .json({ message: `Reply must be 1-${MAX_REPLY_LENGTH} characters` });
+  }
+  const review = await findOwnShopReview(req);
+  if (!review) return res.status(404).json({ message: "Review not found" });
+
+  const updated = await prisma.review.update({
+    where: { id: review.id },
+    data: { seller_reply: reply, seller_reply_at: new Date() },
+  });
+  // Chi bao lan tra loi dau; sua lai khong bao nua
+  if (!review.seller_reply) {
+    notifyUser({
+      userId: review.user_id,
+      title: "The seller replied to your review",
+      message: `${req.shop.name} replied to your review of ${review.product.name}`,
+      type: "SYSTEM",
+      // Cung dang slug "<ten>-p<id>" voi frontend (makeProductSlug)
+      link: `/product/${createSlug(review.product.name) || "product"}-p${review.product.id}#reviews`,
+    });
+  }
+  res.json({ message: "Reply saved", review: updated });
+});
+
+// DELETE /api/reviews/:id/reply
+export const deleteReviewReply = asyncHandler(async (req, res) => {
+  const review = await findOwnShopReview(req);
+  if (!review) return res.status(404).json({ message: "Review not found" });
+  const updated = await prisma.review.update({
+    where: { id: review.id },
+    data: { seller_reply: null, seller_reply_at: null },
+  });
+  res.json({ message: "Reply removed", review: updated });
 });

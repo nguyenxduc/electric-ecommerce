@@ -328,7 +328,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
               />
             )}
             {selectedInfo === 'comment' && (
-              <ReviewComponent productId={Number(product.id)} />
+              <ReviewComponent productId={Number(product.id)} shopName={product.shop?.name} />
             )}
           </div>
         </div>

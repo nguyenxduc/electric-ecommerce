@@ -416,6 +416,7 @@ export const approveShop = asyncHandler(async (req, res) => {
     title: "Shop approved 🎉",
     message: `Your shop "${shop.name}" has been approved. You can now manage it from the Seller Dashboard.`,
     type: "SHOP",
+    link: "/profile?tab=seller",
   });
 
   return res.json({ success: true, data: updated });
@@ -455,6 +456,7 @@ export const rejectShop = asyncHandler(async (req, res) => {
       reason ? `: ${reason}` : "."
     } You can update your application and resubmit.`,
     type: "SHOP",
+    link: "/profile?tab=seller",
   });
 
   return res.json({ success: true, data: updated });
@@ -526,6 +528,7 @@ export const suspendShop = asyncHandler(async (req, res) => {
       reason ? `: ${reason}` : "."
     } Its products are hidden from buyers. Contact support for details.`,
     type: "SHOP",
+    link: "/profile?tab=seller",
   });
 
   return res.json({ success: true, data: updated });

@@ -4,14 +4,18 @@ import { ROLES } from "../constants/roles.js";
 // Programmatic notification writer, usable from any controller (shop
 // approval, new order for seller, ...). user_id = null means broadcast.
 // Mirrors the shape used by notification.controller.js::createNotification.
-export async function notifyUser({ userId = null, title, message, type = "SYSTEM" }) {
+// link: duong dan noi bo (bat dau bang "/", khong phai "//") de bam vao thong bao; sai thi bo qua.
+export async function notifyUser({ userId = null, title, message, type = "SYSTEM", link = null }) {
   try {
     if (!title || !message) return null;
+    const safeLink =
+      typeof link === "string" && link.startsWith("/") && !link.startsWith("//") ? link.slice(0, 500) : null;
     return await prisma.notification.create({
       data: {
         title: String(title).trim(),
         message: String(message).trim(),
         type,
+        link: safeLink,
         user_id: userId ? BigInt(userId) : null,
       },
     });

@@ -22,6 +22,7 @@ import { writeAuditLog, auditContext } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
+import { suggest, getTrending, MAX_SUGGEST_QUERY } from "../services/searchSuggest.service.js";
 import { resolveFilteredProductIds } from "../services/productFilter.service.js";
 
 // Chuan hoa + kiem tra mang bien the tu payload; tra { error } hoac { variants }.
@@ -752,6 +753,7 @@ export const takedownProduct = asyncHandler(async (req, res) => {
     title: "Product taken down",
     message: `Your product "${product.name}" was taken down for violating marketplace policy: ${reason}. Edit the listing and contact support to restore it.`,
     type: "SHOP",
+    link: `/seller/products/${id}`,
   });
   res.json({
     message: "Product taken down",
@@ -785,6 +787,7 @@ export const restoreProduct = asyncHandler(async (req, res) => {
     title: "Product restored",
     message: `Your product "${product.name}" has been restored and is live again.`,
     type: "SHOP",
+    link: `/seller/products/${id}`,
   });
   res.json({ message: "Product restored", product: { id: Number(id), is_active: true } });
 });
@@ -795,6 +798,15 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     data: { deleted_at: new Date() },
   });
   res.json({ message: "Product deleted successfully" });
+});
+
+export const suggestSearch = asyncHandler(async (req, res) => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (q.length > MAX_SUGGEST_QUERY) {
+    return res.status(400).json({ message: `q must be at most ${MAX_SUGGEST_QUERY} characters` });
+  }
+  if (!q) return res.json({ trending: await getTrending() });
+  res.json(await suggest(req, q));
 });
 
 export const searchProducts = asyncHandler(async (req, res) => {

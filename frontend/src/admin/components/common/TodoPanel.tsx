@@ -31,7 +31,7 @@ export default function TodoPanel({
         </h2>
         {action}
       </div>
-      <ul className={`grid grid-cols-2 sm:grid-cols-3 ${items.length > 3 ? 'lg:grid-cols-6' : 'lg:grid-cols-3'} gap-3`}>
+      <ul className={`grid grid-cols-2 sm:grid-cols-3 ${items.length > 6 ? 'lg:grid-cols-4' : items.length > 3 ? 'lg:grid-cols-6' : 'lg:grid-cols-3'} gap-3`}>
         {items.map(item => {
           const n = item.count ?? 0
           return (

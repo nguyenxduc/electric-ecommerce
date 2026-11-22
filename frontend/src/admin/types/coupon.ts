@@ -11,6 +11,7 @@ export type AdminCoupon = {
   min_order?: number
   max_discount?: number | string | null
   usage_limit?: number
+  per_user_limit?: number | null
   used_count?: number
   starts_at?: string | null
   expires_at?: string | null
@@ -45,6 +46,7 @@ export type CreateCouponRequest = {
   min_order?: number | null
   max_discount?: number | null
   usage_limit?: number | null
+  per_user_limit?: number | null
   starts_at?: string | null
   expires_at?: string | null
   is_active?: boolean

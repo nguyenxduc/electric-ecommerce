@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Camera, Loader2 } from 'lucide-react'
-import { useSearchProducts } from '../../hooks/useProducts'
+import { useSearchSuggest } from '../../hooks/useProducts'
 import {
   fetchImageSearchOverview,
   searchProductsByImage
@@ -23,11 +23,42 @@ type ModalProps = {
   searchTerm: string
   onClose: () => void
   onChange: (value: string) => void
-  onSubmit: () => void
+  onSubmit: (term?: string) => void
+  onNavigate: (path: string) => void
   onSelectProduct: (productId: number, productName: string) => void
 }
 
-const useDebouncedValue = (value: string, delay = 350) => {
+type SuggestItem = {
+  id: string
+  section: 'recent' | 'trending' | 'category' | 'product' | 'shop'
+  label: string
+  img?: string | null
+  price?: number
+  go: () => void
+}
+
+const RECENT_KEY = 'ngx_recent_searches'
+const RECENT_MAX = 8
+
+const readRecent = (): string[] => {
+  try {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]')
+    return Array.isArray(list) ? list.filter(x => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+const saveRecent = (term: string) => {
+  try {
+    const next = [term, ...readRecent().filter(x => x !== term)].slice(0, RECENT_MAX)
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+  } catch {
+    /* localStorage bi chan: bo qua */
+  }
+}
+
+const useDebouncedValue = (value: string, delay = 250) => {
   const [debounced, setDebounced] = useState(value)
 
   useEffect(() => {
@@ -44,13 +75,15 @@ function Modal({
   onClose,
   onChange,
   onSubmit,
+  onNavigate,
   onSelectProduct
 }: ModalProps) {
   const debouncedTerm = useDebouncedValue(searchTerm)
-  const { data, isFetching, isError } = useSearchProducts(debouncedTerm, {
-    limit: 6,
-    sort: 'popular'
-  })
+  const { data, isFetching, isError } = useSearchSuggest(
+    searchTerm.trim() ? debouncedTerm : ''
+  )
+  const [recent, setRecent] = useState<string[]>(readRecent)
+  const [active, setActive] = useState(-1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -60,19 +93,94 @@ function Modal({
   const [imageData, setImageData] = useState<ImageSearchData | null>(null)
   const overviewRequestIdRef = useRef(0)
 
-  const results = useMemo(() => data?.products || [], [data])
-
-  const formattedResults = useMemo(
-    () =>
-      results.map(product => ({
-        id: Number(product.id),
-        name: product.name,
-        price: product.final_price ?? product.price,
-        thumb: product.img?.[0],
-        slug: makeProductSlug(product.name, product.id)
+  const items = useMemo<SuggestItem[]>(() => {
+    if (!searchTerm.trim()) {
+      return [
+        ...recent.map(t => ({
+          id: `sg-recent-${t}`,
+          section: 'recent' as const,
+          label: t,
+          go: () => onSubmit(t)
+        })),
+        ...(data?.trending || []).map(t => ({
+          id: `sg-trending-${t}`,
+          section: 'trending' as const,
+          label: t,
+          go: () => onSubmit(t)
+        }))
+      ]
+    }
+    return [
+      ...(data?.categories || []).map(c => ({
+        id: `sg-cat-${c.id}`,
+        section: 'category' as const,
+        label: c.name,
+        go: () => onNavigate(`/collection/${c.slug}`)
       })),
-    [results]
-  )
+      ...(data?.products || []).map(p => ({
+        id: `sg-prod-${p.id}`,
+        section: 'product' as const,
+        label: p.name,
+        img: p.img,
+        price: p.final_price,
+        go: () => onSelectProduct(p.id, p.name)
+      })),
+      ...(data?.shops || []).map(sh => ({
+        id: `sg-shop-${sh.slug}`,
+        section: 'shop' as const,
+        label: sh.name,
+        img: sh.logo_url,
+        go: () => onNavigate(`/shop/${sh.slug}`)
+      }))
+    ]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, recent, searchTerm])
+
+  const clearRecent = () => {
+    try {
+      localStorage.removeItem(RECENT_KEY)
+    } catch {
+      /* bo qua */
+    }
+    setRecent([])
+  }
+
+  const renderChips = (section: SuggestItem['section']) =>
+    items
+      .filter(i => i.section === section)
+      .map(item => (
+        <button
+          key={item.id}
+          id={item.id}
+          role="option"
+          aria-selected={items[active]?.id === item.id}
+          type="button"
+          onClick={item.go}
+          className={`max-w-full truncate px-3 py-1 rounded-full text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 ${
+            items[active]?.id === item.id ? 'bg-blue-50 border-blue-300' : 'bg-white'
+          }`}
+        >
+          {item.label}
+        </button>
+      ))
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (items.length === 0) return
+      e.preventDefault()
+      const step = e.key === 'ArrowDown' ? 1 : -1
+      const next =
+        active < 0 ? (step > 0 ? 0 : items.length - 1) : (active + step + items.length) % items.length
+      setActive(next)
+      document.getElementById(items[next].id)?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (items[active]) items[active].go()
+      else onSubmit()
+    } else if (e.key === 'Escape') {
+      onClose()
+    }
+  }
 
   const formattedImageResults = useMemo(
     () =>
@@ -204,16 +312,19 @@ function Modal({
               placeholder="Search products or categories"
               className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={searchTerm}
-              onChange={e => onChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  onSubmit()
-                }
+              role="combobox"
+              aria-expanded
+              aria-controls="search-suggestions"
+              aria-autocomplete="list"
+              aria-activedescendant={items[active]?.id}
+              onChange={e => {
+                setActive(-1)
+                onChange(e.target.value)
               }}
+              onKeyDown={handleKeyDown}
             />
             <button
-              onClick={onSubmit}
+              onClick={() => onSubmit()}
               className="max-sm:hidden px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
               disabled={!searchTerm.trim()}
             >
@@ -379,67 +490,115 @@ function Modal({
             </div>
           )}
 
-          {!searchTerm.trim() && !imageData && (
-            <p className="text-sm text-gray-500">
-              Enter keywords to start searching for products.
-            </p>
-          )}
-
-          {searchTerm.trim() && !imageData && (
-            <div className="space-y-3">
-              {isFetching && (
-                <div className="space-y-2">
-                  {[...Array(4)].map((_, idx) => (
-                    <div
-                      key={idx}
-                      className="h-16 bg-gray-100 rounded-xl animate-pulse"
-                    />
-                  ))}
-                </div>
-              )}
-
-              {isError && (
-                <p className="text-sm text-red-500">
-                  Unable to search products. Please try again.
-                </p>
-              )}
-
-              {!isFetching &&
-                !isError &&
-                formattedResults.length === 0 && (
-                  <p className="text-sm text-gray-500">
-                    No matching products found.
-                  </p>
-                )}
-
-              {formattedResults.length > 0 && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {formattedResults.map(item => (
+          {!imageData && (
+            <div id="search-suggestions" role="listbox" aria-label="Search suggestions" className="space-y-4">
+              {!searchTerm.trim() && recent.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold text-gray-900">Recent searches</h3>
                     <button
-                      key={item.id}
                       type="button"
-                      onClick={() => onSelectProduct(item.id, item.name)}
-                      className="flex items-center gap-4 p-3 border border-gray-100 rounded-xl hover:border-blue-200 hover:shadow-sm transition text-left"
+                      onClick={clearRecent}
+                      className="text-xs text-gray-500 hover:text-gray-800"
                     >
-                      <img
-                        src={
-                          item.thumb ||
-                          PLACEHOLDER_IMAGE
-                        }
-                        alt={item.name}
-                        className="h-16 w-16 object-contain rounded-lg bg-gray-50"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800 line-clamp-2">
-                          {item.name}
-                        </p>
-                        <p className="text-sm text-blue-600 font-semibold mt-1">
-                          ${Number(item.price).toLocaleString('en-US')}
-                        </p>
-                      </div>
+                      Clear
                     </button>
-                  ))}
-                </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {renderChips('recent')}
+                  </div>
+                </section>
+              )}
+              {!searchTerm.trim() && (data?.trending?.length ?? 0) > 0 && (
+                <section>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Trending</h3>
+                  <div className="flex flex-wrap gap-2">{renderChips('trending')}</div>
+                </section>
+              )}
+
+              {searchTerm.trim() && (
+                <>
+                  {isFetching && items.length === 0 && (
+                    <div className="space-y-2">
+                      {[...Array(3)].map((_, idx) => (
+                        <div key={idx} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+                      ))}
+                    </div>
+                  )}
+                  {isError && (
+                    <p className="text-sm text-red-500">
+                      Unable to search products. Please try again.
+                    </p>
+                  )}
+                  {!isFetching && !isError && items.length === 0 && (
+                    <p className="text-sm text-gray-500">No matching products found.</p>
+                  )}
+                  {items.some(i => i.section === 'category') && (
+                    <div className="flex flex-wrap gap-2">{renderChips('category')}</div>
+                  )}
+                  {items.some(i => i.section === 'product') && (
+                    <div className="space-y-1">
+                      {items.map(
+                        item =>
+                          item.section === 'product' && (
+                            <button
+                              key={item.id}
+                              id={item.id}
+                              role="option"
+                              aria-selected={items[active]?.id === item.id}
+                              type="button"
+                              onClick={item.go}
+                              className={`w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-gray-50 ${
+                                items[active]?.id === item.id ? 'bg-blue-50' : ''
+                              }`}
+                            >
+                              <img
+                                src={item.img || PLACEHOLDER_IMAGE}
+                                alt=""
+                                className="h-12 w-12 object-contain rounded-lg bg-gray-50 flex-shrink-0"
+                              />
+                              <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 line-clamp-2">
+                                {item.label}
+                              </span>
+                              <span className="shrink-0 text-sm font-semibold text-blue-600">
+                                ${Number(item.price).toLocaleString('en-US')}
+                              </span>
+                            </button>
+                          )
+                      )}
+                    </div>
+                  )}
+                  {items.some(i => i.section === 'shop') && (
+                    <div className="space-y-1">
+                      {items.map(
+                        item =>
+                          item.section === 'shop' && (
+                            <button
+                              key={item.id}
+                              id={item.id}
+                              role="option"
+                              aria-selected={items[active]?.id === item.id}
+                              type="button"
+                              onClick={item.go}
+                              className={`w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-gray-50 ${
+                                items[active]?.id === item.id ? 'bg-blue-50' : ''
+                              }`}
+                            >
+                              <img
+                                src={item.img || PLACEHOLDER_IMAGE}
+                                alt=""
+                                className="h-8 w-8 object-cover rounded-full bg-gray-100 flex-shrink-0"
+                              />
+                              <span className="flex-1 min-w-0 truncate text-sm text-gray-800">
+                                {item.label}
+                              </span>
+                              <span className="shrink-0 text-xs text-gray-500">Shop</span>
+                            </button>
+                          )
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -454,10 +613,17 @@ const Search = () => {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = () => {
-    if (!searchTerm.trim()) return
+  const handleSubmit = (term?: string) => {
+    const value = (term ?? searchTerm).trim()
+    if (!value) return
+    saveRecent(value)
     setIsOpen(false)
-    navigate(`/collection/all?search=${encodeURIComponent(searchTerm.trim())}`)
+    navigate(`/collection/all?search=${encodeURIComponent(value)}`)
+  }
+
+  const handleNavigate = (path: string) => {
+    setIsOpen(false)
+    navigate(path)
   }
 
   const handleSelectProduct = (productId: number, productName: string) => {
@@ -475,6 +641,7 @@ const Search = () => {
           onClose={() => setIsOpen(false)}
           onChange={value => setSearchTerm(value)}
           onSubmit={handleSubmit}
+          onNavigate={handleNavigate}
           onSelectProduct={handleSelectProduct}
         />
       )}

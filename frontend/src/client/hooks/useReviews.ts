@@ -6,14 +6,20 @@ import {
   deleteReview,
   getProductReviewStats,
   type ReviewResponse,
+  type ReviewFilter,
   type CreateReviewPayload,
   type UpdateReviewPayload
 } from '../services/reviewService'
 
-export const useProductReviews = (productId: number, page: number = 1, limit: number = 10) => {
+export const useProductReviews = (
+  productId: number,
+  page: number = 1,
+  limit: number = 10,
+  filter: ReviewFilter = {}
+) => {
   return useQuery<ReviewResponse, Error>({
-    queryKey: ['reviews', productId, page, limit],
-    queryFn: () => getReviewsByProduct(productId, page, limit),
+    queryKey: ['reviews', productId, page, limit, filter],
+    queryFn: () => getReviewsByProduct(productId, page, limit, filter),
     enabled: !!productId,
     staleTime: 2 * 60 * 1000, // 2 minutes
   })

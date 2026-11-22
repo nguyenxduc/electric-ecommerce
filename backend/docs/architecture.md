@@ -106,6 +106,10 @@ Ngoai huong phu thuoc, con hai cho bi dat sai cho ma chi lo ra khi doc lai ca ca
   the: o tim kiem cua nguoi dung, thu can chiu loi go phim nhat, van ket o `contains`
   va tra ve rong khi go "iphon", trong khi chatbot ngay ben canh da co day du cong cu.
   Chuyen sang `lib/productSearch.js` thi ca hai cung dung mot duong.
+- **Goi y o tim kiem.** `GET /products/suggest?q=` (`services/searchSuggest.service.js`)
+  tra san pham (tai dung `findSearchCandidateIds` + `buyerVisibilityWhere`), danh muc,
+  gian hang dang hoat dong. `q` rong tra `trending` (2 tu dau ten san pham ban chay +
+  danh muc, cache trong bo nho 60s); `q` > 100 ky tu tra 400.
 - **Xu ly loi lap 147 lan.** `asyncHandler` va `AppError` da duoc viet san trong
   `middleware/error.middleware.js` nhung khong noi nao dung, con moi handler thi tu
   viet mot khoi `try/catch` chi de log roi tra 500. Ha tang co san ma khong ai dung
@@ -128,12 +132,21 @@ Thu tu kiem tra:
 
 1. `couponStatus`: `is_active=false` → `COUPON_PAUSED`; `starts_at` o tuong lai →
    `COUPON_NOT_STARTED`; qua `expires_at` → `COUPON_EXPIRED`; het `usage_limit` →
-   `COUPON_LIMIT_REACHED`.
+   `COUPON_LIMIT_REACHED`; nguoi mua da dung du `per_user_limit` (null = khong
+   gioi han) → `used_by_you` / `COUPON_ALREADY_USED` ("You have already used this
+   voucher"). So lan dung (`userUses`) do `countUserCouponUses` trong
+   `coupon.service.js` dem: dem `order_groups` cua nguoi mua co it nhat mot don chua
+   huy, nen checkout nhieu shop chi tinh mot lan va huy don tra luot. Kho voucher
+   hien `used_by_you` o tab Expired / Used.
 2. Voucher ca nhan (`Coupon.users` khac rong) chi dung cho dung nguoi →
    `COUPON_NOT_OWNED` (403).
 3. Pham vi: voucher shop chi tinh tren phan hang cua shop do (`COUPON_SHOP_MISSING`),
    `min_order` so voi phan hang shop; voucher san so voi ca gio.
 4. Voucher phan tram bi chan boi `max_discount`, va khong bao gio vuot tien hang.
+
+Tai `createOrder`, sau khi `updateMany` chiem `used_count` (giu khoa dong voucher)
+trong cung transaction, dem lai luot dung cua nguoi mua; vuot `per_user_limit` thi
+rollback → 400, nen hai checkout song song cua cung nguoi khong lot qua gioi han.
 
 `couponStatus` cung la nguon cho chip trang thai o kho voucher, trang seller va admin.
 
@@ -438,6 +451,22 @@ de phat hien giao gia va giu COD.
 Trang Shop Profile gui anh trong request rieng sau khi luu thong tin, nen upload
 loi (Cloudinary) khong lam mat cac truong khac (tests/40-seller-tools).
 
+### Danh gia san pham: anh, bo loc, seller tra loi
+
+`POST /reviews` va `PUT /reviews/:id` nhan multipart (field `images`, toi da 5
+anh JPG/PNG/WebP <= 2MB; multer loi -> 400, file tam xoa khi dong ket noi) va
+JSON nhu cu. Van chi nguoi mua co don `delivered` moi danh gia, moi san pham
+mot lan. Khi sua, `keep_images` (mang/chuoi JSON) la anh cu giu lai; khong gui
+= giu het. `GET /reviews/product/:productId?rating=1..5&has_images=true` loc
+danh sach (`summary` van la tong cua san pham); `/stats` them `withImages`.
+
+Seller: `GET /reviews/shop/mine?filter=unreplied&rating=` (danh gia san pham
+shop minh), `PUT /reviews/:id/reply {reply}` (1-1000 ky tu, sua duoc) va
+`DELETE /reviews/:id/reply`, ca hai qua `sellerRoute`; review khong thuoc shop
+-> 404. Lan tra loi dau `notifyUser` bao nguoi mua kem link
+`/product/<ten>-p<id>#reviews`. To-do seller dem `unreplied_reviews`
+(tests/41-reviews).
+
 ---
 
 ## 6. Vong doi gian hang
@@ -489,7 +518,8 @@ Admin xem toan bo ho so truoc khi duyet; trang shop cong khai chi lo quan/tinh.
 
 `services/todo.service.js` dem viec can xu ly, dung cho
 `GET /dashboard/shop/todo` (seller: don cho xac nhan/giao/dang giao, yeu cau
-tra hang, tin nhan chua doc, san pham con <= `LOW_STOCK_THRESHOLD`) va
+tra hang, tin nhan chua doc, san pham con <= `LOW_STOCK_THRESHOLD`, danh gia
+chua tra loi) va
 `GET /dashboard/todo` (admin: shop cho duyet, chat ho tro chua doc, co gian lan
 dang mo, san pham dang bi go). Moi o tren giao dien link toi danh sach da loc
 san qua `?status=`.
@@ -562,3 +592,27 @@ Moi route deu `protectRoute`; moi thao tac theo `:id` tim ban ghi bang
 SDT chuan hoa bang `normalizeVnPhone` (`lib/sms.js`). Checkout dien san tu dia
 chi mac dinh, cho doi qua picker, va co o "Save this address" luu dia chi nhap
 tay sau khi dat don thanh cong (tests/37-address-book).
+
+## 9. Trung tam thong bao
+
+Moi thong bao ghi qua `notifyUser` (`lib/notify.js`), kem `link` tuy chon: duong
+dan noi bo bat dau bang `/` (link ngoai hoac `//...` bi bo qua, luu `null`).
+
+| Su kien | Nguoi nhan | `link` |
+|---|---|---|
+| Dat don (moi don con) | nguoi mua / seller | `/profile?tab=orders&order=<id>` / `/seller/orders/<id>` |
+| Doi trang thai don, quyet dinh tra hang | nguoi mua | `/profile?tab=orders&order=<id>` |
+| Nguoi mua huy don | seller | `/seller/orders/<id>` |
+| Yeu cau tra hang | seller | `/seller/returns` |
+| Duyet / tu choi / treo gian hang | chu shop | `/profile?tab=seller` |
+| Takedown / khoi phuc san pham | seller | `/seller/products/<id>` |
+
+- `GET /notifications?type=ORDER|PROMO|SYSTEM&page&limit&unreadOnly`: pham vi la
+  thong bao cua user + broadcast (`user_id` null). Tab `SYSTEM` gom moi loai khac
+  ORDER/PROMO (SHOP, SYSTEM, null). `data.unread = { total, ORDER, PROMO, SYSTEM }`.
+- `POST /notifications/mark-read`: `{ ids: [...] }` (id cua nguoi khac khong khop
+  pham vi nen bi bo qua) hoac `{ all: true }`.
+- Frontend: `NotificationBell` co tab + badge, bam muc thi danh dau da doc va
+  `navigate(link)`. `Order.tsx` doc `?order=<id>` de mo chi tiet don roi xoa param.
+- Gioi han da biet: trang thai da doc nam tren chinh dong thong bao, nen broadcast
+  bi danh dau da doc cho moi nguoi khi mot user danh dau.

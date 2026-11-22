@@ -61,6 +61,7 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
     title: "Return request ↩️",
     message: `Order ${order.order_number} has a return request: "${request.reason}"`,
     type: "ORDER",
+    link: "/seller/returns",
   });
 
   return res.status(201).json({ success: true, data: request });
@@ -186,6 +187,7 @@ export const resolveReturnRequest = asyncHandler(async (req, res) => {
             note ? `: ${note}` : "."
           }`,
     type: "ORDER",
+    link: `/profile?tab=orders&order=${request.order_id}`,
   });
 
   return res.json({ success: true, data: updated });

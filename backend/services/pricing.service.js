@@ -103,7 +103,7 @@ export const computeTierDiscount = (totalAmount, tierDiscountRate) => {
  *
  * @returns {"paused"|"scheduled"|"expired"|"used_up"|"active"}
  */
-export const couponStatus = (coupon, now = new Date()) => {
+export const couponStatus = (coupon, now = new Date(), userUses = 0) => {
   if (coupon.is_active === false) return "paused";
   if (coupon.starts_at && now < new Date(coupon.starts_at)) return "scheduled";
   if (coupon.expires_at && now > new Date(coupon.expires_at)) return "expired";
@@ -114,6 +114,10 @@ export const couponStatus = (coupon, now = new Date()) => {
   ) {
     return "used_up";
   }
+  // Moi nguoi mua chi dung duoc per_user_limit lan (userUses = so checkout chua huy)
+  if (coupon.per_user_limit != null && userUses >= coupon.per_user_limit) {
+    return "used_by_you";
+  }
   return "active";
 };
 
@@ -122,6 +126,10 @@ const STATUS_ERRORS = {
   scheduled: { code: "COUPON_NOT_STARTED", message: "Voucher is not active yet" },
   expired: { code: "COUPON_EXPIRED", message: "Coupon has expired" },
   used_up: { code: "COUPON_LIMIT_REACHED", message: "Coupon usage limit reached" },
+  used_by_you: {
+    code: "COUPON_ALREADY_USED",
+    message: "You have already used this voucher",
+  },
 };
 
 /** Muc giam tho tren `base`, ap tran max_discount cho voucher phan tram. */
@@ -152,12 +160,13 @@ export const resolveCouponDiscount = ({
   tierDiscountRate,
   amountAfterTierDiscount,
   userId,
+  userUses = 0,
   now = new Date(),
 }) => {
   if (!coupon) {
     return { ok: false, code: "COUPON_NOT_FOUND", message: "Invalid coupon code" };
   }
-  const status = couponStatus(coupon, now);
+  const status = couponStatus(coupon, now, userUses);
   if (status !== "active") return { ok: false, ...STATUS_ERRORS[status] };
   // Voucher ca nhan: phai thuoc dung nguoi dang dat.
   if (
@@ -226,7 +235,14 @@ export const resolveCouponDiscount = ({
  * voucher shop dung pham vi. Thieu shopAmounts thi coi ca `amount` la hang cua
  * shop so huu voucher (hanh vi cu cua /coupons/validate).
  */
-export const previewCouponDiscount = ({ coupon, amount, shopAmounts, userId, now }) => {
+export const previewCouponDiscount = ({
+  coupon,
+  amount,
+  shopAmounts,
+  userId,
+  userUses,
+  now,
+}) => {
   const shopGroups = new Map();
   if (shopAmounts && typeof shopAmounts === "object") {
     for (const [shopId, subtotal] of Object.entries(shopAmounts)) {
@@ -241,6 +257,7 @@ export const previewCouponDiscount = ({ coupon, amount, shopAmounts, userId, now
     tierDiscountRate: 0,
     amountAfterTierDiscount: Number(amount) || 0,
     userId,
+    userUses,
     now,
   });
 };
