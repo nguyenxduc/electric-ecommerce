@@ -363,6 +363,33 @@ const Collection = () => {
     }
   }, [allProducts, searchResults, searchQuery])
 
+  // Hieu ung khi ket qua moi hien ra. Huong: doi category -> theo vi tri chip
+  // (phai thi truot tu phai vao); chuyen trang -> trang sau tu phai; doi filter
+  // hay sort -> hien dan len. Lan dau vao trang: khong hieu ung luoi.
+  const gridKey = products?.products?.length
+    ? // Chi theo danh sach id: luc doi trang/category, luoi cu (placeholder) van
+      // hien voi trang moi; neu dua trang vao key thi hieu ung bi tinh luc do
+      products.products.map(p => p.id).join(',')
+    : ''
+  const categoryIndex = Math.max(
+    0,
+    categories.findIndex(
+      c => (c.id === 0 ? 'all' : ('slug' in c && c.slug) || String(c.id)) === (collection || 'all')
+    )
+  )
+  const gridMotionRef = useRef<{ key: string; cat: number; page: number; cls: string } | null>(null)
+  if (gridKey && gridMotionRef.current?.key !== gridKey) {
+    const prev = gridMotionRef.current
+    let cls = ''
+    if (prev && prev.key) {
+      if (prev.cat !== categoryIndex) cls = categoryIndex > prev.cat ? 'page-in-right' : 'page-in-left'
+      else if (prev.page !== currentPage) cls = currentPage > prev.page ? 'page-in-right' : 'page-in-left'
+      else cls = 'page-in-up'
+    }
+    gridMotionRef.current = { key: gridKey, cat: categoryIndex, page: currentPage, cls }
+  }
+  const gridMotion = gridMotionRef.current?.cls ?? ''
+
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -586,11 +613,14 @@ const Collection = () => {
                 </div>
               ) : (
                 <>
-                  <ProductGrid
-                    products={products.products}
-                    selectedCompareProducts={compareProducts}
-                    onCompareToggle={handleToggleCompare}
-                  />
+                  <div key={gridKey} className={gridMotion}>
+                    <ProductGrid
+                      products={products.products}
+                      selectedCompareProducts={compareProducts}
+                      onCompareToggle={handleToggleCompare}
+                      className={gridMotion ? 'stagger-in' : ''}
+                    />
+                  </div>
 
                   {products.pagination &&
                     shouldShowPagination(products.pagination) && (
