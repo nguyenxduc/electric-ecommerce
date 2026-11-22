@@ -67,8 +67,16 @@
     transition: stroke-width 160ms ease;
   }
   .icon-btn:hover > svg,
+  .icon-btn:focus-visible > svg,
   .icon-btn[aria-expanded='true'] > svg {
     stroke-width: 1.75;
+  }
+  /* Bo vien focus xanh chung (vd: dong popup gio bang Esc thi focus quay ve
+     nut va hien vong xanh). Nguoi dung ban phim van thay nut dang focus nho
+     icon dam net + mau ink nhu khi hover. */
+  .icon-btn:focus-visible {
+    outline: none;
+    @apply text-ink;
   }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-gray-500;
