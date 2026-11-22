@@ -746,7 +746,7 @@ const Search = () => {
           setIsOpen(true)
           setSearchTerm('')
         }}
-        className="rounded-full p-2 transition hover:bg-gray-100"
+        className="icon-btn"
         aria-label="Open search"
         aria-haspopup="dialog"
       >

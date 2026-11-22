@@ -54,6 +54,10 @@
   .section-wrap {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-12;
   }
+  /* Nut icon tren header: hover chi hien vien tron mong, khong to nen ca khoi */
+  .icon-btn {
+    @apply relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 ring-1 ring-inset ring-transparent transition-shadow hover:text-ink hover:ring-gray-300 aria-expanded:ring-ink;
+  }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-gray-500;
   }

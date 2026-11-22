@@ -89,7 +89,7 @@ const Navbar = () => {
               {me?.role === 'admin' && (
                 <Link
                   to="/admin"
-                  className="p-2 rounded-full text-gray-600 hover:text-ink hover:bg-gray-100"
+                  className="icon-btn"
                   title="Admin Panel"
                   aria-label="Admin Panel"
                 >
@@ -99,7 +99,7 @@ const Navbar = () => {
               {me?.role === 'seller' && (
                 <Link
                   to="/seller"
-                  className="p-2 rounded-full text-gray-600 hover:text-ink hover:bg-gray-100"
+                  className="icon-btn"
                   title="Seller Dashboard"
                   aria-label="Seller Dashboard"
                 >
@@ -111,7 +111,7 @@ const Navbar = () => {
                 to="/profile"
                 aria-label="Profile"
                 title={tier ? `${me?.name} · ${tier}` : me?.name}
-                className="ml-1 flex items-center gap-2 rounded-full pl-1 pr-1 sm:pr-3 py-1 hover:bg-gray-100"
+                className="ml-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-1 ring-1 ring-inset ring-transparent transition-shadow hover:ring-gray-300 sm:pr-3"
               >
                 {me?.avatar ? (
                   <img src={me.avatar} alt="" className="w-8 h-8 rounded-full object-cover" width={32} height={32} />

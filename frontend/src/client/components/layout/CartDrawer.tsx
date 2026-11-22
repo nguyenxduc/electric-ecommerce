@@ -139,12 +139,12 @@ const CartDrawer = ({ cartProducts }: CartProps) => {
       )}
       <button
         ref={buttonRef}
-        className="relative rounded-lg p-2 text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-blue-600"
+        className="icon-btn"
         onClick={() => setDrawerOpen(!drawerOpen)}
         aria-label={count ? `Cart, ${count} items` : 'Cart'}
         aria-expanded={drawerOpen}
       >
-        <img src={CartIcon} alt="" className="h-10 w-10" />
+        <img src={CartIcon} alt="" className="h-9 w-9" />
         {count > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-xs text-white">
             {count}
