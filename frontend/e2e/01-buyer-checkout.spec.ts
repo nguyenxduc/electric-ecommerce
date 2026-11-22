@@ -11,8 +11,8 @@ test('buyer: variant, cart, checkout COD with shipping quote', async ({ page }) 
   // Login qua modal
   await page.goto('/')
   await page.getByRole('button', { name: 'Login / Sign Up' }).click()
-  await page.getByPlaceholder('E-mail', { exact: true }).fill('jane@example.com')
-  await page.getByPlaceholder('Password', { exact: true }).fill(PASSWORD)
+  await page.getByLabel('Email', { exact: true }).fill('jane@example.com')
+  await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
   await page.getByRole('button', { name: 'Log in', exact: true }).last().click()
   await expect(page.getByRole('button', { name: 'Login / Sign Up' })).toBeHidden()
 
