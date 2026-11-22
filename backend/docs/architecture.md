@@ -214,6 +214,14 @@ sap theo `(product_id, variant_id, mau)`. Lop phong ho: `lib/transaction.js`
 lan; van khong duoc thi tra 409 `CHECKOUT_BUSY`. Loi 500 khong tra
 `error.message` ra ngoai. Xem `tests/41-order-concurrency`.
 
+**Hoan kho khoa cung thu tu.** Huy don, duyet tra hang va xoa don deu cong kho
+qua `lib/restock.js`, cung khoa cac dong ay. Thu tu khoa nam o MOT cho,
+`lib/stockLock.js`: sap mon theo `(product_id, variant_id, mau)`, trong moi mon
+bien the -> mau -> san pham. Ca checkout lan hoan kho dung no; them noi nao cham
+vao kho thi cung phai dung. Ba giao dich hoan kho (`transitionOrderStatus`,
+duyet tra hang, `deleteOrder`) cung boc `withTxConflictRetry`, het luot thi tra
+409. Xem `tests/42-restock-concurrency`.
+
 ---
 
 ## 3. Luong AI: tro ly ao (truy hoi lai + goi cong cu + phong thu tiem lenh)

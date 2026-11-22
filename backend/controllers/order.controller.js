@@ -41,23 +41,17 @@ import { applyOrderListFilters } from "../lib/orderFilters.js";
 import { toCsv } from "../lib/csv.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { isTxConflict, withTxConflictRetry } from "../lib/transaction.js";
+import { stockLockKey, compareStockLockKey } from "../lib/stockLock.js";
 
 const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409, SHIPMENT_ACTIVE: 409 };
 
-// Khoa sap xep cho buoc tru kho trong createOrder: (product_id, variant_id, mau).
-// Chi can la mot thu tu toan phan co dinh de moi giao dich khoa dong cung thu tu.
-const stockKeyOf = (item) => [
-  item.data.product_id,
-  item.data.variant_id == null ? -1n : BigInt(item.data.variant_id),
-  `${item.color?.code ?? ""}|${item.color?.name ?? ""}`,
-];
-const compareStockKey = (a, b) => {
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] < b[i]) return -1;
-    if (a[i] > b[i]) return 1;
-  }
-  return 0;
-};
+// Khoa sap xep cho buoc tru kho trong createOrder - cung thu tu voi hoan kho.
+const stockKeyOf = (item) =>
+  stockLockKey({
+    productId: item.data.product_id,
+    variantId: item.data.variant_id,
+    color: item.color,
+  });
 
 // Yeu cau hoa don cong ty tu checkout: chi giu cac truong chuoi da biet, cat
 // do dai - day la du lieu nguoi dung go, se in len hoa don.
@@ -376,7 +370,7 @@ export const createOrder = async (req, res) => {
       // cung la thu tu trong gio.
       const stockLines = groups
         .flatMap((group) => group.items)
-        .sort((a, b) => compareStockKey(stockKeyOf(a), stockKeyOf(b)));
+        .sort((a, b) => compareStockLockKey(stockKeyOf(a), stockKeyOf(b)));
       for (const item of stockLines) {
         const it = item.data;
         const colorObj = item.color;
@@ -863,7 +857,7 @@ export const deleteOrder = asyncHandler(async (req, res) => {
 
   let refundOwed = null;
   try {
-    await prisma.$transaction(async (tx) => {
+    await withTxConflictRetry(() => prisma.$transaction(async (tx) => {
       // Re-check status atomically - closes the gap between the read
       // above and this write so two concurrent deletes can't both
       // restock/revert points for the same order.
@@ -879,12 +873,17 @@ export const deleteOrder = asyncHandler(async (req, res) => {
         throw new Error("ORDER_ALREADY_RESOLVED");
       }
       refundOwed = await cancelInTx(tx, order);
-    });
+    }));
   } catch (err) {
     if (err.message === "ORDER_ALREADY_RESOLVED") {
       return res
         .status(409)
         .json({ message: "Order was already updated by another request" });
+    }
+    if (isTxConflict(err)) {
+      return res
+        .status(409)
+        .json({ message: "Order is busy right now. Please try again." });
     }
     throw err;
   }
