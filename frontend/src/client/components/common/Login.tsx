@@ -1,6 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+  MailCheck,
+  User,
+  X
+} from 'lucide-react'
 import { apiErrorMessage } from '../../../lib/apiError'
 import {
   useLogin,
@@ -30,116 +43,45 @@ interface AuthModalProps {
   onSuccess?: () => void
 }
 
-const MailIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...props}
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M17 21.25H7C3.35 21.25 1.25 19.15 1.25 15.5V8.5C1.25 4.85 3.35 2.75 7 2.75H17C20.65 2.75 22.75 4.85 22.75 8.5V15.5C22.75 19.15 20.65 21.25 17 21.25ZM7 4.25C4.14 4.25 2.75 5.64 2.75 8.5V15.5C2.75 18.36 4.14 19.75 7 19.75H17C19.86 19.75 21.25 18.36 21.25 15.5V8.5C21.25 5.64 19.86 4.25 17 4.25H7Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M11.9998 12.87C11.1598 12.87 10.3098 12.61 9.65978 12.08L6.52978 9.57997C6.20978 9.31997 6.14978 8.84997 6.40978 8.52997C6.66978 8.20997 7.13978 8.14997 7.45978 8.40997L10.5898 10.91C11.3498 11.52 12.6398 11.52 13.3998 10.91L16.5298 8.40997C16.8498 8.14997 17.3298 8.19997 17.5798 8.52997C17.8398 8.84997 17.7898 9.32997 17.4598 9.57997L14.3298 12.08C13.6898 12.61 12.8398 12.87 11.9998 12.87Z"
-      fill="#B4B4B4"
-    />
-  </svg>
-)
+type FieldProps = {
+  label: string
+  icon?: React.ComponentType<{ className?: string }>
+  trailing?: React.ReactNode
+  hint?: string
+} & React.InputHTMLAttributes<HTMLInputElement>
 
-const LockIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...props}
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M6.18014 22.75C6.08014 22.75 5.97014 22.74 5.88014 22.73L3.71014 22.43C2.67014 22.29 1.73014 21.36 1.57014 20.3L1.27014 18.11C1.17014 17.41 1.47014 16.5 1.97014 15.99L6.36014 11.6C5.65014 8.76002 6.47014 5.76001 8.56014 3.69001C11.8001 0.460015 17.0701 0.450015 20.3201 3.69001C21.8901 5.26002 22.7501 7.35001 22.7501 9.57001C22.7501 11.79 21.8901 13.88 20.3201 15.45C18.2201 17.53 15.2301 18.35 12.4101 17.63L8.01014 22.02C7.59014 22.46 6.84014 22.75 6.18014 22.75ZM14.4301 2.76001C12.6801 2.76001 10.9401 3.42001 9.61014 4.75001C7.81014 6.54001 7.16014 9.16002 7.91014 11.6C7.99014 11.87 7.92014 12.15 7.72014 12.35L3.02014 17.05C2.85014 17.22 2.71014 17.66 2.74014 17.89L3.04014 20.08C3.10014 20.46 3.51014 20.89 3.89014 20.94L6.07014 21.24C6.31014 21.28 6.75014 21.14 6.92014 20.97L11.6401 16.26C11.8401 16.06 12.1301 16 12.3901 16.08C14.8001 16.84 17.4301 16.19 19.2301 14.39C20.5101 13.11 21.2201 11.39 21.2201 9.57001C21.2201 7.74002 20.5101 6.03001 19.2301 4.75001C17.9301 3.43001 16.1801 2.76001 14.4301 2.76001Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M9.19008 20.54C9.00008 20.54 8.81008 20.47 8.66008 20.32L6.36008 18.02C6.07008 17.73 6.07008 17.25 6.36008 16.96C6.65008 16.67 7.13008 16.67 7.42008 16.96L9.72008 19.26C10.0101 19.55 10.0101 20.03 9.72008 20.32C9.57008 20.47 9.38008 20.54 9.19008 20.54Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M14.5 11.75C13.26 11.75 12.25 10.74 12.25 9.5C12.25 8.26 13.26 7.25 14.5 7.25C15.74 7.25 16.75 8.26 16.75 9.5C16.75 10.74 15.74 11.75 14.5 11.75ZM14.5 8.75C14.09 8.75 13.75 9.09 13.75 9.5C13.75 9.91 14.09 10.25 14.5 10.25C14.91 10.25 15.25 9.91 15.25 9.5C15.25 9.09 14.91 8.75 14.5 8.75Z"
-      fill="#B4B4B4"
-    />
-  </svg>
-)
+// O nhap co nhan hien thi (khong chi placeholder), icon trai, nut phu ben phai
+const Field = ({ label, icon: Icon, trailing, hint, className = '', ...input }: FieldProps) => {
+  const id = useId()
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <div className="relative">
+        {Icon && (
+          <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        )}
+        <input
+          id={id}
+          {...input}
+          className={`w-full rounded-xl bg-white py-3 text-[15px] text-ink ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-ink ${
+            Icon ? 'pl-10' : 'pl-3.5'
+          } ${trailing ? 'pr-11' : 'pr-3.5'} ${className}`}
+        />
+        {trailing && <div className="absolute right-1.5 top-1/2 -translate-y-1/2">{trailing}</div>}
+      </div>
+      {hint && <p className="mt-1.5 text-xs text-gray-500">{hint}</p>}
+    </div>
+  )
+}
 
-const EyeIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
+const TextButton = ({ className = '', ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+  <button
+    type="button"
     {...props}
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M9.46992 15.28C9.27992 15.28 9.08992 15.21 8.93992 15.06C8.11992 14.24 7.66992 13.15 7.66992 12C7.66992 9.61001 9.60992 7.67001 11.9999 7.67001C13.1499 7.67001 14.2399 8.12001 15.0599 8.94001C15.1999 9.08001 15.2799 9.27001 15.2799 9.47001C15.2799 9.67001 15.1999 9.86001 15.0599 10L9.99992 15.06C9.84992 15.21 9.65992 15.28 9.46992 15.28ZM11.9999 9.17001C10.4399 9.17001 9.16992 10.44 9.16992 12C9.16992 12.5 9.29992 12.98 9.53992 13.4L13.3999 9.54001C12.9799 9.30001 12.4999 9.17001 11.9999 9.17001Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M5.59984 18.51C5.42984 18.51 5.24984 18.45 5.10984 18.33C4.03984 17.42 3.07984 16.3 2.25984 15C1.19984 13.35 1.19984 10.66 2.25984 9.00001C4.69984 5.18001 8.24984 2.98001 11.9998 2.98001C14.1998 2.98001 16.3698 3.74001 18.2698 5.17001C18.5998 5.42001 18.6698 5.89001 18.4198 6.22001C18.1698 6.55001 17.6998 6.62001 17.3698 6.37001C15.7298 5.13001 13.8698 4.48001 11.9998 4.48001C8.76984 4.48001 5.67984 6.42001 3.51984 9.81001C2.76984 10.98 2.76984 13.02 3.51984 14.19C4.26984 15.36 5.12984 16.37 6.07984 17.19C6.38984 17.46 6.42984 17.93 6.15984 18.25C6.01984 18.42 5.80984 18.51 5.59984 18.51Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M11.9996 21.02C10.6696 21.02 9.36957 20.75 8.11957 20.22C7.73957 20.06 7.55957 19.62 7.71957 19.24C7.87957 18.86 8.31957 18.68 8.69957 18.84C9.75957 19.29 10.8696 19.52 11.9896 19.52C15.2196 19.52 18.3096 17.58 20.4696 14.19C21.2196 13.02 21.2196 10.98 20.4696 9.81C20.1596 9.32 19.8196 8.85 19.4596 8.41C19.1996 8.09 19.2496 7.62 19.5696 7.35C19.8896 7.09 20.3596 7.13 20.6296 7.46C21.0196 7.94 21.3996 8.46 21.7396 9C22.7996 10.65 22.7996 13.34 21.7396 15C19.2996 18.82 15.7496 21.02 11.9996 21.02Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M12.6896 16.27C12.3396 16.27 12.0196 16.02 11.9496 15.66C11.8696 15.25 12.1396 14.86 12.5496 14.79C13.6496 14.59 14.5696 13.67 14.7696 12.57C14.8496 12.16 15.2396 11.9 15.6496 11.97C16.0596 12.05 16.3296 12.44 16.2496 12.85C15.9296 14.58 14.5496 15.95 12.8296 16.27C12.7796 16.26 12.7396 16.27 12.6896 16.27Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M2.00043 22.75C1.81043 22.75 1.62043 22.68 1.47043 22.53C1.18043 22.24 1.18043 21.76 1.47043 21.47L8.94043 14C9.23043 13.71 9.71043 13.71 10.0004 14C10.2904 14.29 10.2904 14.77 10.0004 15.06L2.53043 22.53C2.38043 22.68 2.19043 22.75 2.00043 22.75Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M14.5297 10.22C14.3397 10.22 14.1497 10.15 13.9997 10C13.7097 9.71 13.7097 9.23 13.9997 8.94L21.4697 1.47C21.7597 1.18 22.2397 1.18 22.5297 1.47C22.8197 1.76 22.8197 2.24 22.5297 2.53L15.0597 10C14.9097 10.15 14.7197 10.22 14.5297 10.22Z"
-      fill="#B4B4B4"
-    />
-  </svg>
-)
-const EyeOffIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={1.8}
-    {...props}
-  >
-    <path d="M3 3l18 18" />
-    <path d="M9.9 5.2A10.33 10.33 0 0 1 12 5c6 0 10 7 10 7a16.65 16.65 0 0 1-3.15 3.89M6.35 6.35C3.9 8.19 2 12 2 12a16.45 16.45 0 0 0 6.2 6.2M9 9a3 3 0 1 0 4.24 4.24" />
-  </svg>
-)
-
-const ProfileIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...props}
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      d="M12 12.75C8.83 12.75 6.25 10.17 6.25 7C6.25 3.83 8.83 1.25 12 1.25C15.17 1.25 17.75 3.83 17.75 7C17.75 10.17 15.17 12.75 12 12.75ZM12 2.75C9.66 2.75 7.75 4.66 7.75 7C7.75 9.34 9.66 11.25 12 11.25C14.34 11.25 16.25 9.34 16.25 7C16.25 4.66 14.34 2.75 12 2.75Z"
-      fill="#B4B4B4"
-    />
-    <path
-      d="M20.5901 22.75C20.1801 22.75 19.8401 22.41 19.8401 22C19.8401 18.55 16.3202 15.75 12.0002 15.75C7.68015 15.75 4.16016 18.55 4.16016 22C4.16016 22.41 3.82016 22.75 3.41016 22.75C3.00016 22.75 2.66016 22.41 2.66016 22C2.66016 17.73 6.85015 14.25 12.0002 14.25C17.1502 14.25 21.3401 17.73 21.3401 22C21.3401 22.41 21.0001 22.75 20.5901 22.75Z"
-      fill="#B4B4B4"
-    />
-  </svg>
+    className={`font-medium text-ink underline-offset-4 hover:underline disabled:opacity-50 ${className}`}
+  />
 )
 
 const Login = ({
@@ -152,7 +94,6 @@ const Login = ({
 }: AuthModalProps) => {
   const { data: settingsData } = usePublicSettings('general')
   const brandName = brand || settingsData?.settings?.store_name || 'Tech Shop'
-  const [tab, setTab] = useState<'login' | 'register'>('login')
   const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'reset'>(
     'login'
   )
@@ -167,7 +108,6 @@ const Login = ({
   const [newPassword, setNewPassword] = useState('')
   // Quen mat khau 2 buoc: gui ma ve email -> nhap ma + mat khau moi
   const [resetStep, setResetStep] = useState<'request' | 'confirm'>('request')
-  const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [agreeCondition, setAgreeCondition] = useState(false)
 
@@ -182,18 +122,26 @@ const Login = ({
   const resetMutation = useResetPassword()
   const { refetch: refetchUser } = useValidateToken()
 
+  // Esc dong, khoa cuon trang phia sau, focus o nhap dau tien
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    const first = dialogRef.current?.querySelector<HTMLElement>(
-      "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
-    )
-    first?.focus()
-    return () => document.removeEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    dialogRef.current?.querySelector<HTMLElement>('input')?.focus()
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
   }, [open, onClose])
+
+  // Doi buoc thi dua focus ve o nhap dau tien cua buoc moi
+  useEffect(() => {
+    if (open) dialogRef.current?.querySelector<HTMLElement>('form input')?.focus()
+  }, [mode, resetStep, open])
 
   // Handle login success
   useEffect(() => {
@@ -203,7 +151,6 @@ const Login = ({
       refetchUser()
       setEmail('')
       setPassword('')
-      setRemember(false)
       setMode('login')
       onSuccess?.()
       onClose()
@@ -239,7 +186,6 @@ const Login = ({
       )
       setVerifyEmail(email)
       setMode('verify')
-      setTab('login')
       setAgreeCondition(false)
       registerMutation.reset()
     }
@@ -264,9 +210,8 @@ const Login = ({
     if (mode === 'login') {
       if (onLogin) {
         // Use callback if provided (for backward compatibility)
-        onLogin(email, password, remember)
+        onLogin(email, password, false)
       } else {
-        // Use hook directly
         loginMutation.mutate({ email, password })
       }
     } else if (mode === 'register') {
@@ -279,10 +224,8 @@ const Login = ({
         return
       }
       if (onRegister) {
-        // Use callback if provided (for backward compatibility)
         onRegister({ fullName, email, password })
       } else {
-        // Use hook directly
         registerMutation.mutate({
           name: fullName,
           email,
@@ -299,6 +242,7 @@ const Login = ({
         {
           onSuccess: () => {
             toast.success('Verification successful, please log in')
+            setEmail(verifyEmail)
             setMode('login')
           },
           onError: (err: unknown) => {
@@ -349,362 +293,332 @@ const Login = ({
         toast.error(apiErrorMessage(err, 'Failed to send code'))
     })
 
-  return (
-    <div className="fixed inset-0 z-50" onClick={onClose}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" />
+  const resendVerify = () => {
+    if (!verifyEmail) {
+      toast.error('Enter email to resend code')
+      return
+    }
+    resendVerifyMutation.mutate(verifyEmail, {
+      onSuccess: () => toast.success('Verification code resent'),
+      onError: (err: unknown) => toast.error(apiErrorMessage(err, 'Failed to send code'))
+    })
+  }
 
-      {/* Dialog */}
-      <div className="absolute inset-0 flex items-center justify-center p-4">
+  const pending =
+    mode === 'login'
+      ? loginMutation.isPending
+      : mode === 'register'
+      ? registerMutation.isPending
+      : mode === 'verify'
+      ? verifyMutation.isPending
+      : resetStep === 'request'
+      ? forgotMutation.isPending
+      : resetMutation.isPending
+
+  const title =
+    mode === 'login'
+      ? `Log in to ${brandName}`
+      : mode === 'register'
+      ? `Create your ${brandName} account`
+      : mode === 'verify'
+      ? 'Verify your email'
+      : resetStep === 'request'
+      ? 'Forgot your password?'
+      : 'Set a new password'
+
+  const subtitle =
+    mode === 'login'
+      ? 'Track orders, save vouchers and check out faster.'
+      : mode === 'register'
+      ? 'Buy from verified shops, earn loyalty points on every order.'
+      : mode === 'verify'
+      ? verifyEmail
+        ? `Enter the 6-digit code we sent to ${verifyEmail}.`
+        : 'Enter your email and the 6-digit code we sent you.'
+      : resetStep === 'request'
+      ? 'Step 1 of 2 · We will email you a reset code.'
+      : `Step 2 of 2 · Enter the code sent to ${resetEmail} and a new password.`
+
+  const submitLabel =
+    mode === 'login'
+      ? 'Log in'
+      : mode === 'register'
+      ? 'Create account'
+      : mode === 'verify'
+      ? 'Verify email'
+      : resetStep === 'request'
+      ? 'Send reset code'
+      : 'Reset password'
+
+  const passwordToggle = (
+    <button
+      type="button"
+      onClick={() => setShowPassword(s => !s)}
+      aria-label={showPassword ? 'Hide password' : 'Show password'}
+      className="rounded-lg p-2 text-gray-400 hover:bg-paper hover:text-ink"
+    >
+      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+    </button>
+  )
+
+  const backToLogin = () => {
+    setMode('login')
+    setResetStep('request')
+  }
+
+  // Portal ra body: Navbar nam trong header co backdrop-blur, ma backdrop-filter
+  // bien header thanh khung chua cua moi phan tu position:fixed ben trong -> modal
+  // tung bi can giua trong dai header cao 64px, mat ca tieu de va o email.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] overflow-y-auto bg-ink/40"
+      onClick={onClose}
+    >
+      <div className="flex min-h-full items-end justify-center sm:items-center sm:p-6">
         <div
           ref={dialogRef}
-          className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="auth-title"
+          className="relative w-full max-w-[440px] rounded-t-3xl bg-white px-6 pb-8 pt-6 shadow-[0_32px_80px_-32px_rgb(23_24_27/0.5)] sm:rounded-3xl sm:px-8 sm:pt-8"
           onClick={e => e.stopPropagation()}
         >
-          {/* Tabs */}
-          <div className="flex items-center justify-center pt-5">
-            <button
-              className={`pb-2 px-10 text-sm font-light ${
-                tab === 'login'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 border-b-2 border-gray-500'
-              }`}
-              onClick={() => {
-                setTab('login')
-                setMode('login')
-              }}
-            >
-              Log in
-            </button>
-            <button
-              className={`pb-2 px-10 text-sm font-light ${
-                tab === 'register'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 border-b-2 border-gray-500'
-              }`}
-              onClick={() => {
-                setTab('register')
-                setMode('register')
-              }}
-            >
-              Create Account
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-4 top-4 rounded-full p-2 text-gray-400 hover:bg-paper hover:text-ink"
+          >
+            <X className="h-4 w-4" />
+          </button>
 
-          <div className="px-8 pb-8">
-            <h2 className="text-2xl sm:text-3xl font-normal text-center mt-8">
-              {mode === 'login'
-                ? `Log in to ${brandName}`
-                : mode === 'register'
-                ? `Create your ${brandName} account`
-                : mode === 'verify'
-                ? 'Verify Email'
-                : resetStep === 'request'
-                ? 'Forgot your password?'
-                : 'Set a new password'}
-            </h2>
-            {mode === 'reset' && (
-              <p className="mt-2 text-center text-sm text-gray-500">
-                {resetStep === 'request'
-                  ? 'Step 1 of 2: enter your email and we will send you a reset code.'
-                  : `Step 2 of 2: enter the code sent to ${resetEmail} and your new password.`}
-              </p>
+          {(mode === 'login' || mode === 'register') ? (
+            // Chuyen dang nhap / dang ky dang segmented control
+            <div role="tablist" aria-label="Account" className="mr-10 inline-flex rounded-full bg-paper p-1 text-sm font-medium">
+              {(['login', 'register'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m}
+                  onClick={() => setMode(m)}
+                  className={`rounded-full px-4 py-1.5 ${
+                    mode === m ? 'bg-white text-ink shadow-sm ring-1 ring-gray-200/80' : 'text-gray-500 hover:text-ink'
+                  }`}
+                >
+                  {m === 'login' ? 'Log in' : 'Sign up'}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={backToLogin}
+              className="-ml-1 inline-flex items-center gap-1.5 rounded-full px-1 py-1.5 text-sm font-medium text-gray-500 hover:text-ink"
+            >
+              <ArrowLeft className="h-4 w-4" /> Back to log in
+            </button>
+          )}
+
+          {mode === 'verify' && (
+            <span className="mt-6 flex h-11 w-11 items-center justify-center rounded-full bg-paper">
+              <MailCheck className="h-5 w-5 text-ink" />
+            </span>
+          )}
+          {mode === 'reset' && (
+            <span className="mt-6 flex h-11 w-11 items-center justify-center rounded-full bg-paper">
+              <KeyRound className="h-5 w-5 text-ink" />
+            </span>
+          )}
+
+          <h2 id="auth-title" className="mt-5 text-2xl font-semibold tracking-tight text-ink">
+            {title}
+          </h2>
+          <p className="mt-1.5 text-sm text-gray-500">{subtitle}</p>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {mode === 'register' && (
+              <Field
+                label="Full name"
+                icon={User}
+                type="text"
+                required
+                autoComplete="name"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                placeholder="Jane Nguyen"
+              />
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-              {mode === 'register' && (
-                <label className="relative block">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <ProfileIcon className="w-5 h-5" />
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                    placeholder="Full Name"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-              )}
-
-              {/* Email */}
-              {mode !== 'verify' && !(mode === 'reset' && resetStep === 'confirm') && (
-                <label className="relative block">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <MailIcon className="w-5 h-5" />
-                  </span>
-                  <input
-                    type="email"
-                    required
-                    value={mode === 'reset' ? resetEmail : email}
-                    onChange={e =>
-                      mode === 'reset'
-                        ? setResetEmail(e.target.value)
-                        : setEmail(e.target.value)
-                    }
-                    placeholder="E-mail"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-              )}
-
-              {/* Password */}
-              {(mode === 'login' || mode === 'register') && (
-                <label className="relative block">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <LockIcon className="w-5 h-5" />
-                  </span>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    {...(mode === 'register' && { minLength: 8 })}
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Password"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(s => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                    aria-label={
-                      showPassword ? 'Hide password' : 'Show password'
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="w-5 h-5" />
-                    ) : (
-                      <EyeIcon className="w-5 h-5" />
-                    )}
-                  </button>
-                </label>
-              )}
-
-              {/* Confirm password */}
-              {mode === 'register' && (
-                <label className="relative block">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <LockIcon className="w-5 h-5" />
-                  </span>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm Password"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </label>
-              )}
-
-              {/* Verify form */}
-              {mode === 'verify' && (
-                <>
-                  <label className="relative block">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <MailIcon className="w-5 h-5" />
-                    </span>
-                    <input
-                      type="email"
-                      required
-                      value={verifyEmail}
-                      onChange={e => setVerifyEmail(e.target.value)}
-                      placeholder="Email to verify"
-                      className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <input
-                      type="text"
-                      required
-                      value={verifyCode}
-                      onChange={e => setVerifyCode(e.target.value)}
-                      placeholder="Enter 6-digit code"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
-                  <div className="flex items-center gap-2 text-sm">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!verifyEmail) {
-                          toast.error('Enter email to resend code')
-                          return
-                        }
-                        resendVerifyMutation.mutate(verifyEmail, {
-                          onSuccess: () =>
-                            toast.success('Verification code resent'),
-                          onError: (err: unknown) =>
-                            toast.error(
-                              apiErrorMessage(err, 'Failed to send code')
-                            )
-                        })
-                      }}
-                      className="text-blue-600 hover:underline"
-                    >
-                      Resend Code
-                    </button>
-                    {resendVerifyMutation.isPending && (
-                      <span className="text-xs text-gray-500">Sending...</span>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Reset password form */}
-              {mode === 'reset' && resetStep === 'confirm' && (
-                <>
-                  <label className="block">
-                    <input
-                      type="text"
-                      required
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      value={resetCode}
-                      onChange={e => setResetCode(e.target.value)}
-                      placeholder="Reset code sent to email"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <input
-                      type="password"
-                      required
-                      autoComplete="new-password"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="New password (>=6)"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      minLength={6}
-                    />
-                  </label>
-                  <div className="flex items-center justify-between text-sm">
-                    <button
-                      type="button"
-                      onClick={() => setResetStep('request')}
-                      className="text-gray-600 hover:underline"
-                    >
-                      Change email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={sendResetCode}
-                      disabled={forgotMutation.isPending}
-                      className="text-blue-600 hover:underline disabled:opacity-50"
-                    >
-                      {forgotMutation.isPending ? 'Sending...' : 'Resend code'}
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {/* Remember + Forgot */}
-              {mode === 'login' && (
-                <div className="flex items-center justify-between text-sm">
-                  <label className="inline-flex items-center gap-2"></label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setResetEmail(email)
-                      setResetStep('request')
-                      setMode('reset')
-                    }}
-                    className="text-blue-600 hover:underline"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-              )}
-
-              {mode === 'register' && (
-                <div className="flex items-center justify-between text-sm">
-                  <label className="inline-flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={agreeCondition}
-                      onChange={e => setAgreeCondition(e.target.checked)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-gray-600">I agree to all</span>
-                    <Link to="#" className="text-blue-600 hover:underline">
-                      Terms & Conditions
-                    </Link>
-                  </label>
-                </div>
-              )}
-
-              {/* Primary action */}
-              <button
-                type="submit"
-                disabled={
-                  mode === 'login'
-                    ? loginMutation.isPending
-                    : mode === 'register'
-                    ? registerMutation.isPending
-                    : mode === 'verify'
-                    ? verifyMutation.isPending
-                    : resetStep === 'request'
-                    ? forgotMutation.isPending
-                    : resetMutation.isPending
+            {(mode === 'login' || mode === 'register' || (mode === 'reset' && resetStep === 'request')) && (
+              <Field
+                label="Email"
+                icon={Mail}
+                type="email"
+                required
+                autoComplete="email"
+                value={mode === 'reset' ? resetEmail : email}
+                onChange={e =>
+                  mode === 'reset' ? setResetEmail(e.target.value) : setEmail(e.target.value)
                 }
-                className="w-full bg-blue-600 text-white rounded-lg py-3 text-sm font-light hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {(mode === 'login' && loginMutation.isPending) ||
-                (mode === 'register' && registerMutation.isPending) ||
-                (mode === 'verify' && verifyMutation.isPending) ||
-                (mode === 'reset' && (resetMutation.isPending || forgotMutation.isPending)) ? (
-                  <span className="w-5 h-5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
-                ) : null}
-                {mode === 'login'
-                  ? 'Log in'
-                  : mode === 'register'
-                  ? 'Create Account'
-                  : mode === 'verify'
-                  ? 'Verify Email'
-                  : resetStep === 'request'
-                  ? 'Send reset code'
-                  : 'Reset Password'}
-              </button>
+                placeholder="you@example.com"
+              />
+            )}
 
-              {/* Footer */}
-              <p className="text-center text-sm text-gray-500">
-                {mode === 'login' ? (
-                  <>
-                    Don’t have an account ?
-                    <button
-                      type="button"
+            {(mode === 'login' || mode === 'register') && (
+              <div>
+                <Field
+                  label="Password"
+                  icon={Lock}
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  {...(mode === 'register' && { minLength: 8 })}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={mode === 'login' ? 'Your password' : 'At least 8 characters'}
+                  trailing={passwordToggle}
+                />
+                {mode === 'login' && (
+                  <div className="mt-2 text-right text-sm">
+                    <TextButton
                       onClick={() => {
-                        setTab('register')
-                        setMode('register')
+                        setResetEmail(email)
+                        setResetStep('request')
+                        setMode('reset')
                       }}
-                      className="text-blue-600 ml-1 hover:underline"
                     >
-                      sign up
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Already have an account ?
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTab('login')
-                        setMode('login')
-                      }}
-                      className="text-blue-600 ml-1 hover:underline"
-                    >
-                      log in
-                    </button>
-                  </>
+                      Forgot password?
+                    </TextButton>
+                  </div>
                 )}
+              </div>
+            )}
+
+            {mode === 'register' && (
+              <Field
+                label="Confirm password"
+                icon={Lock}
+                type={showPassword ? 'text' : 'password'}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Repeat your password"
+                aria-invalid={!!confirmPassword && confirmPassword !== password}
+                hint={
+                  confirmPassword && confirmPassword !== password
+                    ? 'Passwords do not match yet.'
+                    : undefined
+                }
+              />
+            )}
+
+            {mode === 'verify' && (
+              <>
+                <Field
+                  label="Email"
+                  icon={Mail}
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={verifyEmail}
+                  onChange={e => setVerifyEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+                <Field
+                  label="Verification code"
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={verifyCode}
+                  onChange={e => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+                  placeholder="••••••"
+                  className="text-center font-mono text-lg tracking-[0.5em]"
+                />
+                <p className="text-sm text-gray-500">
+                  Didn’t get it?{' '}
+                  <TextButton onClick={resendVerify} disabled={resendVerifyMutation.isPending}>
+                    {resendVerifyMutation.isPending ? 'Sending…' : 'Resend code'}
+                  </TextButton>
+                </p>
+              </>
+            )}
+
+            {mode === 'reset' && resetStep === 'confirm' && (
+              <>
+                <Field
+                  label="Reset code"
+                  type="text"
+                  required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={resetCode}
+                  onChange={e => setResetCode(e.target.value)}
+                  placeholder="Code from your email"
+                  className="font-mono tracking-widest"
+                />
+                <Field
+                  label="New password"
+                  icon={Lock}
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  trailing={passwordToggle}
+                />
+                <div className="flex items-center justify-between text-sm">
+                  <TextButton onClick={() => setResetStep('request')} className="text-gray-600">
+                    Change email
+                  </TextButton>
+                  <TextButton onClick={sendResetCode} disabled={forgotMutation.isPending}>
+                    {forgotMutation.isPending ? 'Sending…' : 'Resend code'}
+                  </TextButton>
+                </div>
+              </>
+            )}
+
+            {mode === 'register' && (
+              <label className="flex cursor-pointer items-start gap-2.5 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={agreeCondition}
+                  onChange={e => setAgreeCondition(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-ink"
+                />
+                <span>
+                  I agree to the{' '}
+                  <Link to="#" className="font-medium text-ink underline underline-offset-4">
+                    Terms & Conditions
+                  </Link>
+                </span>
+              </label>
+            )}
+
+            <button type="submit" disabled={pending} className="btn-primary !mt-6 w-full py-3 text-[15px]">
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitLabel}
+            </button>
+
+            {(mode === 'login' || mode === 'register') && (
+              <p className="text-center text-sm text-gray-500">
+                {mode === 'login' ? 'New to ' + brandName + '? ' : 'Already have an account? '}
+                <TextButton onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
+                  {mode === 'login' ? 'Create an account' : 'Log in'}
+                </TextButton>
               </p>
-            </form>
-          </div>
+            )}
+          </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

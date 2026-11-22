@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 type Tone = 'info' | 'danger'
 
@@ -47,8 +48,10 @@ const ConfirmModal = ({
       ? 'bg-red-600 hover:bg-red-700'
       : 'bg-blue-600 hover:bg-blue-700')
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  // Portal ra body: modal co the duoc render ben trong header (Navbar), ma header
+  // co backdrop-blur -> position:fixed bi gioi han trong khung header.
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onClose} />
 
       <div
@@ -80,9 +83,9 @@ const ConfirmModal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
 export default ConfirmModal
-
