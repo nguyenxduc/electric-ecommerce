@@ -139,7 +139,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 </div>
               </div>
               {product.img.length > 1 && (
-                // Chua padding 6px quanh dai anh nho: vien chon (ring-2 + offset-2 = 4px)
+                // Chua padding 6px quanh dai anh nho: vien chon (ring-1 + offset-2 = 3px)
                 // nam ngoai o anh, overflow-x-auto tung cat mat mep tren va anh sat le
                 <div className="-mx-1.5 flex gap-3 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
                   {product.img.map((image, index) => (
@@ -148,7 +148,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                       onClick={() => setMainImage(image)}
                       aria-label={`Show image ${index + 1}`}
                       aria-pressed={mainImage === image}
-                      className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-[#f3f1ec] ring-2 ring-offset-2 ring-offset-paper ${
+                      className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-[#f3f1ec] ring-1 ring-offset-2 ring-offset-paper ${
                         mainImage === image ? 'ring-ink' : 'ring-transparent hover:ring-gray-300'
                       }`}
                     >
