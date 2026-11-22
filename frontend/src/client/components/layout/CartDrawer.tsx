@@ -1,10 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ShoppingBag, X } from 'lucide-react'
+import { ArrowRight, ShoppingBag, ShoppingBasket, X } from 'lucide-react'
 import CartContent from '../cart/CartContent'
 
-import CartIcon from '../../../assets/cart-icon.svg'
 import { Cart, CartItem } from '../../types/cart'
 
 type PopoverProps = {
@@ -144,9 +143,9 @@ const CartDrawer = ({ cartProducts }: CartProps) => {
         aria-label={count ? `Cart, ${count} items` : 'Cart'}
         aria-expanded={drawerOpen}
       >
-        <img src={CartIcon} alt="" className="h-9 w-9" />
+        <ShoppingBasket className="h-[22px] w-[22px]" aria-hidden="true" />
         {count > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-xs text-white">
+          <span className="absolute right-0 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-paper">
             {count}
           </span>
         )}

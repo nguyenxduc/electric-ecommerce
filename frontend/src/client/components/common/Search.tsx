@@ -28,7 +28,6 @@ import {
 import type { ImageSearchData } from '../../types/product'
 import { makeProductSlug } from '../../utils/productSlug'
 
-import SearchIcon from '../../../assets/search-icon.svg'
 
 type ModalProps = {
   searchTerm: string
@@ -750,7 +749,7 @@ const Search = () => {
         aria-label="Open search"
         aria-haspopup="dialog"
       >
-        <img src={SearchIcon} alt="" className="h-6 w-6" />
+        <SearchGlyph className="h-[22px] w-[22px]" aria-hidden="true" />
       </button>
     </div>
   )

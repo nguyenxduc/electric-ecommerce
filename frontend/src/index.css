@@ -54,9 +54,19 @@
   .section-wrap {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-12;
   }
-  /* Nut icon tren header: hover chi hien vien tron mong, khong to nen ca khoi */
+  /* Nut icon tren header: khong vien, khong to nen. Hover / dang mo (aria-expanded)
+     thi chinh net ve cua icon dam va toi hon. Icon phai la SVG net (lucide,
+     currentColor) - <img> khong doi mau/net duoc. */
   .icon-btn {
-    @apply relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-600 ring-1 ring-inset ring-transparent transition-shadow hover:text-ink hover:ring-gray-300 aria-expanded:ring-ink;
+    @apply relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-ink aria-expanded:text-ink;
+  }
+  .icon-btn > svg {
+    stroke-width: 1.6;
+    transition: stroke-width 160ms ease;
+  }
+  .icon-btn:hover > svg,
+  .icon-btn[aria-expanded='true'] > svg {
+    stroke-width: 2.3;
   }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-gray-500;

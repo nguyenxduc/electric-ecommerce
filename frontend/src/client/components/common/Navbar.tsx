@@ -93,7 +93,7 @@ const Navbar = () => {
                   title="Admin Panel"
                   aria-label="Admin Panel"
                 >
-                  <Settings className="w-5 h-5" aria-hidden="true" />
+                  <Settings className="h-[22px] w-[22px]" aria-hidden="true" />
                 </Link>
               )}
               {me?.role === 'seller' && (
@@ -103,7 +103,7 @@ const Navbar = () => {
                   title="Seller Dashboard"
                   aria-label="Seller Dashboard"
                 >
-                  <Store className="w-5 h-5" aria-hidden="true" />
+                  <Store className="h-[22px] w-[22px]" aria-hidden="true" />
                 </Link>
               )}
               <NotificationBell />
@@ -111,7 +111,7 @@ const Navbar = () => {
                 to="/profile"
                 aria-label="Profile"
                 title={tier ? `${me?.name} · ${tier}` : me?.name}
-                className="ml-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-1 ring-1 ring-inset ring-transparent transition-shadow hover:ring-gray-300 sm:pr-3"
+                className="group ml-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-1 sm:pr-3"
               >
                 {me?.avatar ? (
                   <img src={me.avatar} alt="" className="w-8 h-8 rounded-full object-cover" width={32} height={32} />
@@ -121,7 +121,7 @@ const Navbar = () => {
                   </span>
                 )}
                 <span className="hidden lg:flex flex-col leading-tight text-left max-w-[120px]">
-                  <span className="text-xs font-semibold text-ink truncate">{me?.name}</span>
+                  <span className="text-xs font-semibold text-ink truncate underline-offset-2 group-hover:underline">{me?.name}</span>
                   {tier && (
                     <span className="text-[11px] text-gray-500 truncate">
                       {tier}
