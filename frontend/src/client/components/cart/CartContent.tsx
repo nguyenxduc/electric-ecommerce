@@ -1,63 +1,83 @@
-
+import { Link } from 'react-router-dom'
+import { Store } from 'lucide-react'
 import type { CartItem } from '../../types/cart'
+import { groupCartItemsByShop } from '../../utils/groupCartItemsByShop'
+import { makeProductSlug } from '../../utils/productSlug'
 
 interface CartProps {
   cartProducts: CartItem[]
+  // Bam vao san pham thi dong popup gio hang
+  onNavigate?: () => void
 }
 
-const CartContent = ({ cartProducts }: CartProps) => {
-  if (!cartProducts || cartProducts.length === 0) {
-    return <div className="text-sm text-gray-500">No items in cart</div>
-  }
+// Danh sach mon trong popup gio hang, gom theo shop giong trang Cart/Checkout
+// (moi shop la mot don rieng khi thanh toan).
+const CartContent = ({ cartProducts, onNavigate }: CartProps) => {
+  if (!cartProducts?.length) return null
+  const groups = groupCartItemsByShop(cartProducts)
 
   return (
-    <div>
-      {cartProducts.map((product, index) => {
-        const imageUrl = product.image_url || ''
-        const name = product.name || 'Unknown Product'
-        const colorName = product.color?.name || ''
-        const quantity = product.sold_quantity || product.quantity || 0
-        const finalPrice =
-          product.final_price || product.unit_final_price || product.price || 0
-
-        return (
-          <div
-            key={product.id || index}
-            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-gray-200 transition-colors"
-          >
-            <div className="h-16 w-16 flex-shrink-0 bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-200">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={name}
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <div className="text-xs text-gray-400">No image</div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium text-gray-900 truncate mb-1">
-                {name}
-              </h3>
-              {product.variant && (
-                <p className="text-xs text-gray-500 mb-1">
-                  {product.variant.name}
-                </p>
-              )}
-              {colorName && (
-                <p className="text-xs text-gray-500 mb-1">{colorName}</p>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-600">Qty: {quantity}</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  ${finalPrice.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )
-      })}
+    <div className="space-y-4">
+      {groups.map(group => (
+        <section key={group.key}>
+          <h4 className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            <Store className="h-3.5 w-3.5" aria-hidden />
+            {group.shopName}
+          </h4>
+          <ul className="divide-y divide-gray-100">
+            {group.items.map(item => {
+              const finalPrice = item.final_price || item.unit_final_price || item.price || 0
+              const hasDiscount = item.discount > 0 && item.price > finalPrice
+              const meta = [item.variant?.name, item.color?.name].filter(Boolean).join(' · ')
+              return (
+                <li key={item.id}>
+                  <Link
+                    to={`/product/${makeProductSlug(item.name, item.product_id)}`}
+                    onClick={onNavigate}
+                    className={`-mx-2 flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-paper ${
+                      item.unavailable ? 'opacity-60' : ''
+                    }`}
+                  >
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-paper">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt=""
+                          className="h-full w-full object-contain p-1 mix-blend-multiply"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-gray-400">No image</span>
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-ink">{item.name}</span>
+                      <span className="mt-0.5 block truncate text-xs text-gray-500">
+                        {item.unavailable ? (
+                          <span className="text-red-600">No longer available</span>
+                        ) : (
+                          <>
+                            {meta && `${meta} · `}Qty {item.quantity}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="price block text-sm font-semibold text-ink">
+                        ${(finalPrice * item.quantity).toFixed(2)}
+                      </span>
+                      {hasDiscount && (
+                        <span className="price block text-xs text-gray-400 line-through">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   )
 }
