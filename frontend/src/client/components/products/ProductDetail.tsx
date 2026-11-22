@@ -238,14 +238,15 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">
                     Key Specifications
                   </h3>
-                  <dl className="space-y-2">
+                  {/* Bang thong so: khung vien manh, cac dong ngan bang duong ke manh */}
+                  <dl className="divide-y divide-gray-200/70 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
                     {product.specs.slice(0, visibleCount).map(s => (
                       <div
                         key={s.label}
-                        className="flex justify-between py-2 border-b border-gray-100"
+                        className="flex items-baseline justify-between gap-4 px-4 py-2.5"
                       >
-                        <dt className="text-sm text-gray-600">{s.label}</dt>
-                        <dd className="text-sm font-medium text-gray-900">
+                        <dt className="text-sm text-gray-500">{s.label}</dt>
+                        <dd className="text-right text-sm font-medium text-ink">
                           {s.value}
                         </dd>
                       </div>
@@ -253,7 +254,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                   </dl>
                   {product.specs.length > 5 && (
                     <button
-                      className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      type="button"
+                      className="mt-3 text-sm font-medium text-ink underline-offset-4 hover:underline"
                       onClick={() => setExpanded(!expanded)}
                     >
                       {expanded
