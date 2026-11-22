@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import CategoryNav from '../components/collection/CategoryNav'
-import FilterTagsBar from '../components/collection/FilterTagsBar'
 import SidebarFilters from '../components/collection/SidebarFilters'
 import SortDropdown from '../components/collection/SortDropdown'
 import ProductGrid from '../components/collection/ProductGrid'
@@ -234,7 +233,7 @@ const Collection = () => {
     return match?.name ?? null
   }, [compareCategoryId, categoriesData])
 
-  const { data: allProducts, isLoading } = useCollectionProducts(
+  const { data: allProducts, isLoading, isPlaceholderData: isCollectionStale } = useCollectionProducts(
     productsFetchCategory,
     sortBy,
     filterString,
@@ -243,7 +242,7 @@ const Collection = () => {
     !!collectionParam // enable query only if collectionParam exists
   )
 
-  const { data: searchResults, isLoading: isSearching } = useSearchProducts(
+  const { data: searchResults, isLoading: isSearching, isPlaceholderData: isSearchStale } = useSearchProducts(
     searchQuery,
     {
       // "featured" khi tim kiem = xep theo do khop: khong gui sort de backend giu thu hang
@@ -429,37 +428,10 @@ const Collection = () => {
     setSearchParams(newParams)
   }
 
-  const removeTag = (tag: string) => {
-    const params = new URLSearchParams(searchParams)
-
-    // Find and remove tag from all filter parameters
-    let found = false
-    params.forEach((value, key) => {
-      if (['page', 'sort', 'search'].includes(key)) return
-
-      const values = value.split(',').filter(v => v.trim())
-      if (values.includes(tag)) {
-        const newValues = values.filter(v => v !== tag)
-        if (newValues.length > 0) {
-          params.set(key, newValues.join(','))
-        } else {
-          params.delete(key)
-        }
-        found = true
-      }
-    })
-
-    if (found) {
-      // Reset to page 1 when removing filter
-      params.set('page', '1')
-      setSearchParams(params)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-white">
       {categories.length > 0 && <CategoryNav categories={categories} />}
-      <FilterTagsBar tags={selectedTags} onRemoveTag={removeTag} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
         {(isLoadingFilters || Object.keys(filters.options).length > 0) && (
@@ -541,7 +513,13 @@ const Collection = () => {
           )}
 
           {!(searchQuery ? isSearching : isCollectionLoading) && products && (
-            <>
+            // Dang tai ket qua moi: lam mo luoi cu thay vi doi sang skeleton
+            <div
+              aria-busy={searchQuery ? isSearchStale : isCollectionStale}
+              className={`transition-opacity duration-200 ${
+                (searchQuery ? isSearchStale : isCollectionStale) ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
               {products.products.length === 0 ? (
                 <div className="py-12 text-center text-gray-500">
                   <p className="text-base font-medium text-gray-800">
@@ -606,7 +584,7 @@ const Collection = () => {
                     )}
                 </>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
