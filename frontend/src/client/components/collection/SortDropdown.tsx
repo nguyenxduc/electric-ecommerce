@@ -41,11 +41,24 @@ const SortDropdown = ({ options, selected, onSelect }: SortDropdownProps) => {
         className="group inline-flex items-center gap-2 py-2 text-sm text-gray-600 hover:text-ink"
       >
         Sort by
-        <span className="font-semibold text-ink">{current?.label}</span>
-        <ChevronDown
-          className={`h-4 w-4 text-gray-500 transition-transform duration-200 group-hover:text-ink ${isOpen ? 'rotate-180' : ''}`}
-          aria-hidden="true"
-        />
+        {/* Moi nhan (kem mui ten) chong len cung mot o luoi, chi hien nhan dang
+            chon: be rong nut luon bang nhan dai nhat nen doi lua chon thi
+            "Sort by" khong dich; mui ten di lien sau nhan. */}
+        <span className="inline-grid text-left font-semibold text-ink">
+          {options.map(o => (
+            <span
+              key={o.value}
+              aria-hidden={o.value !== current?.value}
+              className={`inline-flex items-center gap-1.5 [grid-area:1/1] ${o.value === current?.value ? '' : 'invisible'}`}
+            >
+              {o.label}
+              <ChevronDown
+                className={`h-4 w-4 text-gray-500 transition-transform duration-200 group-hover:text-ink ${isOpen ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </span>
+          ))}
+        </span>
       </button>
 
       {isOpen && (
