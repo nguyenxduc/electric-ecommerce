@@ -1,117 +1,92 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowRight, ShoppingBag, X } from 'lucide-react'
 import CartContent from '../cart/CartContent'
-import { useNavigate } from 'react-router-dom'
 
 import CartIcon from '../../../assets/cart-icon.svg'
-import EmptyCart from '../../../assets/empty-cart.png'
-import ProceedCart from '../../../assets/proceed-cart.svg'
 import { Cart, CartItem } from '../../types/cart'
 
-type ModalProps = {
-  open: boolean
+type PopoverProps = {
   onClose(): void
   cartItemCount: number
   totalCost: number
   cartProducts: CartItem[]
 }
 
-function Model({
-  open,
-  onClose,
-  cartItemCount,
-  totalCost,
-  cartProducts
-}: ModalProps) {
+// Popup gio hang neo duoi header. Khong lam toi/mo nen trang: lop phu trong
+// suot chi de bat click ra ngoai thi dong.
+function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: PopoverProps) {
   const navigate = useNavigate()
 
-  if (!open) return null
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
-    <div
-      className="fixed inset-0 z-50 transition-colors bg-black/20"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50" onClick={onClose}>
       <div
-        className="fixed top-16 right-4 md:right-8 bg-white rounded-lg shadow-xl border border-gray-200 w-[90vw] max-w-[450px] max-h-[80vh] overflow-hidden transition-all transform"
+        role="dialog"
+        aria-label="Shopping cart"
+        className="fixed right-4 top-[72px] flex max-h-[calc(100vh-96px)] w-[calc(100vw-2rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_-24px_rgb(23_24_27/0.35)] ring-1 ring-gray-200/80 md:right-8"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Shopping Cart
-            </h3>
-            <button
-              onClick={onClose}
-              className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {cartItemCount ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'}
-                </p>
-                <div className="space-y-3">
-                  <CartContent cartProducts={cartProducts} />
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <img
-                  src={EmptyCart}
-                  alt="empty-cart"
-                  className="w-24 h-24 mb-4 opacity-50"
-                />
-                <p className="text-gray-500 mb-2">Your cart is empty</p>
-                <p className="text-sm text-gray-400">
-                  Add some products to get started
-                </p>
-              </div>
+        <header className="flex items-center justify-between px-5 pb-3 pt-4">
+          <h3 className="text-base font-semibold text-ink">
+            Your cart
+            {cartItemCount > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'}
+              </span>
             )}
-          </div>
+          </h3>
+          <button
+            onClick={onClose}
+            aria-label="Close cart"
+            className="-mr-1.5 rounded-full p-1.5 text-gray-400 hover:bg-paper hover:text-ink"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
 
-          {/* Footer */}
-          {cartItemCount > 0 && (
-            <div className="border-t border-gray-200 p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Total:</span>
-                <span className="text-lg font-semibold text-gray-900">
-                  $
-                  {typeof totalCost === 'number'
-                    ? totalCost.toFixed(2)
-                    : '0.00'}
+        {cartItemCount > 0 ? (
+          <>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
+              <CartContent cartProducts={cartProducts} onNavigate={onClose} />
+            </div>
+            <footer className="border-t border-gray-100 px-5 pb-5 pt-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm text-gray-600">Subtotal</span>
+                <span className="price text-lg font-semibold text-ink">
+                  ${(typeof totalCost === 'number' ? totalCost : 0).toFixed(2)}
                 </span>
               </div>
+              <p className="mt-0.5 text-xs text-gray-500">Shipping and vouchers are applied at checkout.</p>
               <button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                className="btn-primary mt-4 w-full py-3"
                 onClick={() => {
                   navigate('/cart')
                   onClose()
                 }}
               >
-                View Cart
-                <img src={ProceedCart} alt="proceed-cart" className="h-4 w-4" />
+                View cart
+                <ArrowRight className="h-4 w-4" />
               </button>
-            </div>
-          )}
-        </div>
+            </footer>
+          </>
+        ) : (
+          <div className="flex flex-col items-center px-5 pb-8 pt-4 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-paper">
+              <ShoppingBag className="h-5 w-5 text-gray-500" />
+            </span>
+            <p className="mt-3 text-sm font-medium text-ink">Your cart is empty</p>
+            <p className="mt-1 text-xs text-gray-500">Add some products to get started.</p>
+            <Link to="/collection/all" onClick={onClose} className="btn-secondary mt-5">
+              Shop all products
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -123,32 +98,28 @@ interface CartProps {
 
 const CartDrawer = ({ cartProducts }: CartProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
-
-  if (cartProducts) {
-    console.log('Cart Products in Drawer:', cartProducts)
-  } else {
-    console.log('No cart products available')
-  }
+  const count = cartProducts?.total_items ?? 0
 
   return (
-    <div className="">
+    <div>
       {drawerOpen && (
-        <Model
-          open={drawerOpen}
+        <CartPopover
           onClose={() => setDrawerOpen(false)}
-          cartItemCount={cartProducts ? cartProducts?.total_items : 0}
-          totalCost={cartProducts ? cartProducts?.total_price : 0}
-          cartProducts={cartProducts ? cartProducts?.items : []}
+          cartItemCount={count}
+          totalCost={cartProducts?.total_price ?? 0}
+          cartProducts={cartProducts?.items ?? []}
         />
       )}
       <button
-        className="relative p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+        className="relative rounded-lg p-2 text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-blue-600"
         onClick={() => setDrawerOpen(!drawerOpen)}
+        aria-label={count ? `Cart, ${count} items` : 'Cart'}
+        aria-expanded={drawerOpen}
       >
-        <img src={CartIcon} alt="Cart" className="h-10 w-10" />
-        {(cartProducts ? cartProducts?.total_items : 0) > 0 && (
-          <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
-            {cartProducts ? cartProducts?.total_items : 0}
+        <img src={CartIcon} alt="" className="h-10 w-10" />
+        {count > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-600 px-1 text-xs text-white">
+            {count}
           </span>
         )}
       </button>
