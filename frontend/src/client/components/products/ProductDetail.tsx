@@ -238,8 +238,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">
                     Key Specifications
                   </h3>
-                  {/* Bang thong so: khung vien manh, cac dong ngan bang duong ke manh */}
-                  <dl className="divide-y divide-gray-200/70 overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200">
+                  {/* Bang thong so: khung vien manh, nen trong suot, cac dong ngan bang duong ke manh */}
+                  <dl className="divide-y divide-gray-200/70 overflow-hidden rounded-2xl ring-1 ring-gray-200">
                     {product.specs.slice(0, visibleCount).map(s => (
                       <div
                         key={s.label}
