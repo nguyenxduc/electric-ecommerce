@@ -93,7 +93,7 @@ const Navbar = () => {
                   title="Admin Panel"
                   aria-label="Admin Panel"
                 >
-                  <Settings className="h-[22px] w-[22px]" aria-hidden="true" />
+                  <Settings aria-hidden="true" />
                 </Link>
               )}
               {me?.role === 'seller' && (
@@ -103,7 +103,7 @@ const Navbar = () => {
                   title="Seller Dashboard"
                   aria-label="Seller Dashboard"
                 >
-                  <Store className="h-[22px] w-[22px]" aria-hidden="true" />
+                  <Store aria-hidden="true" />
                 </Link>
               )}
               <NotificationBell />

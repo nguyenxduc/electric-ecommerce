@@ -120,9 +120,9 @@ export default function NotificationBell() {
         title="Notifications"
         aria-label="Notifications"
       >
-        <Bell className="h-[22px] w-[22px]" aria-hidden="true" />
+        <Bell aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute right-0 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-paper">
+          <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9.5px] font-semibold leading-none tabular-nums text-white ring-2 ring-paper">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

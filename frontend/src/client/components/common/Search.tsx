@@ -749,7 +749,7 @@ const Search = () => {
         aria-label="Open search"
         aria-haspopup="dialog"
       >
-        <SearchGlyph className="h-[22px] w-[22px]" aria-hidden="true" />
+        <SearchGlyph aria-hidden="true" />
       </button>
     </div>
   )

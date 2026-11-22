@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, ShoppingBag, ShoppingBasket, X } from 'lucide-react'
+import { ArrowRight, ShoppingBag, X } from 'lucide-react'
 import CartContent from '../cart/CartContent'
 
 import { Cart, CartItem } from '../../types/cart'
@@ -143,9 +143,9 @@ const CartDrawer = ({ cartProducts }: CartProps) => {
         aria-label={count ? `Cart, ${count} items` : 'Cart'}
         aria-expanded={drawerOpen}
       >
-        <ShoppingBasket className="h-[22px] w-[22px]" aria-hidden="true" />
+        <ShoppingBag aria-hidden="true" />
         {count > 0 && (
-          <span className="absolute right-0 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-paper">
+          <span className="absolute -right-0.5 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-ink px-1 text-[9.5px] font-semibold leading-none tabular-nums text-white ring-2 ring-paper">
             {count}
           </span>
         )}

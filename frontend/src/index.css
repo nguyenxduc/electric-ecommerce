@@ -61,12 +61,14 @@
     @apply relative inline-flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:text-ink aria-expanded:text-ink;
   }
   .icon-btn > svg {
-    stroke-width: 1.6;
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.5;
     transition: stroke-width 160ms ease;
   }
   .icon-btn:hover > svg,
   .icon-btn[aria-expanded='true'] > svg {
-    stroke-width: 2.3;
+    stroke-width: 1.75;
   }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.14em] text-gray-500;
