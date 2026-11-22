@@ -35,10 +35,28 @@ const Collection = () => {
   const { collection } = useParams<{ collection: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Get category data by slug (if not 'all')
-  const { data: categoryData, isLoading: isCategoryLoading } =
-    useCategoryBySlug(collection || '')
-  const categoryId = categoryData?.id ? Number(categoryData.id) : undefined
+  // Danh sach category (da tai cho thanh CategoryNav) du de doi slug -> id ngay,
+  // khong phai cho /categories/slug. Truoc day trong luc cho, san pham roi ve
+  // 'all' va sidebar thanh skeleton: doi category lan dau thay nhay "All" roi
+  // moi ra dung category (lan sau co cache nen khong bi).
+  const { data: categoriesData } = useCategories()
+  const listCategory = useMemo(
+    () =>
+      collection && collection !== 'all'
+        ? categoriesData?.find(c => c.slug === collection || String(c.id) === collection)
+        : undefined,
+    [categoriesData, collection]
+  )
+
+  // Get category data by slug (if not 'all') - chi con la duong du phong
+  const { data: categoryData, isLoading: isCategoryBySlugLoading } =
+    useCategoryBySlug(listCategory ? '' : collection || '')
+  const categoryId = listCategory
+    ? Number(listCategory.id)
+    : categoryData?.id
+    ? Number(categoryData.id)
+    : undefined
+  const isCategoryLoading = !listCategory && isCategoryBySlugLoading
 
   // Determine the collection parameter for products API
   const collectionParam = useMemo(() => {
@@ -57,11 +75,10 @@ const Collection = () => {
     [searchParams]
   )
 
-  // Fetch categories and filters from API
-  const { data: categoriesData } = useCategories()
+  // Fetch filters from API
   // Only pass categoryId if we're not on "All" collection
   // This ensures global filters only show on "All" collection
-  const { data: filtersData, isLoading: isLoadingFilters } = useFilters(
+  const { data: filtersData, isLoading: isLoadingFilters, isPlaceholderData: isFiltersStale } = useFilters(
     collection === 'all' ? undefined : categoryId
   )
 
@@ -445,7 +462,12 @@ const Collection = () => {
             >
               {showFilters ? 'Hide filters' : `Filters${selectedTags.length ? ` (${selectedTags.length})` : ''}`}
             </button>
-            <div className={showFilters ? 'block' : 'hidden lg:block'}>
+            <div
+              aria-busy={isFiltersStale}
+              className={`${showFilters ? 'block' : 'hidden lg:block'} transition-opacity duration-200 ${
+                isFiltersStale ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
               <SidebarFilters
                 filters={filters}
                 onFilterChange={handleFilterChange}
