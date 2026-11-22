@@ -298,6 +298,38 @@ export const removeAllFromCart = asyncHandler(async (req, res) => {
   res.json({ message: "All items removed from cart", cart_summary: summary });
 });
 
+const AMBIGUOUS_LINE =
+  "This product is in your cart more than once; send cart_item_id to pick the line";
+
+const colorCodeOf = (color) => {
+  if (!color) return "";
+  if (typeof color === "string") {
+    try {
+      return JSON.parse(color)?.code || "";
+    } catch {
+      return "";
+    }
+  }
+  return color.code || "";
+};
+
+// Khong co cart_item_id: tim dong theo san pham (+ bien the, + ma mau neu gui kem).
+// Con nhieu dong khop thi bao mo ho thay vi sua nham dong khac mau.
+const findLineByProduct = async (cartId, productId, { variantId, colorCode, include } = {}) => {
+  const lines = await prisma.cartItem.findMany({
+    where: {
+      cart_id: cartId,
+      product_id: BigInt(productId),
+      ...(variantId != null ? { variant_id: BigInt(variantId) } : {}),
+      deleted_at: null,
+    },
+    ...(include && { include }),
+    orderBy: { id: "asc" },
+  });
+  const matches = colorCode ? lines.filter((l) => colorCodeOf(l.color) === colorCode) : lines;
+  return { item: matches[0] ?? null, ambiguous: matches.length > 1 };
+};
+
 export const updateQuantity = asyncHandler(async (req, res) => {
   const { product_id } = req.params;
   const { quantity, cart_item_id } = req.body;
@@ -317,15 +349,13 @@ export const updateQuantity = asyncHandler(async (req, res) => {
       include: { product: true, variant: true },
     });
   } else {
-    cartItem = await prisma.cartItem.findFirst({
-      where: {
-        cart_id: cart.id,
-        product_id: BigInt(product_id),
-        ...(req.body.variant_id != null ? { variant_id: BigInt(req.body.variant_id) } : {}),
-        deleted_at: null,
-      },
+    const found = await findLineByProduct(cart.id, product_id, {
+      variantId: req.body.variant_id,
+      colorCode: req.body.color?.code,
       include: { product: true, variant: true },
     });
+    if (found.ambiguous) return res.status(400).json({ message: AMBIGUOUS_LINE });
+    cartItem = found.item;
   }
 
   if (!cartItem) return res.status(404).json({ message: "Item not found in cart" });
@@ -379,9 +409,9 @@ export const deleteCartItem = asyncHandler(async (req, res) => {
       where: { id: BigInt(cart_item_id), cart_id: cart.id, deleted_at: null },
     });
   } else {
-    cartItem = await prisma.cartItem.findFirst({
-      where: { cart_id: cart.id, product_id: BigInt(product_id), deleted_at: null },
-    });
+    const found = await findLineByProduct(cart.id, product_id, { colorCode: req.query.color_code });
+    if (found.ambiguous) return res.status(400).json({ message: AMBIGUOUS_LINE });
+    cartItem = found.item;
   }
 
   if (!cartItem) return res.status(404).json({ message: "Item not found in cart" });
