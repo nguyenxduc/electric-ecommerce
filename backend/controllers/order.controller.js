@@ -40,8 +40,24 @@ import { parsePagination } from "../lib/pagination.js";
 import { applyOrderListFilters } from "../lib/orderFilters.js";
 import { toCsv } from "../lib/csv.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { isTxConflict, withTxConflictRetry } from "../lib/transaction.js";
 
 const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409, SHIPMENT_ACTIVE: 409 };
+
+// Khoa sap xep cho buoc tru kho trong createOrder: (product_id, variant_id, mau).
+// Chi can la mot thu tu toan phan co dinh de moi giao dich khoa dong cung thu tu.
+const stockKeyOf = (item) => [
+  item.data.product_id,
+  item.data.variant_id == null ? -1n : BigInt(item.data.variant_id),
+  `${item.color?.code ?? ""}|${item.color?.name ?? ""}`,
+];
+const compareStockKey = (a, b) => {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] < b[i]) return -1;
+    if (a[i] > b[i]) return 1;
+  }
+  return 0;
+};
 
 // Yeu cau hoa don cong ty tu checkout: chi giu cac truong chuoi da biet, cat
 // do dai - day la du lieu nguoi dung go, se in len hoa don.
@@ -326,7 +342,7 @@ export const createOrder = async (req, res) => {
       couponShopKey,
     });
 
-    const created = await prisma.$transaction(async (tx) => {
+    const created = await withTxConflictRetry(() => prisma.$transaction(async (tx) => {
       const orderGroup = await tx.orderGroup.create({
         data: {
           user_id: BigInt(userId),
@@ -348,6 +364,58 @@ export const createOrder = async (req, res) => {
           risk_score: risk.score || 0,
         },
       });
+
+      // Tru kho + tang sold cho MOI mon cua ca checkout, theo mot thu tu co dinh.
+      //
+      // Cap nhat co dieu kien (quantity >= can) chan ban vuot kho: giao dich
+      // cham hon nhan count = 0 va bi huy. Moi UPDATE khoa dong toi cuoi giao
+      // dich, nen neu hai gio {X, Y} va {Y, X} khoa theo thu tu trong gio thi
+      // moi ben giu mot dong va cho dong kia -> deadlock. Sap theo
+      // (product_id, variant_id, mau) thi moi giao dich khoa cung mot thu tu.
+      // Lam mot lan cho ca checkout chu khong theo tung shop, vi thu tu shop
+      // cung la thu tu trong gio.
+      const stockLines = groups
+        .flatMap((group) => group.items)
+        .sort((a, b) => compareStockKey(stockKeyOf(a), stockKeyOf(b)));
+      for (const item of stockLines) {
+        const it = item.data;
+        const colorObj = item.color;
+        if (it.variant_id) {
+          const variantHit = await tx.productVariant.updateMany({
+            where: { id: it.variant_id, quantity: { gte: it.quantity } },
+            data: { quantity: { decrement: it.quantity } },
+          });
+          if (variantHit.count === 0) {
+            throw new Error(`OUT_OF_STOCK:${item.productName}`);
+          }
+        }
+        if (colorObj && (colorObj.code || colorObj.name)) {
+          const colorHit = await tx.productColor.updateMany({
+            where: {
+              product_id: it.product_id,
+              quantity: { gte: it.quantity },
+              OR: [
+                colorObj.code ? { code: colorObj.code } : undefined,
+                colorObj.name ? { name: colorObj.name } : undefined,
+              ].filter(Boolean),
+            },
+            data: { quantity: { decrement: it.quantity } },
+          });
+          if (colorHit.count === 0) {
+            throw new Error(`OUT_OF_STOCK:${item.productName}`);
+          }
+        }
+        const stockHit = await tx.product.updateMany({
+          where: { id: it.product_id, quantity: { gte: it.quantity } },
+          data: {
+            quantity: { decrement: it.quantity },
+            sold: { increment: it.quantity },
+          },
+        });
+        if (stockHit.count === 0) {
+          throw new Error(`OUT_OF_STOCK:${item.productName}`);
+        }
+      }
 
       const createdOrders = [];
       for (const group of groups) {
@@ -374,49 +442,6 @@ export const createOrder = async (req, res) => {
             shop: { select: { id: true, name: true, slug: true } },
           },
         });
-
-        // Decrement stock and increment sold for this shop's items.
-        // Conditional updates (quantity >= needed) make concurrent checkouts
-        // safe: the slower buyer's transaction aborts instead of overselling.
-        for (const item of group.items) {
-          const it = item.data;
-          const colorObj = item.color;
-          if (it.variant_id) {
-            const variantHit = await tx.productVariant.updateMany({
-              where: { id: it.variant_id, quantity: { gte: it.quantity } },
-              data: { quantity: { decrement: it.quantity } },
-            });
-            if (variantHit.count === 0) {
-              throw new Error(`OUT_OF_STOCK:${item.productName}`);
-            }
-          }
-          if (colorObj && (colorObj.code || colorObj.name)) {
-            const colorHit = await tx.productColor.updateMany({
-              where: {
-                product_id: it.product_id,
-                quantity: { gte: it.quantity },
-                OR: [
-                  colorObj.code ? { code: colorObj.code } : undefined,
-                  colorObj.name ? { name: colorObj.name } : undefined,
-                ].filter(Boolean),
-              },
-              data: { quantity: { decrement: it.quantity } },
-            });
-            if (colorHit.count === 0) {
-              throw new Error(`OUT_OF_STOCK:${item.productName}`);
-            }
-          }
-          const stockHit = await tx.product.updateMany({
-            where: { id: it.product_id, quantity: { gte: it.quantity } },
-            data: {
-              quantity: { decrement: it.quantity },
-              sold: { increment: it.quantity },
-            },
-          });
-          if (stockHit.count === 0) {
-            throw new Error(`OUT_OF_STOCK:${item.productName}`);
-          }
-        }
 
         // Cộng điểm theo từng đơn con, tính trên tiền hàng (không gồm phí ship)
         await earnPointsForOrder(
@@ -454,7 +479,7 @@ export const createOrder = async (req, res) => {
       }
 
       return { orderGroup, orders: createdOrders };
-    });
+    }));
 
     // Ghi co nghi van (neu co) ngoai giao dich: loi o day khong lam hong don.
     recordCheckoutRisk(created.orderGroup, risk, riskCtx).catch((err) =>
@@ -524,9 +549,17 @@ export const createOrder = async (req, res) => {
         message: `Voucher "${code}" has reached its usage limit.`,
       });
     }
-    res
-      .status(500)
-      .json({ message: "Failed to create order", error: error.message });
+    // Van xung dot sau khi da chay lai: hang khong thieu, chi la qua dong.
+    if (isTxConflict(error)) {
+      return res.status(409).json({
+        code: "CHECKOUT_BUSY",
+        message: "Checkout is busy right now. Please try again.",
+      });
+    }
+    // Khong tra error.message: thong bao goc cua Prisma/Postgres lo ten bang,
+    // cau truy van va process id ra ngoai.
+    console.error("[createOrder]", error);
+    res.status(500).json({ message: "Failed to create order" });
   }
 };
 
