@@ -118,7 +118,6 @@ function Modal({
     searchTerm.trim() ? debouncedTerm : ''
   )
   const [recent, setRecent] = useState<string[]>(readRecent)
-  const [active, setActive] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -193,8 +192,6 @@ function Modal({
     setRecent([])
   }
 
-  const isActive = (item: SuggestItem) => items[active]?.id === item.id
-
   const renderChips = (section: SuggestItem['section'], icon?: ReactNode) =>
     items
       .filter(i => i.section === section)
@@ -203,12 +200,9 @@ function Modal({
           key={item.id}
           id={item.id}
           role="option"
-          aria-selected={isActive(item)}
           type="button"
           onClick={item.go}
-          className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-full px-3 py-1.5 text-sm ring-1 ring-inset hover:ring-ink ${
-            isActive(item) ? 'bg-ink text-white ring-ink' : 'bg-white text-gray-700 ring-gray-200'
-          }`}
+          className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full bg-white px-3 py-1.5 text-sm text-gray-700 ring-1 ring-inset ring-gray-200 hover:ring-ink"
         >
           {icon}
           <span className="truncate">{item.label}</span>
@@ -223,12 +217,9 @@ function Modal({
             key={item.id}
             id={item.id}
             role="option"
-            aria-selected={isActive(item)}
             type="button"
             onClick={item.go}
-            className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-paper ${
-              isActive(item) ? 'bg-paper ring-1 ring-inset ring-gray-300' : ''
-            }`}
+            className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-paper"
           >
             {section === 'product' ? (
               <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-paper">
@@ -257,19 +248,11 @@ function Modal({
         )
     )
 
+  // Enter luon tim theo chu dang go (khong chon goi y bang phim mui ten)
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      if (items.length === 0) return
+    if (e.key === 'Enter') {
       e.preventDefault()
-      const step = e.key === 'ArrowDown' ? 1 : -1
-      const next =
-        active < 0 ? (step > 0 ? 0 : items.length - 1) : (active + step + items.length) % items.length
-      setActive(next)
-      document.getElementById(items[next].id)?.scrollIntoView({ block: 'nearest' })
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      if (items[active]) items[active].go()
-      else onSubmit()
+      onSubmit()
     }
   }
 
@@ -422,18 +405,13 @@ function Modal({
                 aria-expanded
                 aria-controls="search-suggestions"
                 aria-autocomplete="list"
-                aria-activedescendant={items[active]?.id}
-                onChange={e => {
-                  setActive(-1)
-                  onChange(e.target.value)
-                }}
+                onChange={e => onChange(e.target.value)}
                 onKeyDown={handleKeyDown}
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => {
-                    setActive(-1)
                     onChange('')
                     inputRef.current?.focus()
                   }}
@@ -707,7 +685,7 @@ function Modal({
           )}
         </div>
 
-        {/* Chan: xem tat ca ket qua + phim tat */}
+        {/* Chan: xem tat ca ket qua */}
         {term && !imageData && (
           <button
             type="button"
@@ -720,11 +698,6 @@ function Modal({
             <ArrowRight className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
-        <div className="hidden flex-shrink-0 items-center gap-4 border-t border-gray-100 px-5 py-2.5 text-xs text-gray-500 sm:flex">
-          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">↑</kbd> <kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">↓</kbd> to navigate</span>
-          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">Enter</kbd> to select</span>
-          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">Esc</kbd> to close</span>
-        </div>
       </div>
     </div>,
     document.body
