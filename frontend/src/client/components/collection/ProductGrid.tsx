@@ -5,16 +5,18 @@ import { MAX_COMPARE_PRODUCTS } from '../../constants/compare';
 
 interface ProductGridProps {
   products: Product[];
+  // Them class cho luoi (vd. hieu ung the hien so le)
+  className?: string;
   selectedCompareProducts?: Product[];
   onCompareToggle?: (product: Product) => void;
 }
 
-const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle }: ProductGridProps) => {
+const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle, className = '' }: ProductGridProps) => {
   const selectedCompareIds = selectedCompareProducts.map(product => product.id);
   const selectedCategoryId = selectedCompareProducts[0]?.category_id;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+    <div className={`grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 ${className}`}>
       {products.slice(0, 9).map((product) => (
         <ProductCard
           key={product.id}

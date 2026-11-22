@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import CategoryNav from '../components/collection/CategoryNav'
-import FilterTagsBar from '../components/collection/FilterTagsBar'
 import SidebarFilters from '../components/collection/SidebarFilters'
 import SortDropdown from '../components/collection/SortDropdown'
 import ProductGrid from '../components/collection/ProductGrid'
@@ -36,10 +35,28 @@ const Collection = () => {
   const { collection } = useParams<{ collection: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Get category data by slug (if not 'all')
-  const { data: categoryData, isLoading: isCategoryLoading } =
-    useCategoryBySlug(collection || '')
-  const categoryId = categoryData?.id ? Number(categoryData.id) : undefined
+  // Danh sach category (da tai cho thanh CategoryNav) du de doi slug -> id ngay,
+  // khong phai cho /categories/slug. Truoc day trong luc cho, san pham roi ve
+  // 'all' va sidebar thanh skeleton: doi category lan dau thay nhay "All" roi
+  // moi ra dung category (lan sau co cache nen khong bi).
+  const { data: categoriesData } = useCategories()
+  const listCategory = useMemo(
+    () =>
+      collection && collection !== 'all'
+        ? categoriesData?.find(c => c.slug === collection || String(c.id) === collection)
+        : undefined,
+    [categoriesData, collection]
+  )
+
+  // Get category data by slug (if not 'all') - chi con la duong du phong
+  const { data: categoryData, isLoading: isCategoryBySlugLoading } =
+    useCategoryBySlug(listCategory ? '' : collection || '')
+  const categoryId = listCategory
+    ? Number(listCategory.id)
+    : categoryData?.id
+    ? Number(categoryData.id)
+    : undefined
+  const isCategoryLoading = !listCategory && isCategoryBySlugLoading
 
   // Determine the collection parameter for products API
   const collectionParam = useMemo(() => {
@@ -58,11 +75,10 @@ const Collection = () => {
     [searchParams]
   )
 
-  // Fetch categories and filters from API
-  const { data: categoriesData } = useCategories()
+  // Fetch filters from API
   // Only pass categoryId if we're not on "All" collection
   // This ensures global filters only show on "All" collection
-  const { data: filtersData, isLoading: isLoadingFilters } = useFilters(
+  const { data: filtersData, isLoading: isLoadingFilters, isPlaceholderData: isFiltersStale } = useFilters(
     collection === 'all' ? undefined : categoryId
   )
 
@@ -189,10 +205,10 @@ const Collection = () => {
   }, [categoriesData])
 
   const sortOptions = [
-    { value: 'featured', label: 'featured' },
-    { value: 'price-asc', label: 'Price: ascending' },
-    { value: 'price-desc', label: 'Price: descending' },
-    { value: 'newest', label: 'New Arrivals' },
+    { value: 'featured', label: 'Featured' },
+    { value: 'price-asc', label: 'Price: low to high' },
+    { value: 'price-desc', label: 'Price: high to low' },
+    { value: 'newest', label: 'Newest' },
     { value: 'discount', label: 'Biggest discount' }
   ]
 
@@ -234,7 +250,7 @@ const Collection = () => {
     return match?.name ?? null
   }, [compareCategoryId, categoriesData])
 
-  const { data: allProducts, isLoading } = useCollectionProducts(
+  const { data: allProducts, isLoading, isPlaceholderData: isCollectionStale } = useCollectionProducts(
     productsFetchCategory,
     sortBy,
     filterString,
@@ -243,7 +259,7 @@ const Collection = () => {
     !!collectionParam // enable query only if collectionParam exists
   )
 
-  const { data: searchResults, isLoading: isSearching } = useSearchProducts(
+  const { data: searchResults, isLoading: isSearching, isPlaceholderData: isSearchStale } = useSearchProducts(
     searchQuery,
     {
       // "featured" khi tim kiem = xep theo do khop: khong gui sort de backend giu thu hang
@@ -347,6 +363,33 @@ const Collection = () => {
     }
   }, [allProducts, searchResults, searchQuery])
 
+  // Hieu ung khi ket qua moi hien ra. Huong: doi category -> theo vi tri chip
+  // (phai thi truot tu phai vao); chuyen trang -> trang sau tu phai; doi filter
+  // hay sort -> hien dan len. Lan dau vao trang: khong hieu ung luoi.
+  const gridKey = products?.products?.length
+    ? // Chi theo danh sach id: luc doi trang/category, luoi cu (placeholder) van
+      // hien voi trang moi; neu dua trang vao key thi hieu ung bi tinh luc do
+      products.products.map(p => p.id).join(',')
+    : ''
+  const categoryIndex = Math.max(
+    0,
+    categories.findIndex(
+      c => (c.id === 0 ? 'all' : ('slug' in c && c.slug) || String(c.id)) === (collection || 'all')
+    )
+  )
+  const gridMotionRef = useRef<{ key: string; cat: number; page: number; cls: string } | null>(null)
+  if (gridKey && gridMotionRef.current?.key !== gridKey) {
+    const prev = gridMotionRef.current
+    let cls = ''
+    if (prev && prev.key) {
+      if (prev.cat !== categoryIndex) cls = categoryIndex > prev.cat ? 'page-in-right' : 'page-in-left'
+      else if (prev.page !== currentPage) cls = currentPage > prev.page ? 'page-in-right' : 'page-in-left'
+      else cls = 'page-in-up'
+    }
+    gridMotionRef.current = { key: gridKey, cat: categoryIndex, page: currentPage, cls }
+  }
+  const gridMotion = gridMotionRef.current?.cls ?? ''
+
   // Scroll to top when page changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -429,37 +472,10 @@ const Collection = () => {
     setSearchParams(newParams)
   }
 
-  const removeTag = (tag: string) => {
-    const params = new URLSearchParams(searchParams)
-
-    // Find and remove tag from all filter parameters
-    let found = false
-    params.forEach((value, key) => {
-      if (['page', 'sort', 'search'].includes(key)) return
-
-      const values = value.split(',').filter(v => v.trim())
-      if (values.includes(tag)) {
-        const newValues = values.filter(v => v !== tag)
-        if (newValues.length > 0) {
-          params.set(key, newValues.join(','))
-        } else {
-          params.delete(key)
-        }
-        found = true
-      }
-    })
-
-    if (found) {
-      // Reset to page 1 when removing filter
-      params.set('page', '1')
-      setSearchParams(params)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-white">
       {categories.length > 0 && <CategoryNav categories={categories} />}
-      <FilterTagsBar tags={selectedTags} onRemoveTag={removeTag} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col lg:flex-row gap-6 lg:gap-8">
         {(isLoadingFilters || Object.keys(filters.options).length > 0) && (
@@ -473,7 +489,12 @@ const Collection = () => {
             >
               {showFilters ? 'Hide filters' : `Filters${selectedTags.length ? ` (${selectedTags.length})` : ''}`}
             </button>
-            <div className={showFilters ? 'block' : 'hidden lg:block'}>
+            <div
+              aria-busy={isFiltersStale}
+              className={`${showFilters ? 'block' : 'hidden lg:block'} transition-opacity duration-200 ${
+                isFiltersStale ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
               <SidebarFilters
                 filters={filters}
                 onFilterChange={handleFilterChange}
@@ -491,12 +512,26 @@ const Collection = () => {
               : ''
           }`}
         >
-          <div className="flex justify-between flex-col gap-3 mb-6 lg:flex-row lg:items-center">
-            <SortDropdown
-              options={sortOptions}
-              selected={sortBy}
-              onSelect={setSortBy}
-            />
+          <div className="mb-6 flex flex-col gap-3">
+            {/* Hang cong cu: so ket qua ben trai, Sort by ben phai */}
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm text-gray-600">
+                {products && products.products.length > 0 &&
+                  (products.pagination
+                    ? `Showing ${
+                        (products.pagination.current_page - 1) * products.pagination.per_page + 1
+                      }–${Math.min(
+                        products.pagination.current_page * products.pagination.per_page,
+                        products.pagination.total_count
+                      )} of ${products.pagination.total_count} products`
+                    : `${products.products.length} products`)}
+              </p>
+              <SortDropdown
+                options={sortOptions}
+                selected={sortBy}
+                onSelect={setSortBy}
+              />
+            </div>
             {compareIds.length > 0 && (
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -541,7 +576,13 @@ const Collection = () => {
           )}
 
           {!(searchQuery ? isSearching : isCollectionLoading) && products && (
-            <>
+            // Dang tai ket qua moi: lam mo luoi cu thay vi doi sang skeleton
+            <div
+              aria-busy={searchQuery ? isSearchStale : isCollectionStale}
+              className={`transition-opacity duration-200 ${
+                (searchQuery ? isSearchStale : isCollectionStale) ? 'pointer-events-none opacity-50' : ''
+              }`}
+            >
               {products.products.length === 0 ? (
                 <div className="py-12 text-center text-gray-500">
                   <p className="text-base font-medium text-gray-800">
@@ -572,25 +613,14 @@ const Collection = () => {
                 </div>
               ) : (
                 <>
-                  <div className="mb-4 text-sm text-gray-600">
-                    Showing{' '}
-                    {products.pagination
-                      ? `${
-                          (products.pagination.current_page - 1) *
-                            products.pagination.per_page +
-                          1
-                        }-${Math.min(
-                          products.pagination.current_page *
-                            products.pagination.per_page,
-                          products.pagination.total_count
-                        )} of ${products.pagination.total_count} products`
-                      : `${products.products.length} products`}
+                  <div key={gridKey} className={gridMotion}>
+                    <ProductGrid
+                      products={products.products}
+                      selectedCompareProducts={compareProducts}
+                      onCompareToggle={handleToggleCompare}
+                      className={gridMotion ? 'stagger-in' : ''}
+                    />
                   </div>
-                  <ProductGrid
-                    products={products.products}
-                    selectedCompareProducts={compareProducts}
-                    onCompareToggle={handleToggleCompare}
-                  />
 
                   {products.pagination &&
                     shouldShowPagination(products.pagination) && (
@@ -606,7 +636,7 @@ const Collection = () => {
                     )}
                 </>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

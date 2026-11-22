@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import {
   fetchAllFilter,
   fetchFilterByCategory
@@ -9,6 +9,9 @@ export const useFilters = (categoryId?: number) => {
     queryKey: ['filters', categoryId],
     queryFn: () =>
       categoryId ? fetchFilterByCategory(categoryId) : fetchAllFilter(),
-    staleTime: 5 * 60 * 1000
+    staleTime: 5 * 60 * 1000,
+    // Doi category lan dau (chua co cache): giu bo loc cu trong luc tai, khong
+    // thay sidebar bang skeleton lam trang co lai
+    placeholderData: keepPreviousData
   })
 }

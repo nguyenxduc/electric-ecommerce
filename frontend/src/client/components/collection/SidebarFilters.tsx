@@ -38,12 +38,16 @@ const SidebarFilters = ({
       {/* Fixed header */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <h2 className="text-lg font-semibold">Filters</h2>
-        <button
-          onClick={onClearAll}
-          className="text-sm text-blue-600 hover:underline"
-        >
-          Clear all
-        </button>
+        {/* Chi hien khi dang chon it nhat mot filter */}
+        {Object.values(filters.selected).some(v => v && v.length > 0) && (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="text-sm font-medium text-ink underline-offset-4 hover:underline"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {/* Scrollable filter content */}

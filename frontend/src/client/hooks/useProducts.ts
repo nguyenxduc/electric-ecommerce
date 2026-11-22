@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiErrorResponse } from '../../lib/apiError'
 import {
   fetchNewProducts,
@@ -83,7 +83,10 @@ export const useCollectionProducts = (
     queryFn: () =>
       fetchCollectionProducts(category_id, sort, filter, page, limit),
     enabled: enabled && !!category_id,
-    staleTime: 5 * 60 * 1000
+    staleTime: 5 * 60 * 1000,
+    // Doi filter/sort/trang: giu luoi cu trong luc tai, khong thay bang skeleton
+    // (trang ngan lai dot ngot lam trinh duyet keo ve dau trang)
+    placeholderData: keepPreviousData
   })
 
 export const useProductById = (productId: number) =>
@@ -156,7 +159,8 @@ export const useSearchProducts = (query: string, options?: SearchOptions) =>
     queryKey: ['searchProducts', query, options],
     queryFn: () => searchProducts({ query, ...options }),
     enabled: !!query?.trim(),
-    staleTime: 60 * 1000
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData
   })
 
 export const useProductsByCategory = (categoryId: number) =>
