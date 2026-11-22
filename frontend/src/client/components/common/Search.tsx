@@ -4,10 +4,22 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent
+  type ChangeEvent,
+  type ReactNode
 } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Camera, Loader2 } from 'lucide-react'
+import {
+  ArrowRight,
+  Camera,
+  Clock,
+  Loader2,
+  Search as SearchGlyph,
+  Sparkles,
+  Store,
+  TrendingUp,
+  X
+} from 'lucide-react'
 import { useSearchSuggest } from '../../hooks/useProducts'
 import {
   fetchImageSearchOverview,
@@ -19,7 +31,6 @@ import { makeProductSlug } from '../../utils/productSlug'
 import SearchIcon from '../../../assets/search-icon.svg'
 
 type ModalProps = {
-  open: boolean
   searchTerm: string
   onClose: () => void
   onChange: (value: string) => void
@@ -69,8 +80,32 @@ const useDebouncedValue = (value: string, delay = 250) => {
   return debounced
 }
 
+const money = (n?: number) =>
+  `$${Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// To dam phan khop voi tu khoa (khong phan biet hoa thuong)
+const highlight = (text: string, term: string): ReactNode => {
+  const q = term.trim()
+  if (!q) return text
+  const i = text.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 0) return text
+  return (
+    <>
+      {text.slice(0, i)}
+      <mark className="bg-transparent font-semibold text-ink">{text.slice(i, i + q.length)}</mark>
+      {text.slice(i + q.length)}
+    </>
+  )
+}
+
+const SectionTitle = ({ children, action }: { children: ReactNode; action?: ReactNode }) => (
+  <div className="mb-2 flex items-center justify-between">
+    <h3 className="eyebrow">{children}</h3>
+    {action}
+  </div>
+)
+
 function Modal({
-  open,
   searchTerm,
   onClose,
   onChange,
@@ -84,6 +119,7 @@ function Modal({
   )
   const [recent, setRecent] = useState<string[]>(readRecent)
   const [active, setActive] = useState(-1)
+  const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
@@ -92,6 +128,18 @@ function Modal({
   const [imageError, setImageError] = useState('')
   const [imageData, setImageData] = useState<ImageSearchData | null>(null)
   const overviewRequestIdRef = useRef(0)
+
+  // Khoa cuon trang phia sau + Esc de dong (ke ca khi focus khong o input)
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
 
   const items = useMemo<SuggestItem[]>(() => {
     if (!searchTerm.trim()) {
@@ -145,7 +193,9 @@ function Modal({
     setRecent([])
   }
 
-  const renderChips = (section: SuggestItem['section']) =>
+  const isActive = (item: SuggestItem) => items[active]?.id === item.id
+
+  const renderChips = (section: SuggestItem['section'], icon?: ReactNode) =>
     items
       .filter(i => i.section === section)
       .map(item => (
@@ -153,16 +203,59 @@ function Modal({
           key={item.id}
           id={item.id}
           role="option"
-          aria-selected={items[active]?.id === item.id}
+          aria-selected={isActive(item)}
           type="button"
           onClick={item.go}
-          className={`max-w-full truncate px-3 py-1 rounded-full text-sm border border-gray-200 text-gray-700 hover:bg-gray-50 ${
-            items[active]?.id === item.id ? 'bg-blue-50 border-blue-300' : 'bg-white'
+          className={`inline-flex max-w-full items-center gap-1.5 truncate rounded-full px-3 py-1.5 text-sm ring-1 ring-inset hover:ring-ink ${
+            isActive(item) ? 'bg-ink text-white ring-ink' : 'bg-white text-gray-700 ring-gray-200'
           }`}
         >
-          {item.label}
+          {icon}
+          <span className="truncate">{item.label}</span>
         </button>
       ))
+
+  const renderRows = (section: 'product' | 'shop') =>
+    items.map(
+      item =>
+        item.section === section && (
+          <button
+            key={item.id}
+            id={item.id}
+            role="option"
+            aria-selected={isActive(item)}
+            type="button"
+            onClick={item.go}
+            className={`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-paper ${
+              isActive(item) ? 'bg-paper ring-1 ring-inset ring-gray-300' : ''
+            }`}
+          >
+            {section === 'product' ? (
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-paper">
+                <img
+                  src={item.img || PLACEHOLDER_IMAGE}
+                  alt=""
+                  className="h-full w-full object-contain p-1 mix-blend-multiply"
+                />
+              </span>
+            ) : item.img ? (
+              <img src={item.img} alt="" className="h-9 w-9 shrink-0 rounded-full bg-paper object-cover" />
+            ) : (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper">
+                <Store className="h-4 w-4 text-gray-500" />
+              </span>
+            )}
+            <span className="min-w-0 flex-1 text-sm text-gray-700 line-clamp-2">
+              {highlight(item.label, searchTerm)}
+            </span>
+            {section === 'product' ? (
+              <span className="price shrink-0 text-sm font-semibold text-ink">{money(item.price)}</span>
+            ) : (
+              <span className="shrink-0 text-xs text-gray-500">Shop</span>
+            )}
+          </button>
+        )
+    )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -177,8 +270,6 @@ function Modal({
       e.preventDefault()
       if (items[active]) items[active].go()
       else onSubmit()
-    } else if (e.key === 'Escape') {
-      onClose()
     }
   }
 
@@ -215,6 +306,15 @@ function Modal({
     setImageData(null)
     setOverviewLoading(false)
     overviewRequestIdRef.current += 1
+  }
+
+  const clearImage = () => {
+    setSelectedFile(null)
+    setImageError('')
+    setImageData(null)
+    setOverviewLoading(false)
+    overviewRequestIdRef.current += 1
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleSearchByImage = async () => {
@@ -286,66 +386,87 @@ function Modal({
     }
   }
 
-  return (
+  const term = searchTerm.trim()
+  const hasCategories = items.some(i => i.section === 'category')
+  const hasProducts = items.some(i => i.section === 'product')
+  const hasShops = items.some(i => i.section === 'shop')
+
+  // Portal ra body: header co backdrop-blur, ma backdrop-filter bien header thanh
+  // khung chua cho moi phan tu position:fixed ben trong -> modal tung bi nhot
+  // trong dai header cao 64px, ket qua goi y bi cat mat.
+  return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex justify-center items-start sm:p-4 sm:pt-16 sm:pb-8 overflow-y-auto transition-colors ${
-        open ? 'visible bg-black/30 backdrop-blur-sm' : 'invisible pointer-events-none'
-      }`}
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-ink/25 sm:px-4 sm:pt-[10vh]"
       onClick={onClose}
     >
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-sm:h-full max-sm:rounded-none sm:max-h-[min(90vh,calc(100vh-2rem))] sm:my-auto transition-all ${
-          open
-            ? 'scale-100 opacity-100 translate-y-0'
-            : 'scale-105 opacity-0 -translate-y-4'
-        }`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search"
+        className="flex w-full max-w-2xl flex-col bg-white max-sm:h-full sm:max-h-[min(80vh,720px)] sm:rounded-2xl sm:shadow-[0_32px_80px_-32px_rgb(23_24_27/0.45)] sm:ring-1 sm:ring-gray-200/80"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex-shrink-0 p-3 sm:p-6 border-b border-gray-100">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-2 rounded-xl bg-blue-50 max-sm:hidden">
-              <img src={SearchIcon} alt="Search" className="h-5 w-5" />
+        {/* O nhap */}
+        <div className="flex-shrink-0 border-b border-gray-100 p-3 sm:p-4">
+          <div className="flex items-center gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-paper px-4 ring-1 ring-inset ring-transparent focus-within:bg-white focus-within:ring-ink">
+              <SearchGlyph className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
+              <input
+                ref={inputRef}
+                autoFocus
+                type="text"
+                placeholder="Search products, categories or shops"
+                className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-ink placeholder:text-gray-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+                value={searchTerm}
+                role="combobox"
+                aria-expanded
+                aria-controls="search-suggestions"
+                aria-autocomplete="list"
+                aria-activedescendant={items[active]?.id}
+                onChange={e => {
+                  setActive(-1)
+                  onChange(e.target.value)
+                }}
+                onKeyDown={handleKeyDown}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActive(-1)
+                    onChange('')
+                    inputRef.current?.focus()
+                  }}
+                  aria-label="Clear search"
+                  className="-mr-1 rounded-full p-1 text-gray-400 hover:bg-gray-200/60 hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <span className="h-5 w-px shrink-0 bg-gray-200" aria-hidden />
+              <button
+                onClick={handleChooseImage}
+                type="button"
+                aria-label="Search by image"
+                title="Search by image"
+                className="-mr-2 shrink-0 rounded-full p-2 text-gray-500 hover:bg-gray-200/60 hover:text-ink"
+              >
+                <Camera className="h-4 w-4" />
+              </button>
             </div>
-            <input
-              autoFocus
-              type="text"
-              placeholder="Search products or categories"
-              className="flex-1 min-w-0 border border-gray-200 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={searchTerm}
-              role="combobox"
-              aria-expanded
-              aria-controls="search-suggestions"
-              aria-autocomplete="list"
-              aria-activedescendant={items[active]?.id}
-              onChange={e => {
-                setActive(-1)
-                onChange(e.target.value)
-              }}
-              onKeyDown={handleKeyDown}
-            />
             <button
               onClick={() => onSubmit()}
-              className="max-sm:hidden px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
-              disabled={!searchTerm.trim()}
+              className="btn-primary max-sm:hidden"
+              disabled={!term}
             >
               Search
             </button>
             <button
-              onClick={handleChooseImage}
-              type="button"
-              aria-label="Search by image"
-              className="shrink-0 px-3 py-2.5 sm:py-2 rounded-lg border border-gray-200 text-gray-700 text-sm hover:bg-gray-50 inline-flex items-center gap-1.5"
-            >
-              <Camera className="h-4 w-4" />
-              <span className="max-sm:hidden">Image</span>
-            </button>
-            <button
               onClick={onClose}
               type="button"
-              className="shrink-0 px-2 sm:px-3 py-2 rounded-lg sm:border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+              className="shrink-0 rounded-full px-3 py-2 text-sm font-medium text-gray-600 hover:bg-paper hover:text-ink sm:hidden"
             >
-              <span className="sm:hidden">Cancel</span>
-              <span className="max-sm:hidden">Close</span>
+              Cancel
             </button>
             <input
               ref={fileInputRef}
@@ -355,62 +476,82 @@ function Modal({
               onChange={handleImageChange}
             />
           </div>
+
           {(selectedFile || imageError) && (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-paper p-2.5">
               {previewUrl && (
                 <img
                   src={previewUrl}
                   alt="Selected"
-                  className="h-16 w-16 rounded-lg border border-gray-200 object-cover"
+                  className="h-12 w-12 rounded-lg bg-white object-cover ring-1 ring-gray-200"
                 />
               )}
               {selectedFile && (
-                <p className="text-xs text-gray-600 max-w-[220px] truncate">
+                <p className="min-w-0 max-w-[220px] flex-1 truncate text-xs text-gray-600">
                   {selectedFile.name}
                 </p>
               )}
-              <button
-                type="button"
-                onClick={handleSearchByImage}
-                disabled={!selectedFile || imageLoading}
-                className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60 inline-flex items-center gap-2"
-              >
-                {imageLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : null}
-                Search by image
-              </button>
               {imageError && (
                 <p className="text-xs font-medium text-red-600">{imageError}</p>
               )}
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handleSearchByImage}
+                  disabled={!selectedFile || imageLoading}
+                  className="btn-primary px-4 py-2"
+                >
+                  {imageLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  Search by image
+                </button>
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  aria-label="Remove image"
+                  className="rounded-full p-2 text-gray-400 hover:bg-white hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6">
+        {/* Ket qua */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
           {imageData && (
-            <div className="mb-6 space-y-4">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2">
-                <p className="text-sm font-semibold text-emerald-800">
-                  AI image analysis
+            <div className="space-y-5">
+              <div className="space-y-2 rounded-xl bg-paper p-4">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+                  <Sparkles className="h-4 w-4" /> AI image analysis
                 </p>
-                <p className="text-xs text-gray-700">
-                  Type:{' '}
-                  <span className="font-medium">
-                    {imageData.detected.product_type || 'Unknown'}
-                  </span>{' '}
-                  | Brand:{' '}
-                  <span className="font-medium">
-                    {imageData.detected.brand || 'Unknown'}
-                  </span>{' '}
-                  | Model:{' '}
-                  <span className="font-medium">
-                    {imageData.detected.line_or_model || 'Not clearly detected'}
-                  </span>
-                </p>
-                <p className="text-xs text-gray-700">{imageData.notice}</p>
+                <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <div>
+                    <dt className="inline">Type: </dt>
+                    <dd className="inline font-medium text-ink">
+                      {imageData.detected.product_type || 'Unknown'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline">Brand: </dt>
+                    <dd className="inline font-medium text-ink">
+                      {imageData.detected.brand || 'Unknown'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline">Model: </dt>
+                    <dd className="inline font-medium text-ink">
+                      {imageData.detected.line_or_model || 'Not clearly detected'}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="text-xs text-gray-600">{imageData.notice}</p>
                 {overviewLoading && (
-                  <p className="text-xs text-emerald-700 inline-flex items-center gap-1.5">
+                  <p className="inline-flex items-center gap-1.5 text-xs text-gray-500">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Updating product overview...
                   </p>
@@ -423,7 +564,7 @@ function Modal({
                           key={query}
                           type="button"
                           onClick={() => onChange(query)}
-                          className="px-2.5 py-1 rounded-full text-xs border border-emerald-200 text-emerald-800 bg-white hover:bg-emerald-50"
+                          className="rounded-full bg-white px-2.5 py-1 text-xs text-gray-700 ring-1 ring-inset ring-gray-200 hover:ring-ink"
                         >
                           {query}
                         </button>
@@ -433,56 +574,50 @@ function Modal({
               </div>
 
               <section aria-labelledby="image-related-products-heading">
-                <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
-                  <h3
-                    id="image-related-products-heading"
-                    className="text-sm font-semibold text-gray-900"
-                  >
-                    Related products
-                  </h3>
-                  <span className="text-xs text-gray-500">
-                    Sản phẩm liên quan trong cửa hàng
-                    {formattedImageResults.length > 0
-                      ? ` · ${formattedImageResults.length} item${
-                          formattedImageResults.length === 1 ? '' : 's'
-                        }`
-                      : ''}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">
-                  Gợi ý dựa trên ảnh bạn tải lên — không phải khớp chính xác
-                  100%.
+                <SectionTitle
+                  action={
+                    formattedImageResults.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        {formattedImageResults.length} item
+                        {formattedImageResults.length === 1 ? '' : 's'}
+                      </span>
+                    )
+                  }
+                >
+                  <span id="image-related-products-heading">Related products</span>
+                </SectionTitle>
+                <p className="mb-3 text-xs text-gray-500">
+                  Gợi ý dựa trên ảnh bạn tải lên — không phải khớp chính xác 100%.
                 </p>
                 {formattedImageResults.length > 0 ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {formattedImageResults.map(item => (
                       <button
                         key={`img-${item.id}`}
                         type="button"
                         onClick={() => onSelectProduct(item.id, item.name)}
-                        className="flex items-center gap-4 p-3 border border-gray-200 rounded-xl hover:border-emerald-300 hover:shadow-sm transition text-left bg-white"
+                        className="flex items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-inset ring-gray-200 hover:ring-ink"
                       >
-                        <img
-                          src={
-                            item.thumb ||
-                            PLACEHOLDER_IMAGE
-                          }
-                          alt={item.name}
-                          className="h-16 w-16 object-contain rounded-lg bg-gray-50 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 line-clamp-2">
+                        <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-paper">
+                          <img
+                            src={item.thumb || PLACEHOLDER_IMAGE}
+                            alt=""
+                            className="h-full w-full object-contain p-1 mix-blend-multiply"
+                          />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium text-ink line-clamp-2">
                             {item.name}
-                          </p>
-                          <p className="text-sm text-emerald-700 font-semibold mt-1">
-                            ${Number(item.price).toLocaleString('en-US')}
-                          </p>
-                        </div>
+                          </span>
+                          <span className="price mt-0.5 block text-sm font-semibold text-ink">
+                            {money(item.price)}
+                          </span>
+                        </span>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-500 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center">
+                  <p className="rounded-xl bg-paper px-4 py-6 text-center text-sm text-gray-500">
                     No related products found in the shop.
                   </p>
                 )}
@@ -491,120 +626,108 @@ function Modal({
           )}
 
           {!imageData && (
-            <div id="search-suggestions" role="listbox" aria-label="Search suggestions" className="space-y-4">
-              {!searchTerm.trim() && recent.length > 0 && (
+            <div id="search-suggestions" role="listbox" aria-label="Search suggestions" className="space-y-5">
+              {!term && recent.length > 0 && (
                 <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-gray-900">Recent searches</h3>
-                    <button
-                      type="button"
-                      onClick={clearRecent}
-                      className="text-xs text-gray-500 hover:text-gray-800"
-                    >
-                      Clear
-                    </button>
-                  </div>
+                  <SectionTitle
+                    action={
+                      <button
+                        type="button"
+                        onClick={clearRecent}
+                        className="text-xs font-medium text-gray-500 hover:text-ink"
+                      >
+                        Clear
+                      </button>
+                    }
+                  >
+                    Recent searches
+                  </SectionTitle>
                   <div className="flex flex-wrap gap-2">
-                    {renderChips('recent')}
+                    {renderChips('recent', <Clock className="h-3.5 w-3.5 shrink-0 opacity-60" />)}
                   </div>
                 </section>
               )}
-              {!searchTerm.trim() && (data?.trending?.length ?? 0) > 0 && (
+              {!term && (data?.trending?.length ?? 0) > 0 && (
                 <section>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Trending</h3>
-                  <div className="flex flex-wrap gap-2">{renderChips('trending')}</div>
+                  <SectionTitle>Trending</SectionTitle>
+                  <div className="flex flex-wrap gap-2">
+                    {renderChips('trending', <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-60" />)}
+                  </div>
                 </section>
+              )}
+              {!term && recent.length === 0 && !(data?.trending?.length) && (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  Start typing to search products, categories and shops.
+                </p>
               )}
 
-              {searchTerm.trim() && (
+              {term && (
                 <>
                   {isFetching && items.length === 0 && (
                     <div className="space-y-2">
                       {[...Array(3)].map((_, idx) => (
-                        <div key={idx} className="h-14 bg-gray-100 rounded-xl animate-pulse" />
+                        <div key={idx} className="flex items-center gap-3 px-2 py-2">
+                          <div className="h-12 w-12 animate-pulse rounded-lg bg-paper" />
+                          <div className="h-3.5 flex-1 animate-pulse rounded bg-paper" />
+                        </div>
                       ))}
                     </div>
                   )}
                   {isError && (
-                    <p className="text-sm text-red-500">
+                    <p className="text-sm text-red-600">
                       Unable to search products. Please try again.
                     </p>
                   )}
                   {!isFetching && !isError && items.length === 0 && (
-                    <p className="text-sm text-gray-500">No matching products found.</p>
+                    <p className="py-6 text-center text-sm text-gray-500">
+                      No matches for “{term}”. Try another keyword or search by image.
+                    </p>
                   )}
-                  {items.some(i => i.section === 'category') && (
-                    <div className="flex flex-wrap gap-2">{renderChips('category')}</div>
+                  {hasCategories && (
+                    <section>
+                      <SectionTitle>Categories</SectionTitle>
+                      <div className="flex flex-wrap gap-2">{renderChips('category')}</div>
+                    </section>
                   )}
-                  {items.some(i => i.section === 'product') && (
-                    <div className="space-y-1">
-                      {items.map(
-                        item =>
-                          item.section === 'product' && (
-                            <button
-                              key={item.id}
-                              id={item.id}
-                              role="option"
-                              aria-selected={items[active]?.id === item.id}
-                              type="button"
-                              onClick={item.go}
-                              className={`w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-gray-50 ${
-                                items[active]?.id === item.id ? 'bg-blue-50' : ''
-                              }`}
-                            >
-                              <img
-                                src={item.img || PLACEHOLDER_IMAGE}
-                                alt=""
-                                className="h-12 w-12 object-contain rounded-lg bg-gray-50 flex-shrink-0"
-                              />
-                              <span className="flex-1 min-w-0 text-sm font-medium text-gray-800 line-clamp-2">
-                                {item.label}
-                              </span>
-                              <span className="shrink-0 text-sm font-semibold text-blue-600">
-                                ${Number(item.price).toLocaleString('en-US')}
-                              </span>
-                            </button>
-                          )
-                      )}
-                    </div>
+                  {hasProducts && (
+                    <section>
+                      <SectionTitle>Products</SectionTitle>
+                      <div className="-mx-2 space-y-0.5">{renderRows('product')}</div>
+                    </section>
                   )}
-                  {items.some(i => i.section === 'shop') && (
-                    <div className="space-y-1">
-                      {items.map(
-                        item =>
-                          item.section === 'shop' && (
-                            <button
-                              key={item.id}
-                              id={item.id}
-                              role="option"
-                              aria-selected={items[active]?.id === item.id}
-                              type="button"
-                              onClick={item.go}
-                              className={`w-full flex items-center gap-3 p-2 rounded-xl text-left hover:bg-gray-50 ${
-                                items[active]?.id === item.id ? 'bg-blue-50' : ''
-                              }`}
-                            >
-                              <img
-                                src={item.img || PLACEHOLDER_IMAGE}
-                                alt=""
-                                className="h-8 w-8 object-cover rounded-full bg-gray-100 flex-shrink-0"
-                              />
-                              <span className="flex-1 min-w-0 truncate text-sm text-gray-800">
-                                {item.label}
-                              </span>
-                              <span className="shrink-0 text-xs text-gray-500">Shop</span>
-                            </button>
-                          )
-                      )}
-                    </div>
+                  {hasShops && (
+                    <section>
+                      <SectionTitle>Shops</SectionTitle>
+                      <div className="-mx-2 space-y-0.5">{renderRows('shop')}</div>
+                    </section>
                   )}
                 </>
               )}
             </div>
           )}
         </div>
+
+        {/* Chan: xem tat ca ket qua + phim tat */}
+        {term && !imageData && (
+          <button
+            type="button"
+            onClick={() => onSubmit()}
+            className="group flex flex-shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 text-left text-sm hover:bg-paper sm:rounded-b-2xl"
+          >
+            <span className="min-w-0 truncate text-gray-700">
+              See all results for <span className="font-semibold text-ink">“{term}”</span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        )}
+        <div className="hidden flex-shrink-0 items-center gap-4 border-t border-gray-100 px-5 py-2.5 text-xs text-gray-500 sm:flex">
+          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">↑</kbd> <kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">↓</kbd> to navigate</span>
+          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">Enter</kbd> to select</span>
+          <span><kbd className="rounded bg-paper px-1.5 py-0.5 font-sans">Esc</kbd> to close</span>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -636,7 +759,6 @@ const Search = () => {
     <div>
       {isOpen && (
         <Modal
-          open={isOpen}
           searchTerm={searchTerm}
           onClose={() => setIsOpen(false)}
           onChange={value => setSearchTerm(value)}
@@ -651,10 +773,11 @@ const Search = () => {
           setIsOpen(true)
           setSearchTerm('')
         }}
-        className="hover:opacity-80 transition"
+        className="rounded-full p-2 transition hover:bg-gray-100"
         aria-label="Open search"
+        aria-haspopup="dialog"
       >
-        <img src={SearchIcon} alt="Search" className="h-6 w-6" />
+        <img src={SearchIcon} alt="" className="h-6 w-6" />
       </button>
     </div>
   )
