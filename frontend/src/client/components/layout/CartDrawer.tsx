@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ShoppingBag, X } from 'lucide-react'
@@ -8,6 +8,7 @@ import CartIcon from '../../../assets/cart-icon.svg'
 import { Cart, CartItem } from '../../types/cart'
 
 type PopoverProps = {
+  anchorRef: RefObject<HTMLButtonElement | null>
   onClose(): void
   cartItemCount: number
   totalCost: number
@@ -19,8 +20,26 @@ type PopoverProps = {
 // backdrop-blur: backdrop-filter bien header thanh khung chua cua moi phan tu
 // position:fixed ben trong, lop phu se chi phu dai header (bam giua trang
 // khong dong duoc popup).
-function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: PopoverProps) {
+function CartPopover({ anchorRef, onClose, cartItemCount, totalCost, cartProducts }: PopoverProps) {
   const navigate = useNavigate()
+  // Neo mep phai popup thang mep phai nut gio hang. Truoc day dung right-8 theo
+  // cua so, nen o man rong (noi dung header gioi han max-w-7xl) popup dat ra tan
+  // mep man hinh, cach nut hang tram px.
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  useLayoutEffect(() => {
+    const place = () => {
+      const r = anchorRef.current?.getBoundingClientRect()
+      if (!r) return
+      // Khong de popup tran mep trai tren man hep (popup rong min(400, 100vw - 32))
+      const vw = window.innerWidth
+      const width = Math.min(400, vw - 32)
+      const right = Math.max(16, Math.min(vw - r.right, vw - 16 - width))
+      setPos({ top: r.bottom + 8, right })
+    }
+    place()
+    window.addEventListener('resize', place)
+    return () => window.removeEventListener('resize', place)
+  }, [anchorRef])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -33,7 +52,8 @@ function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: Popove
       <div
         role="dialog"
         aria-label="Shopping cart"
-        className="fixed right-4 top-[72px] flex max-h-[calc(100vh-96px)] w-[calc(100vw-2rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_-24px_rgb(23_24_27/0.35)] ring-1 ring-gray-200/80 md:right-8"
+        style={pos ? { top: pos.top, right: pos.right, maxHeight: `calc(100vh - ${pos.top + 24}px)` } : undefined}
+        className="fixed right-4 top-[72px] flex max-h-[calc(100vh-96px)] w-[calc(100vw-2rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl bg-white shadow-[0_24px_60px_-24px_rgb(23_24_27/0.35)] ring-1 ring-gray-200/80"
         onClick={e => e.stopPropagation()}
       >
         <header className="flex items-center justify-between px-5 pb-3 pt-4">
@@ -103,12 +123,14 @@ interface CartProps {
 
 const CartDrawer = ({ cartProducts }: CartProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const count = cartProducts?.total_items ?? 0
 
   return (
     <div>
       {drawerOpen && (
         <CartPopover
+          anchorRef={buttonRef}
           onClose={() => setDrawerOpen(false)}
           cartItemCount={count}
           totalCost={cartProducts?.total_price ?? 0}
@@ -116,6 +138,7 @@ const CartDrawer = ({ cartProducts }: CartProps) => {
         />
       )}
       <button
+        ref={buttonRef}
         className="relative rounded-lg p-2 text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-blue-600"
         onClick={() => setDrawerOpen(!drawerOpen)}
         aria-label={count ? `Cart, ${count} items` : 'Cart'}
