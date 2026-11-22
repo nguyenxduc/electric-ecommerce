@@ -113,6 +113,7 @@ const Compare = () => {
     ids,
     hasValidSelection
   )
+  const loadedIds = useMemo(() => (products ?? []).map(p => p.id), [products])
   const hasSameCategory =
     !!products &&
     products.length > 0 &&
@@ -122,8 +123,9 @@ const Compare = () => {
     isLoading: isComparisonLoading,
     error: comparisonError
   } = useAiProductComparison(
-    ids,
-    hasValidSelection && products?.length === ids.length && hasSameCategory
+    // by-ids bo qua san pham da an: so sanh nhung san pham con lai thay vi treo trang
+    loadedIds,
+    hasValidSelection && loadedIds.length >= MIN_COMPARE_PRODUCTS && hasSameCategory
   )
 
   const handleBack = () => {

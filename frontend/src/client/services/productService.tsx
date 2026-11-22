@@ -81,11 +81,6 @@ export const fetchProductById = async (id: number): Promise<Product> => {
   return data
 }
 
-export const fetchProductsByIds = async (ids: number[]): Promise<Product[]> => {
-  const requests = ids.map(id => fetchProductById(id))
-  return Promise.all(requests)
-}
-
 export const fetchSimilarProducts = async (
   productId: number,
   limit: number = 6
@@ -191,7 +186,7 @@ export const fetchSearchSuggest = async (q: string): Promise<SearchSuggestRes> =
 }
 
 // Nhieu san pham theo id (giu thu tu yeu cau, id an/khong co bi bo)
-export const fetchProductsByIdsBatch = async (ids: number[]): Promise<Product[]> => {
+export const fetchProductsByIds = async (ids: number[]): Promise<Product[]> => {
   const { data } = await axiosClient.get<{ products: Product[] }>('/products/by-ids', {
     params: { ids: ids.join(',') }
   })

@@ -43,6 +43,7 @@ import AdminNotificationsList from './admin/pages/notifications/List'
 import AdminShopsList from './admin/pages/shops/List'
 import AdminCodPage from './admin/pages/cod'
 import AdminFraudPage from './admin/pages/fraud'
+import AdminReportsPage from './admin/pages/reports'
 import AdminTaxPage from './admin/pages/tax'
 import Cart from './client/pages/Cart'
 import ShopPublic from './client/pages/ShopPublic'
@@ -242,6 +243,7 @@ function App() {
             <Route path="notifications" element={<AdminNotificationsList />} />
             <Route path="cod" element={<AdminCodPage />} />
             <Route path="fraud" element={<AdminFraudPage />} />
+            <Route path="reports" element={<AdminReportsPage />} />
             <Route path="tax" element={<AdminTaxPage />} />
             <Route path="settings" element={<AdminSettingsList />} />
           </Route>

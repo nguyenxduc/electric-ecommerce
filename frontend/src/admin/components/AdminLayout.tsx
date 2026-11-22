@@ -23,6 +23,7 @@ import {
   Activity,
   Banknote,
   ShieldAlert,
+  Flag,
   Receipt
 } from 'lucide-react'
 import { useValidateToken } from '../../client/hooks/useAuth'
@@ -66,6 +67,7 @@ const sections: NavSection[] = [
     items: [
       { to: '/admin/cod', label: 'COD Reconciliation', icon: Banknote, end: true },
       { to: '/admin/fraud', label: 'Fraud Flags', icon: ShieldAlert, end: true },
+      { to: '/admin/reports', label: 'Product Reports', icon: Flag, end: true },
       { to: '/admin/tax', label: 'Tax & Invoices', icon: Receipt, end: true }
     ]
   },

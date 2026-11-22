@@ -7,6 +7,7 @@ export default function ReasonModal({
   title,
   description,
   templates = [],
+  initialReason = '',
   confirmText,
   pending,
   onClose,
@@ -15,12 +16,13 @@ export default function ReasonModal({
   title: string
   description?: string
   templates?: string[]
+  initialReason?: string
   confirmText: string
   pending?: boolean
   onClose: () => void
   onConfirm: (reason: string) => void
 }) {
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState(initialReason)
   const valid = reason.trim().length >= 5
   return (
     <Modal

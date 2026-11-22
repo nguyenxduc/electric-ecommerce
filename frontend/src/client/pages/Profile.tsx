@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { apiErrorResponse } from '../../lib/apiError'
-import { Camera, LogOut, X, Loader2, Ticket, Store, MapPin } from 'lucide-react'
+import { Camera, LogOut, X, Loader2, Ticket, Store, MapPin, Users } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
@@ -377,11 +377,20 @@ function Profile() {
                       : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  <img
-                    src={Icon[item.icon as keyof typeof Icon]}
-                    alt={item.icon}
-                    className="h-5 w-5 lg:h-6 lg:w-6"
-                  />
+                  {/* "following" chua co icon rieng trong Icon -> dung lucide, tranh anh vo */}
+                  {item.key === 'following' ? (
+                    <Users
+                      className={`h-5 w-5 lg:h-6 lg:w-6 ${
+                        item.key === tabActive ? 'text-gray-700' : 'text-gray-500'
+                      }`}
+                    />
+                  ) : (
+                    <img
+                      src={Icon[item.icon as keyof typeof Icon]}
+                      alt={item.icon}
+                      className="h-5 w-5 lg:h-6 lg:w-6"
+                    />
+                  )}
                   <span className="text-sm font-light">{item.label}</span>
                 </button>
               )

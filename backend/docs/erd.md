@@ -3,7 +3,7 @@
 > Sinh tu `prisma/schema.prisma` bang `npm run docs:erd`.
 > **Khong sua tay file nay** — sua schema roi chay lai lenh tren.
 
-Tong cong 45 bang nghiep vu (chua tinh 2 bang ha tang cua
+Tong cong 46 bang nghiep vu (chua tinh 2 bang ha tang cua
 cong cu migration). Chia theo mien de doc duoc; quan he bac cau giua cac
 mien duoc noi trong phan mo ta cua tung muc.
 
@@ -125,6 +125,17 @@ erDiagram
     string raw_value
     datetime created_at
   }
+  ProductReport {
+    bigint id "PK"
+    bigint product_id
+    bigint reporter_id
+    string reason
+    string detail
+    string status
+    bigint resolved_by
+    datetime resolved_at
+    datetime created_at
+  }
   FilterKey {
     bigint id "PK"
     string key "UK"
@@ -156,6 +167,7 @@ erDiagram
   Product }o--|| SubCategory : ""
   Product ||--o{ ProductFilterValue : ""
   Product ||--o{ ProductVariant : ""
+  Product ||--o{ ProductReport : ""
   Category ||--o{ SubCategory : ""
   Category ||--o{ FilterOption : ""
   ProductFilterValue }|--|| FilterKey : ""

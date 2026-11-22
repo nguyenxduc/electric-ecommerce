@@ -539,8 +539,20 @@ Admin xem toan bo ho so truoc khi duyet; trang shop cong khai chi lo quan/tinh.
 tra hang, tin nhan chua doc, san pham con <= `LOW_STOCK_THRESHOLD`, danh gia
 chua tra loi) va
 `GET /dashboard/todo` (admin: shop cho duyet, chat ho tro chua doc, co gian lan
-dang mo, san pham dang bi go). Moi o tren giao dien link toi danh sach da loc
+dang mo, san pham dang bi go, bao cao san pham dang mo). Moi o tren giao dien link toi danh sach da loc
 san qua `?status=`.
+
+### Bao cao san pham
+
+Nguoi mua `POST /products/:id/report { reason, detail? }` (reason: counterfeit |
+prohibited | misleading | offensive | other; `other` bat buoc detail; moi nguoi
+mot bao cao moi san pham, trung -> 409 `ALREADY_REPORTED`; khong bao cao duoc
+san pham shop minh). Admin xu ly o `/product-reports` (`services/productReport.service.js`):
+`GET ?status=open|resolved|dismissed` gom theo san pham; `POST /:productId/resolve
+{ reason }` go san pham qua `productModeration.service.js` (dung chung voi
+`PATCH /products/:id/takedown`, bao seller), dong moi bao cao dang mo va
+thong bao nguoi bao cao; `POST /:productId/dismiss` chi dong bao cao, khong
+thong bao. Ca hai ghi audit log.
 
 ---
 

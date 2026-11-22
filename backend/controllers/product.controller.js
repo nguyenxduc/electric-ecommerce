@@ -21,6 +21,7 @@ import {
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { writeAuditLog, auditContext } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
+import { takedownProductById } from "../services/productModeration.service.js";
 import { notifyFollowers } from "../services/shopFollow.service.js";
 import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
@@ -855,36 +856,9 @@ export const takedownProduct = asyncHandler(async (req, res) => {
   if (reason.length < 5 || reason.length > 500) {
     return res.status(400).json({ message: "Reason must be 5-500 characters" });
   }
-  const id = BigInt(req.params.id);
-  const product = await prisma.product.findFirst({
-    where: { id, deleted_at: null },
-    select: { name: true, shop: { select: { owner_id: true } } },
-  });
+  const product = await takedownProductById(BigInt(req.params.id), reason, auditContext(req));
   if (!product) return res.status(404).json({ message: "Product not found" });
-
-  const taken_down_at = new Date();
-  await prisma.product.update({
-    where: { id },
-    data: { is_active: false, takedown_reason: reason, taken_down_at },
-  });
-  writeAuditLog({
-    ...auditContext(req),
-    action: "PRODUCT_TAKEDOWN",
-    resource: "product",
-    resourceId: id,
-    metadata: { reason },
-  });
-  notifyUser({
-    userId: product.shop?.owner_id,
-    title: "Product taken down",
-    message: `Your product "${product.name}" was taken down for violating marketplace policy: ${reason}. Edit the listing and contact support to restore it.`,
-    type: "SHOP",
-    link: `/seller/products/${id}`,
-  });
-  res.json({
-    message: "Product taken down",
-    product: { id: Number(id), is_active: false, takedown_reason: reason, taken_down_at },
-  });
+  res.json({ message: "Product taken down", product });
 });
 
 // PATCH /api/products/:id/restore - admin go bo takedown, hien lai san pham

@@ -103,6 +103,7 @@ model Product {
   embedding       ProductEmbedding?        @relation("ProductEmbedding")
   filter_values   ProductFilterValue[]
   variants        ProductVariant[]
+  reports         ProductReport[]
 
   @@index([flash_ends_at])
   @@index([name])
@@ -271,6 +272,8 @@ model User {
   return_requests ReturnRequest[]
 
   shop_follows ShopFollow[]
+
+  product_reports ProductReport[] @relation("ReportReporter")
 
   @@map("users")
 }
@@ -1024,4 +1027,23 @@ model ShopFollow {
   @@unique([user_id, shop_id])
   @@index([shop_id])
   @@map("shop_follows")
+}
+
+// Nguoi mua bao cao san pham vi pham; admin xu ly o hang cho kiem duyet.
+model ProductReport {
+  id          BigInt    @id @default(autoincrement())
+  product_id  BigInt
+  reporter_id BigInt
+  reason      String // counterfeit | prohibited | misleading | offensive | other
+  detail      String?
+  status      String    @default("open") // open | resolved | dismissed
+  resolved_by BigInt?
+  resolved_at DateTime?
+  created_at  DateTime  @default(now())
+  product     Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  reporter    User      @relation("ReportReporter", fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, reporter_id])
+  @@index([status, created_at])
+  @@map("product_reports")
 }

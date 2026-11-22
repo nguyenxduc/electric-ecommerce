@@ -20,6 +20,7 @@ import MoreFromShop from './MoreFromShop'
 import RecentlyViewed from './RecentlyViewed'
 import { addRecentlyViewed } from '../../utils/recentlyViewed'
 import ShopVouchers from '../shop/ShopVouchers'
+import ReportProduct from './ReportProduct'
 
 interface ProductDetailProps {
   product: Product
@@ -268,6 +269,7 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                 variants={variants}
                 selectedVariant={selectedVariant}
               />
+              <ReportProduct productId={product.id} />
             </div>
           </div>
         </div>

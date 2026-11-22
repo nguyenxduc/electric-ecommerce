@@ -72,6 +72,7 @@ import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
 import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
 import addressRoutes from "./routes/address.route.js";
+import productReportRoutes from "./routes/productReport.route.js";
 import { startDailyJobsScheduler, stopScheduler } from "./jobs/scheduler.js";
 import { startStartupTasks } from "./jobs/startupTasks.js";
 import { setIO } from "./lib/io.js";
@@ -176,6 +177,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/tax", taxRouter);
 app.use("/api/addresses", addressRoutes);
+app.use("/api/product-reports", productReportRoutes);
 
 // Phai dung sau moi route: 404 cho endpoint la, roi mot cho duy nhat xu ly loi.
 // Express 4 khong tu bat promise reject, nen neu thieu luoi nay thi mot handler

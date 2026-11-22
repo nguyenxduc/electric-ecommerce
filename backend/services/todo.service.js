@@ -33,7 +33,7 @@ export const getShopTodo = async (shopId, ownerId) => {
 
 // Viec can xu ly cua admin san: duyet shop, chat ho tro, canh bao gian lan, hang bi go
 export const getAdminTodo = async () => {
-  const [shops_pending, unread_support, fraud_open, products_taken_down] = await Promise.all([
+  const [shops_pending, unread_support, fraud_open, products_taken_down, reports_open] = await Promise.all([
     prisma.shop.count({ where: { status: SHOP_STATUS.PENDING, deleted_at: null } }),
     prisma.message.count({
       where: {
@@ -45,6 +45,7 @@ export const getAdminTodo = async () => {
     }),
     prisma.fraudFlag.count({ where: { status: "open" } }),
     prisma.product.count({ where: { taken_down_at: { not: null }, deleted_at: null } }),
+    prisma.productReport.count({ where: { status: "open" } }),
   ]);
-  return { shops_pending, unread_support, fraud_open, products_taken_down };
+  return { shops_pending, unread_support, fraud_open, products_taken_down, reports_open };
 };

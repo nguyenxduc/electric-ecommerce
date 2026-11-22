@@ -27,7 +27,7 @@ const DOMAINS = [
     note: "Xuong song cua mo hinh da gian hang: mot nguoi dung so huu toi da mot Shop, moi Product thuoc dung mot Shop.",
     models: [
       "Shop", "Product", "Category", "SubCategory",
-      "ProductColor", "ProductVariant", "ProductSpec", "ProductFilterValue",
+      "ProductColor", "ProductVariant", "ProductSpec", "ProductFilterValue", "ProductReport",
       "FilterKey", "FilterOption",
     ],
   },

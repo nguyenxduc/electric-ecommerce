@@ -157,6 +157,7 @@ export type AdminTodo = {
   unread_support: number
   fraud_open: number
   products_taken_down: number
+  reports_open: number
 }
 
 export const getShopTodo = async (): Promise<ShopTodo> =>
