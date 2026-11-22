@@ -23,6 +23,7 @@ import { writeAuditLog, auditContext } from "../services/audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { takedownProductById } from "../services/productModeration.service.js";
 import { notifyFollowers } from "../services/shopFollow.service.js";
+import { notifyWishlistPriceDrop } from "../services/priceAlert.service.js";
 import { LOW_STOCK_THRESHOLD } from "../services/todo.service.js";
 import { findSearchCandidateIds } from "../lib/productSearch.js";
 import { createSlug } from "../lib/slug.js";
@@ -794,6 +795,10 @@ export const updateProduct = asyncHandler(async (req, res) => {
     throw err;
   }
 
+  // Gia ban thuc te giam (doi gia, giam gia, flash dang chay) -> bao nguoi co san pham trong wishlist.
+  // Goi truoc bao flash: nguoi vua theo doi shop vua luu wishlist chi nhan 1 thong bao (dedupe theo link)
+  const priceAlert = notifyWishlistPriceDrop(currentProduct, updatedProduct);
+
   // Flash sale moi/doi sang khung chua het han -> bao nguoi theo doi shop
   const flashChanged =
     updatedProduct.flash_discount != null &&
@@ -804,13 +809,13 @@ export const updateProduct = asyncHandler(async (req, res) => {
   // san pham dang an/bi go thi nguoi mua mo link se 404: khong bao
   if (flashChanged && updatedProduct.is_active !== false && !updatedProduct.taken_down_at) {
     const upcoming = new Date(updatedProduct.flash_starts_at) > new Date();
-    notifyFollowers(updatedProduct.shop_id, {
+    priceAlert.then(() => notifyFollowers(updatedProduct.shop_id, {
       title: "Flash sale",
       message: upcoming
         ? `${updatedProduct.name} goes on flash sale soon: ${Number(updatedProduct.flash_discount)} off`
         : `${updatedProduct.name} is on flash sale: ${Number(updatedProduct.flash_discount)} off`,
       link: `/product/${createSlug(updatedProduct.name) || "product"}-p${updatedProduct.id}`,
-    });
+    }));
   }
 
   res.json({

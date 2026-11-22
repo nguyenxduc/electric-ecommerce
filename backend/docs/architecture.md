@@ -566,6 +566,15 @@ san pham shop minh). Admin xu ly o `/product-reports` (`services/productReport.s
 thong bao nguoi bao cao; `POST /:productId/dismiss` chi dong bao cao, khong
 thong bao. Ca hai ghi audit log.
 
+### Bao giam gia cho wishlist
+
+`updateProduct` so gia ban thuc te truoc/sau (gia - giam gia thuong hoac flash dang chay,
+`effectiveDiscount`). Giam thi `services/priceAlert.service.js` gui PROMO "Price drop on your
+wishlist" cho nguoi co san pham trong wishlist (tru chu shop; bo qua san pham an/bi go, shop
+khong active). Chong spam chung voi thong bao flash cua shop: moi nguoi 1 PROMO cung link
+san pham trong 24h; thong bao flash chay sau thong bao gia de dedupe khong bi dua.
+Test: `tests/52-wishlist-price-alert`.
+
 ### Hoi dap san pham
 
 `GET /products/:id/questions` cong khai (cau da tra loi len truoc). Nguoi mua

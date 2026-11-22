@@ -338,6 +338,10 @@ const Payment = ({
             />
             {isInWishlist ? 'Saved to wishlist' : 'Add to wishlist'}
           </button>
+          {/* Backend bao "Price drop on your wishlist" khi gia ban thuc te giam */}
+          <p className="text-center text-xs text-gray-500" aria-live="polite">
+            {isInWishlist ? "We'll notify you if the price drops." : 'Save it to get a price-drop alert.'}
+          </p>
         </div>
 
         {/* Delivery + buyer protection */}
