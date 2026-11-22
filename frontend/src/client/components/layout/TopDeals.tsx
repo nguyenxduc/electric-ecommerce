@@ -16,7 +16,7 @@ const TopDeals = () => {
       <HorizontalScroller label="Top deals">
         {products.map(p => (
           <li key={p.id} className="w-44 shrink-0 snap-start sm:w-52">
-            <ProductCard product={p} slug={makeProductSlug(p.name, p.id)} />
+            <ProductCard product={p} slug={makeProductSlug(p.name, p.id)} showSavings />
           </li>
         ))}
       </HorizontalScroller>

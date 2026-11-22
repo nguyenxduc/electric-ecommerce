@@ -12,6 +12,8 @@ interface ProductCardProps {
   compareDisabled?: boolean
   compareDisabledReason?: string
   onCompareToggle?: (product: Product) => void
+  // Hien them so tien tiet kiem canh % (khoi Top deals)
+  showSavings?: boolean
 }
 
 // 1234 -> "1.2K": so da ban dang gon nhu cac san
@@ -29,7 +31,8 @@ const ProductCard = ({
   compareSelected = false,
   compareDisabled = false,
   compareDisabledReason,
-  onCompareToggle
+  onCompareToggle,
+  showSavings = false
 }: ProductCardProps) => {
   const price = asNumber(product.price)
   const finalPrice = asNumber(product.final_price)
@@ -49,6 +52,9 @@ const ProductCard = ({
 
   const href = `/product/${slug || makeProductSlug(product.name, product.id)}`
   const shown = finalPrice > 0 ? finalPrice : price
+  // So tien tiet kiem that (tinh ca flash sale): so tron thi bo phan le
+  const saved = Math.round((price - shown) * 100) / 100
+  const savedLabel = Number.isInteger(saved) ? `$${saved.toLocaleString('en-US')}` : `$${saved.toFixed(2)}`
 
   return (
     <div className="zoom-on-hover lift group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/70 focus-within:ring-2 focus-within:ring-brand-500">
@@ -100,15 +106,26 @@ const ProductCard = ({
             {product.name}
           </Link>
         </h3>
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
-          <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
-          {hasDiscount && (
-            <>
-              <span className="price text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
-              <span className="price text-xs font-semibold text-sale-600">-{discountPercentage}%</span>
-            </>
-          )}
-        </div>
+        {showSavings && hasDiscount ? (
+          <div className="mt-2">
+            <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs">
+              <span className="price text-gray-400 line-through">${price.toFixed(2)}</span>
+              <span className="price font-semibold text-sale-600">-{discountPercentage}%</span>
+              {saved > 0 && <span className="price text-gray-400">Save {savedLabel}</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
+            {hasDiscount && (
+              <>
+                <span className="price text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
+                <span className="price text-xs font-semibold text-sale-600">-{discountPercentage}%</span>
+              </>
+            )}
+          </div>
+        )}
         <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs text-gray-500">
           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
           <span className="font-medium text-gray-700">{rating.toFixed(1)}</span>
