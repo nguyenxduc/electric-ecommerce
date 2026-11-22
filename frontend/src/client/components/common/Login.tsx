@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -113,6 +113,30 @@ const Login = ({
 
   const dialogRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+
+  // Huong truot khi doi buoc: login(0) -> register(1) -> reset/verify(2).
+  // Di toi buoc "sau" thi noi dung moi truot tu phai vao, quay lai thi tu trai.
+  const STEP_ORDER = { login: 0, register: 1, reset: 2, verify: 2 } as const
+  const stepKey = `${mode}-${resetStep}`
+  const prevStep = useRef({ key: stepKey, order: STEP_ORDER[mode] })
+  const [slide, setSlide] = useState<'right' | 'left' | null>(null)
+  if (prevStep.current.key !== stepKey) {
+    const order = STEP_ORDER[mode]
+    const next = order >= prevStep.current.order ? 'right' : 'left'
+    prevStep.current = { key: stepKey, order }
+    setSlide(next)
+  }
+
+  // Chieu cao hop co gian muot theo noi dung (form Sign up dai hon Log in)
+  const stageInnerRef = useRef<HTMLDivElement>(null)
+  const [stageHeight, setStageHeight] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = stageInnerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setStageHeight(el.offsetHeight))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [open])
 
   const loginMutation = useLogin()
   const registerMutation = useRegister()
@@ -394,7 +418,13 @@ const Login = ({
 
           {(mode === 'login' || mode === 'register') ? (
             // Chuyen dang nhap / dang ky dang segmented control
-            <div role="tablist" aria-label="Account" className="mr-10 inline-flex rounded-full bg-paper p-1 text-sm font-medium">
+            <div role="tablist" aria-label="Account" className="relative mr-10 inline-grid grid-cols-2 rounded-full bg-paper p-1 text-sm font-medium">
+              {/* Nen trang truot ngang sang tab dang chon */}
+              <span
+                aria-hidden
+                className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm ring-1 ring-gray-200/80 transition-transform duration-300 ease-out"
+                style={{ transform: mode === 'register' ? 'translateX(100%)' : 'translateX(0)' }}
+              />
               {(['login', 'register'] as const).map(m => (
                 <button
                   key={m}
@@ -402,8 +432,8 @@ const Login = ({
                   role="tab"
                   aria-selected={mode === m}
                   onClick={() => setMode(m)}
-                  className={`rounded-full px-4 py-1.5 ${
-                    mode === m ? 'bg-white text-ink shadow-sm ring-1 ring-gray-200/80' : 'text-gray-500 hover:text-ink'
+                  className={`relative z-10 rounded-full px-4 py-1.5 transition-colors duration-300 ${
+                    mode === m ? 'text-ink' : 'text-gray-500 hover:text-ink'
                   }`}
                 >
                   {m === 'login' ? 'Log in' : 'Sign up'}
@@ -420,6 +450,17 @@ const Login = ({
             </button>
           )}
 
+          {/* Khung co gian chieu cao; noi dung ben trong truot ngang khi doi buoc.
+              Padding/margin am de vong focus cua nut khong bi overflow-hidden cat. */}
+          <div
+            className="-mx-2 overflow-hidden px-2 transition-[height] duration-300 ease-out"
+            style={stageHeight != null ? { height: stageHeight } : undefined}
+          >
+          <div ref={stageInnerRef} className="flow-root -mb-2 pb-2">
+          <div
+            key={stepKey}
+            className={slide === 'right' ? 'animate-slide-in-right' : slide === 'left' ? 'animate-slide-in-left' : ''}
+          >
           {mode === 'verify' && (
             <span className="mt-6 flex h-11 w-11 items-center justify-center rounded-full bg-paper">
               <MailCheck className="h-5 w-5 text-ink" />
@@ -615,6 +656,9 @@ const Login = ({
               </p>
             )}
           </form>
+          </div>
+          </div>
+          </div>
         </div>
       </div>
     </div>,

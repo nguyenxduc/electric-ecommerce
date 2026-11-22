@@ -60,10 +60,21 @@ export default {
         'fade-up': {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' }
+        },
+        // Chuyen buoc trong modal dang nhap: truot ngang + hien dan
+        'slide-in-right': {
+          from: { opacity: '0', transform: 'translateX(28px)' },
+          to: { opacity: '1', transform: 'translateX(0)' }
+        },
+        'slide-in-left': {
+          from: { opacity: '0', transform: 'translateX(-28px)' },
+          to: { opacity: '1', transform: 'translateX(0)' }
         }
       },
       animation: {
-        'fade-up': 'fade-up 420ms cubic-bezier(0.23, 1, 0.32, 1) both'
+        'fade-up': 'fade-up 420ms cubic-bezier(0.23, 1, 0.32, 1) both',
+        'slide-in-right': 'slide-in-right 380ms cubic-bezier(0.23, 1, 0.32, 1) both',
+        'slide-in-left': 'slide-in-left 380ms cubic-bezier(0.23, 1, 0.32, 1) both'
       }
     }
   },
