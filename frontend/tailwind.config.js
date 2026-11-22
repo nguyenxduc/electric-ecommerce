@@ -45,7 +45,8 @@ export default {
         purple: brand,
         rose: sale,
         // Xam am (stone) thay xam lanh mac dinh
-        gray: colors.stone,
+        // gray-50 = mau giay: nen trang cu (bg-gray-50) khop nen chung
+        gray: { ...colors.stone, 50: '#f6f4ef' },
         ink: '#17181b',
         paper: '#f6f4ef'
       },

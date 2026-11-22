@@ -6,8 +6,9 @@
   html {
     -webkit-tap-highlight-color: transparent;
   }
+  /* antd/dist/reset.css nap sau va dat html { font-family: sans-serif }: gan font o body de thang */
   body {
-    @apply bg-paper text-ink antialiased;
+    @apply bg-paper text-ink antialiased font-sans;
     font-feature-settings: 'ss01', 'cv11';
   }
   h1,

@@ -109,17 +109,17 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
   }, [product?.id])
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-8 pb-24 lg:pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 lg:p-10">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
+    <div className="pt-6 sm:pt-10 pb-24 lg:pb-12">
+      <div className="section-wrap">
+        <div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_340px] gap-8 lg:gap-10">
             {/* Image Gallery */}
             <div className="lg:col-span-1 space-y-4">
-              <div className="aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
+              <div className="relative aspect-square bg-[#f3f1ec] rounded-3xl overflow-hidden">
                 <ProductImage
                   src={mainImage}
                   alt={product.name}
-                  className="w-full h-full object-contain p-4"
+                  className="absolute inset-0 w-full h-full object-contain p-8 mix-blend-multiply"
                 />
               </div>
               {product.img.length > 1 && (
@@ -128,16 +128,16 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     <button
                       key={index}
                       onClick={() => setMainImage(image)}
-                      className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                        mainImage === image
-                          ? 'border-blue-600 ring-2 ring-blue-200'
-                          : 'border-gray-200 hover:border-gray-300'
+                      aria-label={`Show image ${index + 1}`}
+                      aria-pressed={mainImage === image}
+                      className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-[#f3f1ec] ring-2 ring-offset-2 ring-offset-paper ${
+                        mainImage === image ? 'ring-ink' : 'ring-transparent hover:ring-gray-300'
                       }`}
                     >
                       <ProductImage
                         src={image}
                         alt={`${product.name} ${index + 1}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain p-1.5 mix-blend-multiply"
                       />
                     </button>
                   ))}
@@ -148,12 +148,12 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
             {/* Product Info */}
             <div className="lg:col-span-1 space-y-6">
               <div>
-                <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+                <h1 className="text-3xl lg:text-[40px] leading-[1.1] font-extrabold tracking-tight text-ink mb-4">
                   {product.name}
                 </h1>
                 <div className="flex items-center gap-4 mb-6">
-                  <div className="flex items-center gap-2 text-blue-700 px-3 py-1.5 rounded-lg">
-                    <Star className="w-4 h-4 fill-blue-600 text-blue-600" />
+                  <div className="flex items-center gap-1.5">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" aria-hidden="true" />
                     <span className="font-semibold text-black">
                       {product.rating
                         ? parseFloat(String(product.rating)).toFixed(1)
@@ -246,12 +246,12 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
               )}
             </div>
 
-            {/* Payment Section - Sticky on desktop */}
-            <div className="lg:col-span-1">
+            {/* Cot mua hang dinh khi cuon tren desktop (ca link Report, de khong bi khung gia che) */}
+            <div className="lg:col-span-1 lg:sticky lg:top-24 lg:self-start space-y-3">
               {product.flash_sale?.active && product.flash_sale.ends_at && (
                 <div
                   data-testid="flash-banner"
-                  className="mb-3 flex items-center justify-between rounded-xl bg-gradient-to-r from-red-600 to-orange-500 px-4 py-2 text-white"
+                  className="mb-3 flex items-center justify-between rounded-2xl bg-sale-600 px-4 py-2.5 text-white"
                 >
                   <span className="flex items-center gap-1.5 font-bold">
                     <Zap className="w-4 h-4 fill-current" />

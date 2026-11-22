@@ -233,24 +233,24 @@ const Payment = ({
   }
 
   return (
-    <div className="sticky top-4">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-6 max-w-[400px] w-full">
+    <div>
+      <div className="bg-white rounded-3xl ring-1 ring-gray-200/70 p-6 w-full">
         {/* Price Section */}
         <div className="mb-6 pb-6 border-b border-gray-200">
           <div className="flex items-baseline justify-between mb-2">
             <div className="flex items-baseline gap-2">
-              <h2 className="text-3xl font-bold text-gray-900">
+              <h2 className="price text-3xl font-extrabold text-ink">
                 ${finalPrice.toFixed(2)}
               </h2>
               {discountPercent > 0 && (
-                <span className="text-sm font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                <span className="price text-sm font-semibold text-sale-700 bg-sale-50 px-2 py-0.5 rounded-full">
                   -{discountPercent}%
                 </span>
               )}
             </div>
           </div>
           {discountPercent > 0 && (
-            <p className="text-sm text-gray-500 line-through">
+            <p className="price text-sm text-gray-500 line-through">
               ${(Number(price) + priceDelta).toFixed(2)}
             </p>
           )}
@@ -301,27 +301,27 @@ const Payment = ({
           <button
             onClick={handleBuyNow}
             disabled={!canBuy || addToCartMutation.isPending}
-            className={`w-full flex items-center justify-center gap-2 bg-blue-600 text-white py-3.5 rounded-lg font-semibold transition-all ${
+            className={`w-full flex items-center justify-center gap-2 bg-ink text-white py-3.5 rounded-full font-semibold ${
               canBuy && !addToCartMutation.isPending
-                ? 'hover:bg-blue-700 shadow-md hover:shadow-lg'
+                ? 'hover:bg-brand-800'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
             <Zap className="w-5 h-5" />
-            {addToCartMutation.isPending ? 'Processing...' : 'Buy Now'}
+            {addToCartMutation.isPending ? 'Processing…' : 'Buy Now'}
           </button>
 
           <button
             onClick={handleAddToCart}
             disabled={!canBuy || addToCartMutation.isPending}
-            className={`w-full flex items-center justify-center gap-2 bg-white text-blue-600 py-3.5 rounded-lg font-semibold border-2 border-blue-600 transition-all ${
+            className={`w-full flex items-center justify-center gap-2 bg-white text-ink py-3.5 rounded-full font-semibold border-2 border-ink ${
               canBuy && !addToCartMutation.isPending
-                ? 'hover:bg-blue-50 hover:border-blue-700'
+                ? 'hover:bg-gray-50'
                 : 'opacity-50 cursor-not-allowed'
             }`}
           >
             <ShoppingCart className="w-5 h-5" />
-            {addToCartMutation.isPending ? 'Adding...' : 'Add to Cart'}
+            {addToCartMutation.isPending ? 'Adding…' : 'Add to Cart'}
           </button>
 
           <button
@@ -364,7 +364,7 @@ const Payment = ({
             <p className="text-sm font-semibold text-gray-700 leading-tight">Select options</p>
           ) : (
             <>
-              <p className="text-lg font-bold text-rose-600 leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
+              <p className="price text-lg font-bold text-ink leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
               <p className="text-xs text-gray-500">Qty {buyQty}</p>
             </>
           )}
@@ -373,14 +373,14 @@ const Payment = ({
           onClick={handleAddToCart}
           disabled={(!canBuy && !(hasVariants && !selectedVariant)) || addToCartMutation.isPending}
           aria-label="Add to cart"
-          className="ml-auto flex items-center justify-center w-12 h-11 rounded-lg border-2 border-blue-600 text-blue-600 disabled:opacity-50"
+          className="ml-auto flex items-center justify-center w-12 h-11 rounded-full border-2 border-ink text-ink disabled:opacity-50"
         >
           <ShoppingCart className="w-5 h-5" />
         </button>
         <button
           onClick={handleBuyNow}
           disabled={(!canBuy && !(hasVariants && !selectedVariant)) || addToCartMutation.isPending}
-          className="h-11 px-6 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50"
+          className="h-11 px-6 rounded-full bg-ink text-white font-semibold disabled:opacity-50"
         >
           {needsVariant ? 'Select options' : 'Buy now'}
         </button>
