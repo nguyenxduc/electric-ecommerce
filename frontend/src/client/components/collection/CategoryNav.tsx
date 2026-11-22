@@ -10,8 +10,8 @@ interface CategoryNavProps {
   }>
 }
 
-// Thanh category dang chip chu. Nen ink cua chip dang chon la mot lop rieng
-// truot ngang (transform + width) toi chip moi, cung kieu tab Log in / Sign up.
+// Thanh category dang chip chu. Nen trang (bong nhe, vien manh) cua chip dang
+// chon la mot lop rieng truot ngang (transform + width) toi chip moi, cung kieu tab Log in / Sign up.
 // Dung <Link> that de mo tab moi duoc.
 const CategoryNav = ({ categories }: CategoryNavProps) => {
   const { collection } = useParams<{ collection: string }>()
@@ -57,7 +57,7 @@ const CategoryNav = ({ categories }: CategoryNavProps) => {
           {pill && (
             <li
               aria-hidden
-              className={`pointer-events-none absolute top-3 h-9 rounded-full bg-ink ${
+              className={`pointer-events-none absolute top-3 h-9 rounded-full bg-white shadow-[0_2px_8px_-2px_rgb(23_24_27/0.15)] ring-1 ring-gray-200/80 ${
                 animate ? 'transition-[transform,width] duration-300 ease-out' : ''
               }`}
               style={{ width: pill.width, transform: `translateX(${pill.left}px)`, left: 0 }}
@@ -72,7 +72,7 @@ const CategoryNav = ({ categories }: CategoryNavProps) => {
                   to={`/collection/${slug}`}
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex h-9 items-center whitespace-nowrap rounded-full px-4 text-sm transition-colors duration-300 ${
-                    isActive ? 'font-semibold text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-ink'
+                    isActive ? 'font-semibold text-ink' : 'text-gray-500 hover:text-ink'
                   }`}
                 >
                   {cat.name}
