@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, ShoppingBag, X } from 'lucide-react'
 import CartContent from '../cart/CartContent'
@@ -14,7 +15,10 @@ type PopoverProps = {
 }
 
 // Popup gio hang neo duoi header. Khong lam toi/mo nen trang: lop phu trong
-// suot chi de bat click ra ngoai thi dong.
+// suot chi de bat click ra ngoai thi dong. Portal ra body vi header co
+// backdrop-blur: backdrop-filter bien header thanh khung chua cua moi phan tu
+// position:fixed ben trong, lop phu se chi phu dai header (bam giua trang
+// khong dong duoc popup).
 function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: PopoverProps) {
   const navigate = useNavigate()
 
@@ -24,8 +28,8 @@ function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: Popove
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
-    <div className="fixed inset-0 z-50" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[60]" onClick={onClose}>
       <div
         role="dialog"
         aria-label="Shopping cart"
@@ -88,7 +92,8 @@ function CartPopover({ onClose, cartItemCount, totalCost, cartProducts }: Popove
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
