@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
 test('search box suggests products and remembers recent searches', async ({ page }) => {
   await page.goto('/')
   await page.getByLabel('Open search').click()
-  const input = page.getByPlaceholder('Search products or categories')
+  const input = page.getByRole('combobox')
   await input.fill('lap')
   const option = page.getByRole('option').filter({ hasText: /ASUS ROG/i }).first()
   await expect(option).toBeVisible()
@@ -13,8 +13,8 @@ test('search box suggests products and remembers recent searches', async ({ page
 
   await page.goto('/')
   await page.getByLabel('Open search').click()
-  await page.getByPlaceholder('Search products or categories').fill('xiaomi')
-  await page.getByPlaceholder('Search products or categories').press('Enter')
+  await page.getByRole('combobox').fill('xiaomi')
+  await page.getByRole('combobox').press('Enter')
   await expect(page).toHaveURL(/search=xiaomi/)
 
   await page.getByLabel('Open search').click()
