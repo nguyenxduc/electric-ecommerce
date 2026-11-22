@@ -463,12 +463,26 @@ const Collection = () => {
               : ''
           }`}
         >
-          <div className="flex justify-between flex-col gap-3 mb-6 lg:flex-row lg:items-center">
-            <SortDropdown
-              options={sortOptions}
-              selected={sortBy}
-              onSelect={setSortBy}
-            />
+          <div className="mb-6 flex flex-col gap-3">
+            {/* Hang cong cu: so ket qua ben trai, Sort by ben phai */}
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-sm text-gray-600">
+                {products && products.products.length > 0 &&
+                  (products.pagination
+                    ? `Showing ${
+                        (products.pagination.current_page - 1) * products.pagination.per_page + 1
+                      }–${Math.min(
+                        products.pagination.current_page * products.pagination.per_page,
+                        products.pagination.total_count
+                      )} of ${products.pagination.total_count} products`
+                    : `${products.products.length} products`)}
+              </p>
+              <SortDropdown
+                options={sortOptions}
+                selected={sortBy}
+                onSelect={setSortBy}
+              />
+            </div>
             {compareIds.length > 0 && (
               <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900 shadow-sm">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -550,20 +564,6 @@ const Collection = () => {
                 </div>
               ) : (
                 <>
-                  <div className="mb-4 text-sm text-gray-600">
-                    Showing{' '}
-                    {products.pagination
-                      ? `${
-                          (products.pagination.current_page - 1) *
-                            products.pagination.per_page +
-                          1
-                        }-${Math.min(
-                          products.pagination.current_page *
-                            products.pagination.per_page,
-                          products.pagination.total_count
-                        )} of ${products.pagination.total_count} products`
-                      : `${products.products.length} products`}
-                  </div>
                   <ProductGrid
                     products={products.products}
                     selectedCompareProducts={compareProducts}

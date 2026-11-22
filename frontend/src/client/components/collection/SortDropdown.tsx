@@ -52,7 +52,7 @@ const SortDropdown = ({ options, selected, onSelect }: SortDropdownProps) => {
         <ul
           role="listbox"
           aria-label="Sort products"
-          className="absolute left-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_20px_50px_-20px_rgb(23_24_27/0.35)] ring-1 ring-gray-200/80"
+          className="absolute right-0 top-full z-30 mt-2 w-56 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_20px_50px_-20px_rgb(23_24_27/0.35)] ring-1 ring-gray-200/80"
         >
           {options.map(option => {
             const active = option.value === selected
