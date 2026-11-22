@@ -1,7 +1,7 @@
 import { Star, Store as StoreIcon, Zap } from 'lucide-react'
 import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import { Link } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
 import Payment from './Payment'
 import TechnicalDetail from './TechnicalDetail'
@@ -26,6 +26,14 @@ import ProductQuestions from './ProductQuestions'
 interface ProductDetailProps {
   product: Product
 }
+
+const INFO_TABS = [
+  { key: 'description', label: 'Description' },
+  { key: 'technical', label: 'Technical details' },
+  { key: 'similar', label: 'Similar products' },
+  { key: 'comment', label: 'Reviews' },
+  { key: 'questions', label: 'Questions' }
+] as const
 
 const ProductDetail = ({ product }: ProductDetailProps) => {
   // /product/<slug>#reviews (nut "Write review" o don hang) mo thang tab danh gia;
@@ -108,6 +116,33 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
     setSelectedVariantId(null)
   }, [product?.id])
 
+  // Huong hieu ung khi doi anh chinh: anh phia sau -> truot tu phai vao
+  const mainIndex = Math.max(0, product.img.indexOf(mainImage))
+  const galleryRef = useRef({ index: mainIndex, cls: '' })
+  if (galleryRef.current.index !== mainIndex) {
+    galleryRef.current = {
+      index: mainIndex,
+      cls: mainIndex > galleryRef.current.index ? 'gallery-in-right' : 'gallery-in-left'
+    }
+  }
+
+  // Gach chan tab truot: do vi tri/do rong nut tab dang chon
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const [tabBar, setTabBar] = useState<{ left: number; width: number } | null>(null)
+  const [tabBarAnimate, setTabBarAnimate] = useState(false)
+  useLayoutEffect(() => {
+    const el = tabsRef.current?.querySelector<HTMLElement>(`[data-tab="${selectedInfo}"]`)
+    if (!el) return
+    const place = () => setTabBar({ left: el.offsetLeft, width: el.offsetWidth })
+    place()
+    const id = requestAnimationFrame(() => setTabBarAnimate(true))
+    window.addEventListener('resize', place)
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('resize', place)
+    }
+  }, [selectedInfo])
+
   return (
     <div className="pt-6 sm:pt-10 pb-24 lg:pb-12">
       <div className="section-wrap">
@@ -115,22 +150,31 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_340px] gap-8 lg:gap-10">
             {/* Image Gallery */}
             <div className="lg:col-span-1 space-y-4">
-              <div className="relative aspect-square bg-[#f3f1ec] rounded-3xl overflow-hidden">
-                <ProductImage
-                  src={mainImage}
-                  alt={product.name}
-                  className="absolute inset-0 w-full h-full object-contain p-8 mix-blend-multiply"
-                />
+              {/* Anh chinh: vien xam nhat + bong mo. Ring ve ngoai (khong inset): lop
+                  animation ben trong co nen rieng se che mat ring inset. */}
+              <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#f3f1ec] shadow-[0_24px_60px_-32px_rgb(23_24_27/0.35)] ring-1 ring-gray-200">
+                {/* Lop animation (transform/opacity) tao nhom ve rieng: mix-blend-multiply
+                    cua anh chi hoa voi nen cua chinh lop nay. Thieu bg thi nen trang cua
+                    anh san pham lo ra o anh lon (anh nho van hoa vao nen be). */}
+                <div key={mainImage} className={`absolute inset-0 bg-[#f3f1ec] ${galleryRef.current.cls}`}>
+                  <ProductImage
+                    src={mainImage}
+                    alt={product.name}
+                    className="h-full w-full object-contain p-8 mix-blend-multiply"
+                  />
+                </div>
               </div>
               {product.img.length > 1 && (
-                <div className="flex gap-3 overflow-x-auto pb-2">
+                // Chua padding 6px quanh dai anh nho: vien chon (ring-1 + offset-2 = 3px)
+                // nam ngoai o anh, overflow-x-auto tung cat mat mep tren va anh sat le
+                <div className="-mx-1.5 flex gap-3 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
                   {product.img.map((image, index) => (
                     <button
                       key={index}
                       onClick={() => setMainImage(image)}
                       aria-label={`Show image ${index + 1}`}
                       aria-pressed={mainImage === image}
-                      className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-[#f3f1ec] ring-2 ring-offset-2 ring-offset-paper ${
+                      className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-[#f3f1ec] ring-1 ring-offset-2 ring-offset-paper ${
                         mainImage === image ? 'ring-ink' : 'ring-transparent hover:ring-gray-300'
                       }`}
                     >
@@ -188,11 +232,16 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     {colors.map(c => (
                       <button
                         key={c.name}
+                        type="button"
                         onClick={() => setSelectedColor(c.name)}
-                        className={`w-10 h-10 rounded-full border-2 transition-all ${
+                        aria-label={c.name}
+                        aria-pressed={c.name === selectedColor}
+                        // Vien chon mong (ring-1 + khe offset-2) cung kieu anh nho; vien
+                        // nhat border-black/10 de mau sang (trang, bac) khong chim vao nen
+                        className={`h-9 w-9 rounded-full border border-black/10 ring-1 ring-offset-2 ring-offset-paper transition-shadow ${
                           c.name === selectedColor
-                            ? 'border-blue-600 ring-2 ring-blue-200 scale-110'
-                            : 'border-gray-300 hover:border-gray-400'
+                            ? 'ring-ink'
+                            : 'ring-transparent hover:ring-gray-300'
                         }`}
                         style={{ backgroundColor: c.code }}
                         title={c.name}
@@ -219,14 +268,15 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">
                     Key Specifications
                   </h3>
-                  <dl className="space-y-2">
+                  {/* Bang thong so: chi duong ke ngang manh (tren, giua cac dong, duoi), khong vien doc */}
+                  <dl className="divide-y divide-gray-200 border-y border-gray-200">
                     {product.specs.slice(0, visibleCount).map(s => (
                       <div
                         key={s.label}
-                        className="flex justify-between py-2 border-b border-gray-100"
+                        className="flex items-baseline justify-between gap-4 py-2.5"
                       >
-                        <dt className="text-sm text-gray-600">{s.label}</dt>
-                        <dd className="text-sm font-medium text-gray-900">
+                        <dt className="text-sm text-gray-500">{s.label}</dt>
+                        <dd className="text-right text-sm font-medium text-ink">
                           {s.value}
                         </dd>
                       </div>
@@ -234,7 +284,8 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                   </dl>
                   {product.specs.length > 5 && (
                     <button
-                      className="mt-3 text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      type="button"
+                      className="mt-3 text-sm font-medium text-ink underline-offset-4 hover:underline"
                       onClick={() => setExpanded(!expanded)}
                     >
                       {expanded
@@ -287,76 +338,43 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
 
         {/* Tabs Section */}
         <div id="reviews" className="mt-12 scroll-mt-24">
-          <nav className="border-b border-gray-200 overflow-x-auto">
-            <div className="flex gap-6 sm:gap-8 whitespace-nowrap">
-              <button
-                onClick={() => setSelectedInfo('description')}
-                className={`pb-4 px-1 text-base font-medium transition-colors ${
-                  selectedInfo === 'description'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Product Description
-              </button>
-              <button
-                onClick={() => setSelectedInfo('technical')}
-                className={`pb-4 px-1 text-base font-medium transition-colors ${
-                  selectedInfo === 'technical'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Technical Details
-              </button>
-              <button
-                onClick={() => setSelectedInfo('similar')}
-                className={`pb-4 px-1 text-base font-medium transition-colors ${
-                  selectedInfo === 'similar'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Similar Products
-              </button>
-              <button
-                onClick={() => setSelectedInfo('comment')}
-                className={`pb-4 px-1 text-base font-medium transition-colors ${
-                  selectedInfo === 'comment'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Reviews & Comments
-              </button>
-              <button
-                onClick={() => setSelectedInfo('questions')}
-                className={`pb-4 px-1 text-base font-medium transition-colors ${
-                  selectedInfo === 'questions'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Questions
-              </button>
+          {/* Tab: gach chan ink truot ngang sang tab dang chon (cung kieu thanh category) */}
+          <nav className="border-b border-gray-200">
+            <div
+              ref={tabsRef}
+              role="tablist"
+              aria-label="Product information"
+              className="relative -mb-px flex gap-6 overflow-x-auto whitespace-nowrap [scrollbar-width:none] sm:gap-8 [&::-webkit-scrollbar]:hidden"
+            >
+              {INFO_TABS.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedInfo === t.key}
+                  data-tab={t.key}
+                  onClick={() => setSelectedInfo(t.key)}
+                  className={`pb-4 text-[15px] transition-colors duration-300 ${
+                    selectedInfo === t.key ? 'font-semibold text-ink' : 'text-gray-500 hover:text-ink'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+              {tabBar && (
+                <span
+                  aria-hidden
+                  className={`pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-ink ${
+                    tabBarAnimate ? 'transition-[transform,width] duration-300 ease-out' : ''
+                  }`}
+                  style={{ width: tabBar.width, transform: `translateX(${tabBar.left}px)` }}
+                />
+              )}
             </div>
           </nav>
-          <div className="mt-8">
+          <div key={selectedInfo} className="tab-in mt-8">
             {selectedInfo === 'description' && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
-                  <h3 className="text-xl font-semibold text-gray-900">
-                    Product Description
-                  </h3>
-                  <span className="text-sm text-gray-500">
-                    Detailed overview with photos
-                  </span>
-                </div>
-                <ProductDescription
-                  description={product.description}
-                  productName={product.name}
-                />
-              </div>
+              <ProductDescription description={product.description} productName={product.name} />
             )}
             {selectedInfo === 'technical' && (
               <TechnicalDetail specs={product.specs_detail} />

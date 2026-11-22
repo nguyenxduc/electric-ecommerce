@@ -9,102 +9,71 @@ const isSpecGroup = (
   detail: ProductSpecDetail
 ): detail is { category: string; items: ProductSpec[] } => 'items' in detail
 
+// Thong so ky thuat cung kieu "Key Specifications": tieu de nhom nho, chi duong
+// ke ngang manh, khong khung/nen; 2 cot tren man rong.
+const Row = ({ label, value }: { label: string; value: string }) => (
+  <div className="flex items-baseline justify-between gap-4 py-2.5">
+    <dt className="text-sm text-gray-500">{label}</dt>
+    <dd className="text-right text-sm font-medium text-ink">{value}</dd>
+  </div>
+)
+
 const TechnicalDetail = ({ specs }: TechnicalDetailProps) => {
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {}
-  )
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
 
   if (!specs?.length) {
-    return (
-      <div className="bg-white rounded-xl border border-gray-200 p-6 text-gray-500">
-        No technical specifications available.
-      </div>
-    )
+    return <p className="text-gray-500">No technical specifications available.</p>
   }
 
-  const toggleGroup = (category: string) => {
-    setExpandedGroups(prev => ({
-      ...prev,
-      [category]: !prev[category],
-    }))
-  }
+  const toggleGroup = (category: string) =>
+    setExpandedGroups(prev => ({ ...prev, [category]: !prev[category] }))
+
+  const groups = specs.filter(isSpecGroup)
+  const flat = specs.filter(d => !isSpecGroup(d)) as ProductSpec[]
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 lg:p-8">
-      <h2 className="text-xl lg:text-2xl font-semibold text-gray-900 mb-2">
-        Technical Details
-      </h2>
-      <p className="text-sm text-gray-600 mb-6">
-        Full manufacturer-style specifications grouped by category. Values may
-        vary slightly by region or configuration.
+    <div>
+      <p className="mb-8 max-w-2xl text-sm text-gray-500">
+        Full manufacturer-style specifications grouped by category. Values may vary slightly by
+        region or configuration.
       </p>
 
-      <div className="space-y-6">
-        {specs.map((detail, groupIndex) => {
-          if (isSpecGroup(detail)) {
-            const category = detail.category || 'General'
-            const isExpanded = expandedGroups[category] !== false
-            const visibleItems = isExpanded
-              ? detail.items
-              : detail.items.slice(0, 4)
-            const hasMore = detail.items.length > 4
-
-            return (
-              <section
-                key={`${category}-${groupIndex}`}
-                className="rounded-lg border border-gray-100 overflow-hidden"
-              >
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-100">
-                  <h3 className="text-base font-semibold text-gray-900">
-                    {category}
-                  </h3>
-                </div>
-                <dl className="divide-y divide-gray-100">
-                  {visibleItems.map((item, i) => (
-                    <div
-                      key={`${item.label}-${i}`}
-                      className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 py-3 px-4 even:bg-gray-50/80"
-                    >
-                      <dt className="text-sm text-gray-600 font-medium sm:w-1/3">
-                        {item.label}
-                      </dt>
-                      <dd className="text-sm text-gray-900 sm:w-2/3 sm:text-right font-medium">
-                        {item.value}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                {hasMore && (
-                  <button
-                    type="button"
-                    className="w-full py-2.5 text-sm text-blue-600 hover:text-blue-700 font-medium border-t border-gray-100 bg-white"
-                    onClick={() => toggleGroup(category)}
-                  >
-                    {isExpanded
-                      ? 'Show fewer specs in this section'
-                      : `Show all ${detail.items.length} specs in ${category}`}
-                  </button>
-                )}
-              </section>
-            )
-          }
-
+      <div className="grid gap-x-12 gap-y-10 lg:grid-cols-2">
+        {groups.map((detail, groupIndex) => {
+          const category = detail.category || 'General'
+          const isExpanded = expandedGroups[category] !== false
+          const visibleItems = isExpanded ? detail.items : detail.items.slice(0, 4)
+          const hasMore = detail.items.length > 4
           return (
-            <dl
-              key={`flat-${groupIndex}`}
-              className="rounded-lg border border-gray-100 divide-y divide-gray-100"
-            >
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 py-3 px-4 bg-gray-50/80">
-                <dt className="text-sm text-gray-600 font-medium">
-                  {detail.label}
-                </dt>
-                <dd className="text-sm text-gray-900 font-medium">
-                  {detail.value}
-                </dd>
-              </div>
-            </dl>
+            <section key={`${category}-${groupIndex}`}>
+              <h3 className="eyebrow mb-2">{category}</h3>
+              <dl className="divide-y divide-gray-200 border-y border-gray-200">
+                {visibleItems.map((item, i) => (
+                  <Row key={`${item.label}-${i}`} label={item.label} value={item.value} />
+                ))}
+              </dl>
+              {hasMore && (
+                <button
+                  type="button"
+                  className="mt-3 text-sm font-medium text-ink underline-offset-4 hover:underline"
+                  onClick={() => toggleGroup(category)}
+                >
+                  {isExpanded ? 'Show fewer' : `Show all ${detail.items.length} specs`}
+                </button>
+              )}
+            </section>
           )
         })}
+        {flat.length > 0 && (
+          <section>
+            <h3 className="eyebrow mb-2">General</h3>
+            <dl className="divide-y divide-gray-200 border-y border-gray-200">
+              {flat.map((d, i) => (
+                <Row key={`${d.label}-${i}`} label={d.label} value={d.value} />
+              ))}
+            </dl>
+          </section>
+        )}
       </div>
     </div>
   )
