@@ -7,6 +7,7 @@ import { onOrderReturned } from "../services/invoice.service.js";
 import { ROLES } from "../constants/roles.js";
 import { ORDER_STATUS, RETURN_STATUS } from "../constants/status.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { isTxConflict, withTxConflictRetry } from "../lib/transaction.js";
 
 // POST /api/returns — buyer requests a return on their delivered order
 export const createReturnRequest = asyncHandler(async (req, res) => {
@@ -127,7 +128,7 @@ export const resolveReturnRequest = asyncHandler(async (req, res) => {
 
   let updated;
   try {
-    updated = await prisma.$transaction(async (tx) => {
+    updated = await withTxConflictRetry(() => prisma.$transaction(async (tx) => {
       // Re-check status atomically - closes the gap between the read
       // above and this write so two concurrent resolutions of the same
       // request (e.g. a seller double-clicking Approve) can't both
@@ -156,12 +157,17 @@ export const resolveReturnRequest = asyncHandler(async (req, res) => {
         await onOrderReturned(tx, request.order);
       }
       return tx.returnRequest.findUniqueOrThrow({ where: { id: request.id } });
-    });
+    }));
   } catch (err) {
     if (err.message === "RETURN_ALREADY_RESOLVED") {
       return res
         .status(409)
         .json({ success: false, message: "Request already resolved" });
+    }
+    if (isTxConflict(err)) {
+      return res
+        .status(409)
+        .json({ success: false, message: "Busy right now. Please try again." });
     }
     throw err;
   }
