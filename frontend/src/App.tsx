@@ -59,6 +59,8 @@ import SellerReturnsList from './seller/pages/returns/List'
 import SellerFinance from './seller/pages/finance/Finance'
 import SellerReviewsList from './seller/pages/reviews/List'
 import SellerQuestionsList from './seller/pages/questions/List'
+import FlashSalePage from './client/pages/FlashSalePage'
+import Shops from './client/pages/Shops'
 
 const queryClient = new QueryClient()
 
@@ -160,6 +162,8 @@ function App() {
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment-result" element={<PaymentResult />} />
             <Route path="/shop/:slug" element={<ShopPublic />} />
+            <Route path="/flash-sale" element={<FlashSalePage />} />
+            <Route path="/shops" element={<Shops />} />
           </Route>
           <Route
             path="/seller"

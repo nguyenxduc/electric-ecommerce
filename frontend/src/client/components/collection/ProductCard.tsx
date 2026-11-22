@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Star, Store, Zap } from 'lucide-react'
 import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
@@ -31,7 +31,6 @@ const ProductCard = ({
   compareDisabledReason,
   onCompareToggle
 }: ProductCardProps) => {
-  const navigate = useNavigate()
   const price = asNumber(product.price)
   const finalPrice = asNumber(product.final_price)
   const discount = asNumber(product.discount)
@@ -48,26 +47,21 @@ const ProductCard = ({
 
   const hasDiscount = discountPercentage > 0
 
+  const href = `/product/${slug || makeProductSlug(product.name, product.id)}`
+  const shown = finalPrice > 0 ? finalPrice : price
+
   return (
-    <div
-      className="group relative flex flex-col bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-md hover:border-gray-200 transition cursor-pointer"
-      onClick={() => {
-        trackBehavior('click', product.id, { source: 'product_card' })
-        navigate(`/product/${slug || makeProductSlug(product.name, product.id)}`)
-      }}
-    >
+    <div className="zoom-on-hover lift group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/70 focus-within:ring-2 focus-within:ring-brand-500">
       {onCompareToggle && (
         <button
           type="button"
           disabled={compareDisabled && !compareSelected}
-          onClick={event => {
-            event.stopPropagation()
-            onCompareToggle(product)
-          }}
-          className={`absolute top-2 right-2 z-20 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none ${
+          aria-pressed={compareSelected}
+          onClick={() => onCompareToggle(product)}
+          className={`absolute top-2.5 right-2.5 z-20 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ${
             compareSelected
-              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
+              ? 'bg-ink text-white hover:bg-brand-800'
+              : 'bg-white/90 text-gray-700 ring-1 ring-gray-200 hover:ring-ink'
           } ${compareDisabled && !compareSelected ? 'opacity-50 cursor-not-allowed' : ''}`}
           title={
             compareDisabled && !compareSelected
@@ -81,52 +75,49 @@ const ProductCard = ({
         </button>
       )}
 
-      <div className="relative aspect-square bg-gray-50">
+      <div className="relative aspect-square overflow-hidden bg-[#f3f1ec]">
         {product.flash_sale?.active && (
-          <span className="absolute top-2 left-2 z-10 flex items-center gap-0.5 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
-            <Zap className="w-3 h-3 fill-current" />
+          <span className="absolute top-2.5 left-2.5 z-10 flex items-center gap-0.5 rounded-full bg-sale-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+            <Zap className="w-3 h-3 fill-current" aria-hidden="true" />
             Flash
           </span>
         )}
         {product.img && product.img.length > 0 ? (
-          <ProductImage
-            src={product.img[0]}
-            alt={product.name}
-            className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
-          />
+          <ProductImage src={product.img[0]} alt={product.name} className="absolute inset-0 h-full w-full object-contain p-5 mix-blend-multiply" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-            No image
-          </div>
+          <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">No image</div>
         )}
       </div>
 
-      <div className="flex flex-col flex-1 p-3">
-        <h3 className="text-sm text-gray-800 leading-snug line-clamp-2 min-h-[2.5rem]">
-          {product.name}
+      <div className="flex flex-1 flex-col p-3.5">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm leading-snug text-gray-800">
+          {/* Link phu ca the (after:inset-0): bam dau tren the cung mo san pham, van la <a> that */}
+          <Link
+            to={href}
+            onClick={() => trackBehavior('click', product.id, { source: 'product_card' })}
+            className="after:absolute after:inset-0 after:z-10 focus-visible:outline-none"
+          >
+            {product.name}
+          </Link>
         </h3>
-        <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-lg font-bold text-rose-600">
-            ${(finalPrice > 0 ? finalPrice : price).toFixed(2)}
-          </span>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
           {hasDiscount && (
-            <span className="text-xs font-semibold text-rose-600 bg-rose-50 rounded px-1">
-              -{discountPercentage}%
-            </span>
+            <>
+              <span className="price text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
+              <span className="price text-xs font-semibold text-sale-600">-{discountPercentage}%</span>
+            </>
           )}
         </div>
-        {hasDiscount && (
-          <span className="text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
-        )}
-        <div className="mt-auto pt-2 flex items-center gap-1 text-xs text-gray-500">
-          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+        <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs text-gray-500">
+          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
           <span className="font-medium text-gray-700">{rating.toFixed(1)}</span>
-          <span className="text-gray-300">|</span>
+          <span aria-hidden="true">·</span>
           <span>{compact(asNumber(product.sold))} sold</span>
         </div>
         {product.shop?.name && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-gray-400 truncate">
-            <Store className="w-3 h-3 shrink-0" />
+          <div className="mt-1 flex items-center gap-1 truncate text-xs text-gray-400">
+            <Store className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span className="truncate">{product.shop.name}</span>
           </div>
         )}

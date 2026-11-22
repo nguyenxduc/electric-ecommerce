@@ -34,22 +34,18 @@ const Home = () => {
       <FlashSale />
       <TopDeals />
       <FeaturedShops />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-8">
-        <RecentlyViewed canClear />
-      </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
+      <div className="section-wrap pb-20">
+        <div className="mt-16">
+          <RecentlyViewed canClear />
+        </div>
         <ListProduct
           title="Recommended for you"
           sectionLabel={recommendationStrategyLabel(recommendationData?.data?.strategy)}
           products={recommendationProducts}
           isLoading={loadingRecommendation}
         />
-      </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
-        <ListProduct title="New Arrivals" products={newProduct || null} isLoading={loadingNew} />
-      </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-6">
-        <ListProduct title="Best Sellers" products={popularProduct || null} isLoading={loadingPopular} />
+        <ListProduct title="New arrivals" sectionLabel="Just listed" products={newProduct || null} isLoading={loadingNew} />
+        <ListProduct title="Best sellers" sectionLabel="Most ordered" products={popularProduct || null} isLoading={loadingPopular} />
       </div>
     </div>
   )

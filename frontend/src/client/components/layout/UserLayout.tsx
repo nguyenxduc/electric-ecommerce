@@ -12,16 +12,16 @@ function BehaviorSession() {
 
 const UserLayout = () => {
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       <BehaviorSession />
       <Header />
-      <main>
-        <Outlet/>
+      <main className="flex-1">
+        <Outlet />
       </main>
       <Footer />
       <ChatWidget />
       <AiChatWidget />
-    </>
+    </div>
   )
 }
 

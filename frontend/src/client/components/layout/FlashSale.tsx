@@ -1,4 +1,5 @@
-import { Zap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, Zap } from 'lucide-react'
 import { useFlashSale } from '../../hooks/useProducts'
 import ProductCard from '../collection/ProductCard'
 import Countdown from '../common/Countdown'
@@ -12,21 +13,32 @@ const FlashSale = () => {
   if (!products.length || !endsAt) return null
 
   return (
-    <section data-testid="flash-sale-strip" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-12 mt-10">
-      <div className="rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-3 mb-4 text-white">
-          <h2 className="flex items-center gap-2 text-xl sm:text-2xl font-bold">
-            <Zap className="w-6 h-6 fill-current" />
-            Flash Sale
-          </h2>
-          <span className="flex items-center gap-2 text-sm">
-            Ends in
-            <Countdown endsAt={endsAt} className="bg-black/30 rounded px-2 py-0.5 font-bold" />
-          </span>
+    <section data-testid="flash-sale-strip" className="section-wrap mt-16">
+      <div className="rounded-3xl bg-ink p-5 sm:p-7 text-white">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-sale-300">
+              <Zap className="h-3.5 w-3.5 fill-current" aria-hidden="true" /> Today only
+            </p>
+            <h2 className="mt-1.5 flex flex-wrap items-baseline gap-x-4 text-2xl font-bold sm:text-[28px]">
+              Flash Sale
+              <span className="flex items-center gap-2 text-sm font-normal text-white/60">
+                Ends in
+                <Countdown endsAt={endsAt} className="rounded-md bg-sale-600 px-2 py-0.5 font-bold text-white" />
+              </span>
+            </h2>
+          </div>
+          <Link
+            to="/flash-sale"
+            className="group inline-flex items-center gap-1 text-sm font-semibold text-white hover:text-sale-200"
+          >
+            See every deal
+            <ArrowRight className="h-4 w-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5" aria-hidden="true" />
+          </Link>
         </div>
-        <ul className="flex gap-3 overflow-x-auto pb-1 snap-x">
+        <ul className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 text-ink">
           {products.map(p => (
-            <li key={p.id} className="w-40 sm:w-48 shrink-0 snap-start">
+            <li key={p.id} className="w-44 shrink-0 snap-start sm:w-52">
               <ProductCard product={p} slug={makeProductSlug(p.name, p.id)} />
             </li>
           ))}

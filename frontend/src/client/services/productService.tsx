@@ -30,9 +30,9 @@ export const fetchTopDeals = async (): Promise<ListProductRes> => {
 }
 
 // Flash sale dang chay, het som nhat truoc
-export const fetchFlashSale = async (): Promise<{ products: Product[] }> => {
+export const fetchFlashSale = async (limit = 12): Promise<{ products: Product[] }> => {
   const { data } = await axiosClient.get<{ products: Product[] }>('/products/flash-sale', {
-    params: { limit: 12 }
+    params: { limit }
   })
   return data
 }

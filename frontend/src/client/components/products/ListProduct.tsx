@@ -1,9 +1,9 @@
-import { useNavigate } from 'react-router-dom'
 import ProductCard from '../collection/ProductCard'
 import type { ListProductRes, Product } from '../../types/product'
 import { ProductGridSkeleton, SectionSkeleton } from '../common/LoadingSkeleton'
 import { makeProductSlug } from '../../utils/productSlug'
 import { MAX_COMPARE_PRODUCTS } from '../../constants/compare'
+import SectionHeader from '../common/SectionHeader'
 
 interface ListProductProps {
   title: string
@@ -22,27 +22,11 @@ const ListProduct = ({
   selectedCompareIds = [],
   onCompareToggle
 }: ListProductProps) => {
-  const navigate = useNavigate()
-
-  function ViewAll() {
-    navigate('/collection/all')
-  }
-
   const DataRender = products?.products.slice(0, 4)
 
   return (
-    <section className="mb-10 mt-5">
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
-          {sectionLabel && (
-            <p className="mt-1 text-sm text-gray-500">{sectionLabel}</p>
-          )}
-        </div>
-        <button onClick={ViewAll} className="shrink-0 text-sm font-medium text-blue-600 hover:underline">
-          View All
-        </button>
-      </div>
+    <section className="mt-16">
+      <SectionHeader eyebrow={sectionLabel} title={title} to="/collection/all" />
 
       {isLoading && (
         <>
@@ -52,7 +36,7 @@ const ListProduct = ({
       )}
 
       {!isLoading && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
           {DataRender?.map(product => (
             <ProductCard
               product={product}

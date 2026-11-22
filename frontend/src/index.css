@@ -2,8 +2,88 @@
 @tailwind components;
 @tailwind utilities;
 
-#root {
-  font-family: 'Inter', sans-serif;
-  font-optical-sizing: auto;
-  font-style: normal;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+  /* Vong focus chi hien khi dung ban phim */
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+  }
+  button,
+  a,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+  /* Nhan nut co nhe: phan hoi tuc thi (emil: scale 0.97, ease-out) */
+  button:not(:disabled) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 160ms;
+    transition-timing-function: theme('transitionTimingFunction.out');
+  }
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+@layer components {
+  /* Gia tien: chu so canh deu cot */
+  .price {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-ink hover:border-ink disabled:opacity-50;
+  }
+  .section-wrap {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-12;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-gray-500;
+  }
+}
+
+/* Hieu ung hover chi tren thiet bi co chuot (cham man hinh khong bi dinh hover) */
+@media (hover: hover) and (pointer: fine) {
+  .lift {
+    transition: transform 220ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 220ms ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px -12px rgb(23 24 27 / 0.18);
+  }
+  .zoom-on-hover img {
+    transition: transform 400ms cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  .zoom-on-hover:hover img {
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  button:not(:disabled):active,
+  .lift:hover {
+    transform: none;
+  }
 }

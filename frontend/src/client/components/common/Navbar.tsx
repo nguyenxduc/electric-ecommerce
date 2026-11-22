@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { LayoutGrid, Settings, Store } from 'lucide-react'
+import { Link, NavLink } from 'react-router-dom'
+import { Settings, Store } from 'lucide-react'
 
 import Login from './Login'
 import Search from './Search'
@@ -10,23 +10,40 @@ import CartDrawer from '../layout/CartDrawer'
 import ConfirmModal from './ConfirmModal'
 
 import Logo from '../../../assets/logo.svg'
-import ProfileIcon from '../../../assets/profile-icon.svg'
 import { useValidateToken } from '../../hooks/useAuth'
 import { useCart } from '../../hooks/useCart'
+import { usePublicSettings } from '../../hooks/useSettings'
 import { getTierInfo } from '../../hooks/useLoyalty'
 import { OPEN_LOGIN_EVENT } from '../../utils/loginModal'
+
+const NAV = [
+  { to: '/collection/all', label: 'Shop all' },
+  { to: '/flash-sale', label: 'Flash sale' },
+  { to: '/shops', label: 'Shops' },
+  { to: '/compare', label: 'Compare' }
+]
+
+const initials = (name?: string) =>
+  (name || '?')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0]?.toUpperCase())
+    .join('')
+
+const navClass = ({ isActive }: { isActive: boolean }) =>
+  `relative whitespace-nowrap text-sm transition-colors ${
+    isActive ? 'text-ink font-semibold' : 'text-gray-600 hover:text-ink'
+  }`
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false)
   const [userLoggedIn, setUserLoggedIn] = useState(false)
   const [infoModal, setInfoModal] = useState<string | null>(null)
+  const { data: settings } = usePublicSettings('general')
+  const storeName = settings?.settings?.store_name || 'Tech Shop'
 
-  const {
-    data: user,
-    isLoading,
-    isError,
-    refetch: refetchUser
-  } = useValidateToken()
+  const { data: user, isLoading, isError, refetch: refetchUser } = useValidateToken()
   const isLoggedIn = !isError && !isLoading && !!user
 
   useEffect(() => {
@@ -45,111 +62,99 @@ const Navbar = () => {
   }
 
   const { data: cartProducts, isLoading: isCartLoading } = useCart()
+  const me = user?.user
+  const tier = me?.segment || (me?.loyalty_points != null ? getTierInfo(me.loyalty_points).label : null)
 
   return (
     <>
-      <nav className="container mx-auto flex items-center justify-between px-3 py-4 bg-white">
-        <div>
-          <Link to="/">
-            <img src={Logo} alt="Logo" className="h-8 w-auto" />
-          </Link>
+      <nav className="section-wrap flex items-center gap-6 h-16">
+        <Link to="/" className="flex items-center gap-2 shrink-0" aria-label={`${storeName} home`}>
+          <img src={Logo} alt="" className="h-7 w-auto" width={28} height={28} />
+          <span className="hidden sm:block text-[17px] font-bold tracking-tight text-ink">{storeName}</span>
+        </Link>
+
+        <div className="hidden md:flex items-center gap-7">
+          {NAV.map(n => (
+            <NavLink key={n.to} to={n.to} className={navClass}>
+              {n.label}
+            </NavLink>
+          ))}
         </div>
-        <div className="hidden md:flex space-x-10">
-          <Link
-            to="/"
-            className="text-gray-700 hover:text-blue-600 text-sm font-light"
-          >
-            Home
-          </Link>
-          <Link
-            to="/collection/all"
-            className="text-gray-700 hover:text-blue-600 text-sm font-light"
-          >
-            Product
-          </Link>
-        </div>
-        <div className="flex items-center space-x-3 sm:space-x-4">
-          <Link
-            to="/collection/all"
-            aria-label="Products"
-            className="md:hidden p-1 text-gray-700 hover:text-blue-600"
-          >
-            <LayoutGrid className="w-5 h-5" />
-          </Link>
+
+        <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <Search />
-          {isCartLoading && <CartDrawer cartProducts={null} />}
-          {!isCartLoading && (
-            <CartDrawer cartProducts={cartProducts?.cart || null} />
-          )}
+          <CartDrawer cartProducts={isCartLoading ? null : cartProducts?.cart || null} />
           {userLoggedIn ? (
-            <div className="flex items-center space-x-3">
-              {user?.user?.role === 'admin' && (
+            <>
+              {me?.role === 'admin' && (
                 <Link
                   to="/admin"
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  className="p-2 rounded-full text-gray-600 hover:text-ink hover:bg-gray-100"
                   title="Admin Panel"
+                  aria-label="Admin Panel"
                 >
-                  <Settings className="w-5 h-5" />
+                  <Settings className="w-5 h-5" aria-hidden="true" />
                 </Link>
               )}
-              {user?.user?.role === 'seller' && (
+              {me?.role === 'seller' && (
                 <Link
                   to="/seller"
-                  className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  className="p-2 rounded-full text-gray-600 hover:text-ink hover:bg-gray-100"
                   title="Seller Dashboard"
+                  aria-label="Seller Dashboard"
                 >
-                  <Store className="w-5 h-5" />
+                  <Store className="w-5 h-5" aria-hidden="true" />
                 </Link>
               )}
               <NotificationBell />
-              {(user?.user?.segment != null ||
-                user?.user?.loyalty_points != null) && (
-                <Link
-                  to="/profile"
-                  title="Loyalty & Rewards"
-                  className="hidden sm:flex flex-col items-end text-right leading-tight max-w-[140px]"
-                >
-                  <span className="text-[10px] uppercase tracking-wide text-gray-400">
-                    Tier
+              <Link
+                to="/profile"
+                aria-label="Profile"
+                title={tier ? `${me?.name} · ${tier}` : me?.name}
+                className="ml-1 flex items-center gap-2 rounded-full pl-1 pr-1 sm:pr-3 py-1 hover:bg-gray-100"
+              >
+                {me?.avatar ? (
+                  <img src={me.avatar} alt="" className="w-8 h-8 rounded-full object-cover" width={32} height={32} />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-brand-700 text-white text-xs font-semibold flex items-center justify-center">
+                    {initials(me?.name)}
                   </span>
-                  <span className="text-xs font-semibold text-blue-700 truncate w-full">
-                    {user?.user?.segment ||
-                      getTierInfo(user?.user?.loyalty_points ?? 0).label}
-                  </span>
-                  {typeof user?.user?.loyalty_points === 'number' && (
-                    <span className="text-[10px] text-gray-500">
-                      {user.user.loyalty_points.toLocaleString()} pts
+                )}
+                <span className="hidden lg:flex flex-col leading-tight text-left max-w-[120px]">
+                  <span className="text-xs font-semibold text-ink truncate">{me?.name}</span>
+                  {tier && (
+                    <span className="text-[11px] text-gray-500 truncate">
+                      {tier}
+                      {typeof me?.loyalty_points === 'number' && ` · ${me.loyalty_points.toLocaleString()} pts`}
                     </span>
                   )}
-                </Link>
-              )}
-              <Link to="/profile">
-                <img src={ProfileIcon} alt="Profile" className="h-15 w-15" />
+                </span>
               </Link>
-            </div>
+            </>
           ) : (
-            <button
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base text-white hover:bg-white hover:text-blue-600 hover:ring"
-              onClick={() => setOpenAuth(true)}
-            >
+            <button className="btn-primary ml-1 !px-4 !py-2" onClick={() => setOpenAuth(true)}>
               Login / Sign Up
             </button>
           )}
         </div>
       </nav>
+      {/* Dien thoai: link dieu huong thanh hang cuon ngang duoi logo */}
+      <div className="md:hidden border-t border-gray-200/70">
+        <div className="section-wrap flex gap-6 overflow-x-auto py-2.5">
+          {NAV.map(n => (
+            <NavLink key={n.to} to={n.to} className={navClass}>
+              {n.label}
+            </NavLink>
+          ))}
+        </div>
+      </div>
       <Login
         open={openAuth}
         onClose={() => setOpenAuth(false)}
         onSuccess={handleAuthSuccess}
-        onForgotPassword={() =>
-          setInfoModal('Forgot password feature will be available soon.')
-        }
-        onLoginWithGoogle={() =>
-          setInfoModal('Google OAuth is being prepared.')
-        }
-        onLoginWithFacebook={() =>
-          setInfoModal('Facebook OAuth is being prepared.')
-        }
+        onForgotPassword={() => setInfoModal('Forgot password feature will be available soon.')}
+        onLoginWithGoogle={() => setInfoModal('Google OAuth is being prepared.')}
+        onLoginWithFacebook={() => setInfoModal('Facebook OAuth is being prepared.')}
       />
       <ConfirmModal
         open={!!infoModal}

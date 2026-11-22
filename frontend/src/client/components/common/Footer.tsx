@@ -1,26 +1,41 @@
 import { Link } from 'react-router-dom'
 import { usePublicSettings } from '../../hooks/useSettings'
 
-import LocationIcon from '../../../assets/location-icon.svg'
-import PhoneIcon from '../../../assets/phone-icon.svg'
-import EmailIcon from '../../../assets/email-icon.svg'
-
 import { TbBrandMeta } from 'react-icons/tb'
 import { IoLogoInstagram } from 'react-icons/io'
 import { RiTwitterXLine } from 'react-icons/ri'
 
-import CompanyIcon from '../../../assets/company-icon.svg'
+const COLUMNS = [
+  {
+    title: 'Shop',
+    links: [
+      { to: '/collection/all', label: 'All products' },
+      { to: '/flash-sale', label: 'Flash sale' },
+      { to: '/shops', label: 'Shops' },
+      { to: '/compare', label: 'Compare products' }
+    ]
+  },
+  {
+    title: 'Your account',
+    links: [
+      { to: '/profile?tab=orders', label: 'Order status' },
+      { to: '/profile?tab=orders', label: 'Returns' },
+      { to: '/profile?tab=following', label: 'Followed shops' },
+      { to: '/cart', label: 'Cart' }
+    ]
+  },
+  {
+    title: 'Sell',
+    links: [{ to: '/profile?tab=seller', label: 'Open a shop' }]
+  }
+]
 
 const Footer = () => {
   const { data: settingsData } = usePublicSettings('general')
-
-  // Extract settings with fallback values
   const settings = settingsData?.settings || {}
   const companyName = settings.store_name || 'Tech Shop'
-  const companyAddress =
-    settings.store_address || '123 Main Street, Anytown, USA'
-  const companyPhone = settings.store_phone || '+1 (555) 123-4567'
-  const companyEmail = settings.store_email || 'TechHeimSupport@gmail.com'
+  // Chi hien thong tin lien he da cau hinh, khong bia dia chi/so dien thoai
+  const contacts = [settings.store_address, settings.store_phone, settings.store_email].filter(Boolean)
   // Chua cau hinh link mang xa hoi thi an icon, khong de link chet '#'
   const socials = [
     { url: settings.facebook_url, label: 'Facebook', Icon: TbBrandMeta },
@@ -30,83 +45,64 @@ const Footer = () => {
   const copyrightYear = settings.copyright_year || new Date().getFullYear()
 
   return (
-    <footer className="border-t bg-gradient-to-b from-blue-950 to-blue-900 pt-5">
-      <div className="container grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8 px-6 sm:px-14">
-        <div className="flex flex-col text-white font-thin space-y-1">
-          <h3 className="text-xl font-normal mb-2">Company</h3>
-          <Link to="/profile?tab=orders" className="hover:text-gray-300">
-            order status
-          </Link>
-          <Link to="/profile?tab=orders" className="hover:text-gray-300">
-            returns
-          </Link>
-        </div>
-        <div className="flex flex-col text-white font-thin space-y-1">
-          <h3 className="text-xl font-normal mb-2">Shop</h3>
-          <Link to="/collection/all" className="hover:text-gray-300">
-            all products
-          </Link>
-          <Link to="/cart" className="hover:text-gray-300">
-            cart
-          </Link>
-        </div>
-        <div className="flex flex-col text-white font-thin space-y-1">
-          <h3 className="text-xl font-normal mb-2">Contact us</h3>
-          <div className="inline-flex">
-            <img
-              src={LocationIcon}
-              alt="location-icon"
-              className="w-4 h-4 mr-2 mt-1"
-            />
-            <p className="text-nowrap">{companyAddress}</p>
-          </div>
-          <div className="inline-flex">
-            <img
-              src={PhoneIcon}
-              alt="phone-icon"
-              className="w-4 h-4 mr-2 mt-1"
-            />
-            <p>{companyPhone}</p>
-          </div>
-          <div className="inline-flex">
-            <img
-              src={EmailIcon}
-              alt="email-icon"
-              className="w-4 h-4 mr-2 mt-1"
-            />
-            <p>{companyEmail}</p>
-          </div>
-        </div>
-        <div className="flex flex-col text-white font-thin space-y-1">
+    <footer className="mt-auto bg-ink text-white">
+      <div className="section-wrap grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div>
+          <p className="text-xl font-bold tracking-tight">{companyName}</p>
+          <p className="mt-3 max-w-xs text-sm text-white/60">
+            A marketplace for tech from independent, reviewed sellers.
+          </p>
+          {contacts.length > 0 && (
+            <ul className="mt-5 space-y-1 text-sm text-white/70">
+              {contacts.map(c => (
+                <li key={c} className="break-words">
+                  {c}
+                </li>
+              ))}
+            </ul>
+          )}
           {socials.length > 0 && (
-            <div className="inline-flex space-x-5 pt-3">
+            <div className="mt-5 flex gap-4">
               {socials.map(({ url, label, Icon }) => (
                 <a
                   key={label}
                   href={url}
                   aria-label={label}
-                  className="hover:text-gray-300"
+                  className="text-white/70 hover:text-white"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Icon className="h-7 w-7" />
+                  <Icon className="h-5 w-5" aria-hidden="true" />
                 </a>
               ))}
             </div>
           )}
         </div>
+        {COLUMNS.map(col => (
+          <div key={col.title}>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">{col.title}</p>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              {col.links.map(l => (
+                <li key={l.label}>
+                  <Link to={l.to} className="text-white/80 hover:text-white">
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
-      {/* Chi liet ke phuong thuc san thuc su ho tro (xem Checkout) */}
-      <div className="flex flex-wrap items-center gap-2 px-6 sm:pl-14 mt-8 text-sm">
-        <span className="text-blue-200 mr-1">We accept</span>
-        <span className="bg-white text-blue-950 font-semibold rounded px-3 py-1">Cash on delivery</span>
-        <span className="bg-[#a50064] text-white font-semibold rounded px-3 py-1">MoMo</span>
-      </div>
-      <div className="bg-blue-950 flex flex-col sm:flex-row gap-3 sm:justify-between text-white font-thin text-sm mt-5 py-4 px-6 sm:pl-14 sm:pr-0">
-        <div className="inline-flex gap-3">
-          <img src={CompanyIcon} alt="company-icon" className="w-5 h-5" />
-          <p className="whitespace-nowrap">
-            {copyrightYear} {companyName}.
+      <div className="border-t border-white/10">
+        <div className="section-wrap flex flex-col gap-3 py-5 text-sm text-white/60 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            © {copyrightYear} {companyName}
+          </p>
+          {/* Chi liet ke phuong thuc san thuc su ho tro (xem Checkout) */}
+          <p className="flex items-center gap-2">
+            We accept
+            <span className="rounded-md bg-white/10 px-2 py-0.5 font-medium text-white">Cash on delivery</span>
+            <span className="rounded-md bg-[#a50064] px-2 py-0.5 font-medium text-white">MoMo</span>
           </p>
         </div>
       </div>

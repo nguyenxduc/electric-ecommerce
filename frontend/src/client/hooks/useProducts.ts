@@ -33,10 +33,10 @@ export const useNewProducts = () =>
     staleTime: 5 * 60 * 1000
   })
 
-export const useFlashSale = () =>
+export const useFlashSale = (limit = 12) =>
   useQuery<{ products: Product[] }>({
-    queryKey: ['flashSale'],
-    queryFn: fetchFlashSale,
+    queryKey: ['flashSale', limit],
+    queryFn: () => fetchFlashSale(limit),
     staleTime: 60 * 1000
   })
 
