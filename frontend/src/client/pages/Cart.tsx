@@ -159,7 +159,7 @@ const Cart = () => {
       />
       {/* Progress Bar */}
       <div className="bg-white border-b">
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="section-wrap py-8">
           <div className="flex items-center justify-center">
             <div className="flex items-center w-full max-w-md">
               {/* Cart Step */}
@@ -201,7 +201,7 @@ const Cart = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="section-wrap py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Section - Cart Items */}
           <div className={`${isEmpty ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-4`}>

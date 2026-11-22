@@ -28,7 +28,6 @@ import {
 import type { ImageSearchData } from '../../types/product'
 import { makeProductSlug } from '../../utils/productSlug'
 
-import SearchIcon from '../../../assets/search-icon.svg'
 
 type ModalProps = {
   searchTerm: string
@@ -746,11 +745,11 @@ const Search = () => {
           setIsOpen(true)
           setSearchTerm('')
         }}
-        className="rounded-full p-2 transition hover:bg-gray-100"
+        className="icon-btn"
         aria-label="Open search"
         aria-haspopup="dialog"
       >
-        <img src={SearchIcon} alt="" className="h-6 w-6" />
+        <SearchGlyph aria-hidden="true" />
       </button>
     </div>
   )
