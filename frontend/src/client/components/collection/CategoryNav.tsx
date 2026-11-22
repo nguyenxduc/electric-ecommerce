@@ -1,5 +1,5 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { LayoutGrid } from 'lucide-react'
 
 interface CategoryNavProps {
   categories: Array<{
@@ -10,53 +10,78 @@ interface CategoryNavProps {
   }>
 }
 
-// Thanh category tren trang danh sach, cung kieu the "Shop by category" o trang
-// chu: o icon nen trang vien nhat, category dang chon vien ink + chu dam.
-// Dung <Link> that (mo tab moi duoc) thay vi button + navigate.
+// Thanh category dang chip chu. Nen ink cua chip dang chon la mot lop rieng
+// truot ngang (transform + width) toi chip moi, cung kieu tab Log in / Sign up.
+// Dung <Link> that de mo tab moi duoc.
 const CategoryNav = ({ categories }: CategoryNavProps) => {
   const { collection } = useParams<{ collection: string }>()
   const currentSlug = collection === 'all' || !collection ? 'all' : collection
+
+  const listRef = useRef<HTMLUListElement>(null)
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null)
+  const [animate, setAnimate] = useState(false)
+
+  useLayoutEffect(() => {
+    const list = listRef.current
+    // Do vi tri cua <li> (offsetParent la <ul relative>), khong do <a>: <a> nam
+    // trong <li relative> nen offsetLeft cua no luon ~0
+    const active = list?.querySelector<HTMLElement>('[aria-current="page"]')?.parentElement
+    if (!list || !active) {
+      setPill(null)
+      return
+    }
+    const place = () => setPill({ left: active.offsetLeft, width: active.offsetWidth })
+    place()
+    // Mobile: dua chip dang chon vao giua thanh cuon (chi cuon thanh, khong cuon trang)
+    const target = active.offsetLeft - (list.clientWidth - active.offsetWidth) / 2
+    list.scrollTo({ left: Math.max(0, target), behavior: animate ? 'smooth' : 'auto' })
+    // Lan dau dat thang vao cho; tu lan doi category sau moi truot
+    const id = requestAnimationFrame(() => setAnimate(true))
+    window.addEventListener('resize', place)
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('resize', place)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- animate chi la co bat transition
+  }, [currentSlug, categories])
 
   if (!categories || categories.length === 0) return null
 
   return (
     <nav aria-label="Categories" className="border-b border-gray-200/70">
-      <ul className="section-wrap flex gap-2 overflow-x-auto py-4 [scrollbar-width:none] sm:gap-3 lg:justify-between [&::-webkit-scrollbar]:hidden">
-        {categories.map(cat => {
-          const slug = cat.id === 0 ? 'all' : cat.slug || cat.id.toString()
-          const isActive = currentSlug === slug
-          return (
-            <li key={cat.id} className="shrink-0">
-              <Link
-                to={`/collection/${slug}`}
-                aria-current={isActive ? 'page' : undefined}
-                className="group flex min-w-[76px] flex-col items-center gap-2 rounded-xl px-1 py-1 text-center"
-              >
-                <span
-                  className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-white ring-1 ring-inset transition-shadow ${
-                    isActive ? 'ring-2 ring-ink' : 'ring-gray-200/80 group-hover:ring-ink'
-                  }`}
-                >
-                  {cat.id === 0 ? (
-                    <LayoutGrid className="h-5 w-5 text-ink" strokeWidth={1.5} aria-hidden="true" />
-                  ) : cat.image_url ? (
-                    <img src={cat.image_url} alt="" className="h-7 w-7 object-contain mix-blend-multiply" />
-                  ) : (
-                    <span className="h-5 w-5 rounded bg-paper" />
-                  )}
-                </span>
-                <span
-                  className={`whitespace-nowrap text-xs ${
-                    isActive ? 'font-semibold text-ink' : 'text-gray-600 group-hover:text-ink'
+      <div className="section-wrap">
+        <ul
+          ref={listRef}
+          className="relative -mx-1 flex gap-1 overflow-x-auto px-1 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {pill && (
+            <li
+              aria-hidden
+              className={`pointer-events-none absolute top-3 h-9 rounded-full bg-ink ${
+                animate ? 'transition-[transform,width] duration-300 ease-out' : ''
+              }`}
+              style={{ width: pill.width, transform: `translateX(${pill.left}px)`, left: 0 }}
+            />
+          )}
+          {categories.map(cat => {
+            const slug = cat.id === 0 ? 'all' : cat.slug || cat.id.toString()
+            const isActive = currentSlug === slug
+            return (
+              <li key={cat.id} className="relative shrink-0">
+                <Link
+                  to={`/collection/${slug}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex h-9 items-center whitespace-nowrap rounded-full px-4 text-sm transition-colors duration-300 ${
+                    isActive ? 'font-semibold text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-ink'
                   }`}
                 >
                   {cat.name}
-                </span>
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
     </nav>
   )
 }
