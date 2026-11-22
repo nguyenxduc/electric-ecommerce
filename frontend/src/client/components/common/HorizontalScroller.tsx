@@ -42,7 +42,7 @@ export default function HorizontalScroller({
   }
 
   const arrow =
-    'absolute top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-ink shadow-[0_6px_20px_-6px_rgb(23_24_27/0.35)] ring-1 ring-gray-200 hover:ring-ink sm:flex'
+    'absolute top-[38%] z-10 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white text-ink shadow-[0_6px_20px_-6px_rgb(23_24_27/0.35)] hover:bg-paper sm:flex'
 
   return (
     <div className="relative">
