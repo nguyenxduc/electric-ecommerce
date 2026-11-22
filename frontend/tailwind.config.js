@@ -1,7 +1,7 @@
 import colors from 'tailwindcss/colors'
 
 // Mau thuong hieu: xanh reu dam (thay xanh duong mac dinh cua Tailwind).
-// Anh xa lai blue/indigo/violet/purple sang brand de toan bo class cu doi theo mot lan.
+// Anh xa lai blue/indigo sang brand de toan bo class cu doi theo mot lan.
 const brand = {
   50: '#eef6f2',
   100: '#d6eae1',
@@ -41,8 +41,7 @@ export default {
         sale,
         blue: brand,
         indigo: brand,
-        violet: brand,
-        purple: brand,
+        // purple/violet giu mac dinh: map trang thai don (processing vs shipped) can phan biet voi blue
         rose: sale,
         // Xam am (stone) thay xam lanh mac dinh
         // gray-50 = mau giay: nen trang cu (bg-gray-50) khop nen chung

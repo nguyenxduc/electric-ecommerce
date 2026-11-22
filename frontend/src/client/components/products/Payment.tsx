@@ -340,7 +340,7 @@ const Payment = ({
           </button>
           {/* Backend bao "Price drop on your wishlist" khi gia ban thuc te giam */}
           <p className="text-center text-xs text-gray-500" aria-live="polite">
-            {isInWishlist ? "We'll notify you if the price drops." : 'Save it to get a price-drop alert.'}
+            {isInWishlist ? "We'll notify you when the seller cuts the price." : 'Save it to hear when the seller cuts the price.'}
           </p>
         </div>
 

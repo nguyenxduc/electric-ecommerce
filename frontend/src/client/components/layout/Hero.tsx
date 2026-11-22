@@ -69,7 +69,7 @@ const Hero = () => {
             {picks.map((p, i) => (
               <li
                 key={p.id}
-                className={`animate-fade-up ${i % 2 === 1 ? 'translate-y-6' : ''}`}
+                className={`animate-fade-up ${i % 2 === 1 ? 'mt-6' : ''}`}
                 style={{ animationDelay: `${[80, 140, 190, 230][i]}ms` }}
               >
                 <Link
