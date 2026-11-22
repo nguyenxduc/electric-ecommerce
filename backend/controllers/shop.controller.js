@@ -6,6 +6,7 @@ import { ROLES } from "../constants/roles.js";
 import { createSlug, ensureUniqueSlug } from "../lib/slug.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { SHOP_STATUS } from "../constants/status.js";
+import { countFollowers, isFollowing } from "../services/shopFollow.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 
 export { SHOP_STATUS } from "../constants/status.js";
@@ -309,12 +310,19 @@ export const getShopBySlug = asyncHandler(async (req, res) => {
     _count: { rating: true },
   });
 
+  const [followerCount, following] = await Promise.all([
+    countFollowers(shop.id),
+    req.user ? isFollowing(BigInt(req.user.id), shop.id) : false,
+  ]);
+
   const { owner_id, ...publicShop } = shop;
   return res.json({
     success: true,
     data: {
       ...publicShop,
       is_owner: Boolean(isOwner),
+      follower_count: followerCount,
+      is_following: following,
       rating: ratingAgg._avg.rating
         ? Number(ratingAgg._avg.rating.toFixed(1))
         : null,

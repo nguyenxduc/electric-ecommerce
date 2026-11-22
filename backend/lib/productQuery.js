@@ -24,10 +24,27 @@ export const variantsInclude = {
   select: { id: true, sku: true, name: true, attributes: true, price_delta: true, quantity: true },
 };
 
+// Flash sale dang chay: flash_discount > 0 va now thuoc [flash_starts_at, flash_ends_at).
+export const isFlashActive = (product, now = new Date()) =>
+  Number(product.flash_discount || 0) > 0 &&
+  !!product.flash_starts_at &&
+  !!product.flash_ends_at &&
+  new Date(product.flash_starts_at) <= now &&
+  now < new Date(product.flash_ends_at);
+
+// Giam gia thuc te: trong khung flash sale thi flash_discount THAY discount thuong.
+// Moi cho tinh tien (gio hang, don hang, bao gia) phai di qua ham nay.
+export const effectiveDiscount = (product, now = new Date()) =>
+  isFlashActive(product, now)
+    ? // flash khong bao gio lam gia cao hon giam gia thuong (seller tang discount sau khi dat flash)
+      Math.max(Number(product.flash_discount), Number(product.discount || 0))
+    : Number(product.discount || 0);
+
 // Helper function to calculate final_price and discount_percentage
 export const calculateProductPrices = (product) => {
   const price = Number(product.price);
-  const discount = Number(product.discount || 0);
+  const flashActive = isFlashActive(product);
+  const discount = effectiveDiscount(product);
   const final_price = price - discount;
   const discount_percentage =
     price > 0 ? Math.round((discount / price) * 100) : 0;
@@ -47,6 +64,12 @@ export const calculateProductPrices = (product) => {
     discount,
     final_price,
     discount_percentage,
+    flash_discount: product.flash_discount == null ? null : Number(product.flash_discount),
+    flash_sale: {
+      active: flashActive,
+      ends_at: flashActive ? product.flash_ends_at : null,
+      original_discount: Number(product.discount || 0),
+    },
     rating: product.rating ? Number(product.rating) : 0,
     quantity,
     ...(product.variants && {
@@ -68,6 +91,7 @@ export const SORT_ORDER_BY = {
   popular: { sold: "desc" },
   newest: { created_at: "desc" },
   // Tiet kiem nhieu nhat (so tien); % giam la gia tri tinh nen Prisma khong sap duoc
+  // shortcut: sap theo discount/price luu trong DB, khong tinh flash sale; nang cap neu can sap theo gia flash.
   discount: { discount: "desc" },
 };
 

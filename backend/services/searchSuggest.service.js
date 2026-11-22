@@ -39,7 +39,7 @@ const suggestProducts = async (req, q) => {
   if (ids.length === 0) return [];
   const rows = await prisma.product.findMany({
     where: { id: { in: ids }, deleted_at: null, ...buyerVisibilityWhere(req) },
-    select: { id: true, name: true, img: true, price: true, discount: true },
+    select: { id: true, name: true, img: true, price: true, discount: true, flash_discount: true, flash_starts_at: true, flash_ends_at: true },
   });
   const rank = new Map(ids.map((id, i) => [id.toString(), i]));
   rows.sort((a, b) => rank.get(a.id.toString()) - rank.get(b.id.toString()));

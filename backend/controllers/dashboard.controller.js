@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
 import { ORDER_STATUS } from "../constants/status.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { effectiveDiscount } from "../lib/productQuery.js";
 import { getShopTodo, getAdminTodo } from "../services/todo.service.js";
 import { computeCommission, getShopFinance as buildShopFinance } from "../services/finance.service.js";
 
@@ -169,6 +170,10 @@ const buildDashboardStats = async (res, shopId = null) => {
       };
     }
 
+    const followers = shopId
+      ? await prisma.shopFollow.count({ where: { shop_id: shopId } })
+      : null;
+
     res.json({
       success: true,
       data: {
@@ -217,6 +222,7 @@ const buildDashboardStats = async (res, shopId = null) => {
           formatted: formatCurrency(revenue),
         },
         ...(commission && { commission }),
+        ...(followers !== null && { followers: { total: followers, formatted: formatNumber(followers) } }),
       },
     });
   } catch (error) {
@@ -263,6 +269,9 @@ const buildTopProducts = async (req, res, shopId = null) => {
         name: true,
         price: true,
         discount: true,
+        flash_discount: true,
+        flash_starts_at: true,
+        flash_ends_at: true,
         sold: true,
         img: true,
       },
@@ -270,7 +279,7 @@ const buildTopProducts = async (req, res, shopId = null) => {
 
     const formattedProducts = topProducts.map((product) => {
       const price = Number(product.price);
-      const discount = Number(product.discount);
+      const discount = effectiveDiscount(product);
       const finalPrice = price - discount;
       return {
         id: product.id.toString(),

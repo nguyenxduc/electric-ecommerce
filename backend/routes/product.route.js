@@ -18,6 +18,7 @@ import {
   addSales,
   addRating,
   getSimilarProducts,
+  getFlashSaleProducts,
 } from "../controllers/product.controller.js";
 import {
   searchProductsByImage,
@@ -52,6 +53,7 @@ const resolveProductShop = async (req) => {
 router.get("/", optionalAuth, getAllProducts);
 router.get("/search", optionalAuth, searchProducts);
 router.get("/suggest", optionalAuth, suggestSearch);
+router.get("/flash-sale", optionalAuth, getFlashSaleProducts);
 router.post("/compare-ai", aiLimiter, compareProductsByAi);
 router.post("/search-by-image", aiLimiter, uploadMemory.single("image"), searchProductsByImage);
 router.post("/search-by-image/overview", aiLimiter, getImageSearchOverview);

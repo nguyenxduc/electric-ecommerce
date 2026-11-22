@@ -748,8 +748,19 @@ async function seedProducts(categories, subCategories, shops) {
   );
 
   const createdProducts = [];
-  for (const product of products) {
+  // Flash sale demo: 4 san pham (khong bien the) dang chay, bat dau 1 gio truoc, het sau 3/5/8/12 gio
+  const FLASH_END_HOURS = [3, 5, 8, 12];
+  let flashCount = 0;
+  for (const [index, product] of products.entries()) {
     const data = enrichProduct(product);
+    const flash =
+      index % 3 === 1 && !SEED_VARIANTS[data.name] && flashCount < FLASH_END_HOURS.length
+        ? {
+            flash_discount: Math.round(Number(data.price) * 0.3 * 100) / 100,
+            flash_starts_at: new Date(Date.now() - 3600 * 1000),
+            flash_ends_at: new Date(Date.now() + FLASH_END_HOURS[flashCount++] * 3600 * 1000),
+          }
+        : {};
     const shop = techWorldCategoryIds.has(data.category_id.toString())
       ? shops.techWorld
       : shops.gadgetHub;
@@ -758,6 +769,7 @@ async function seedProducts(categories, subCategories, shops) {
         name: data.name,
         price: data.price,
         discount: data.discount,
+        ...flash,
         quantity: data.quantity,
         sold: data.sold,
         rating: data.rating,

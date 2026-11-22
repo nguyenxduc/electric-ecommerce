@@ -52,9 +52,18 @@ const rowsToSpecsDetail = (rows: SpecDetailRow[]): SpecDetailEntry[] => {
 // Anh tren form: URL da co (giu lai) hoac file moi chon (src = blob preview)
 type ImageItem = { src: string; file?: File }
 
-type FieldKey = 'shop' | 'name' | 'category' | 'price' | 'discount' | 'stock' | 'images'
+type FieldKey = 'shop' | 'name' | 'category' | 'price' | 'discount' | 'flash' | 'stock' | 'images'
 // Thu tu cuon toi loi dau tien = thu tu hien tren man hinh
-const FIELD_ORDER: FieldKey[] = ['shop', 'name', 'category', 'price', 'discount', 'stock', 'images']
+const FIELD_ORDER: FieldKey[] = ['shop', 'name', 'category', 'price', 'discount', 'flash', 'stock', 'images']
+
+// ISO -> gia tri cho <input type="datetime-local"> theo gio may
+const toLocalInput = (iso?: string | null) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 const inputCls = (err?: string) =>
   `w-full border rounded px-3 py-2 ${err ? 'border-red-500' : ''}`
@@ -114,6 +123,10 @@ export default function AdminProductEdit({
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState<number | ''>('')
   const [discount, setDiscount] = useState<number | ''>('')
+  // Flash sale: gio nhap dang datetime-local (gio may nguoi dung), gui len dang ISO
+  const [flashDiscount, setFlashDiscount] = useState<number | ''>('')
+  const [flashStart, setFlashStart] = useState('')
+  const [flashEnd, setFlashEnd] = useState('')
   const [stock, setStock] = useState<number | ''>('')
   const [weightGrams, setWeightGrams] = useState<number>(500)
   const [categoryId, setCategoryId] = useState<number | ''>('')
@@ -146,7 +159,13 @@ export default function AdminProductEdit({
       setName(p.name)
       setDescription(p.description ?? '')
       setPrice(Number(p.price))
-      setDiscount(Number(p.discount || 0))
+      // discount tra ve da la gia flash khi flash dang chay; form phai sua discount thuong
+      setDiscount(Number(p.flash_sale?.original_discount ?? p.discount ?? 0))
+      // flash da het han thi de trong, khong chan luu
+      const flashLive = !!p.flash_ends_at && new Date(p.flash_ends_at).getTime() > Date.now()
+      setFlashDiscount(flashLive && p.flash_discount ? Number(p.flash_discount) : '')
+      setFlashStart(flashLive ? toLocalInput(p.flash_starts_at) : '')
+      setFlashEnd(flashLive ? toLocalInput(p.flash_ends_at) : '')
       setStock(Number(p.quantity || 0))
       setWeightGrams(Number(p.weight_grams) || 500)
       setCategoryId(Number(p.category_id))
@@ -215,6 +234,18 @@ export default function AdminProductEdit({
     if (price === '' || !(priceNum > 0)) e.price = 'Price must be greater than 0'
     if (discountNum < 0 || (priceNum > 0 && discountNum >= priceNum))
       e.discount = 'Discount must be at least 0 and less than the price'
+    if (flashDiscount !== '') {
+      const start = new Date(flashStart).getTime()
+      const end = new Date(flashEnd).getTime()
+      if (!(Number(flashDiscount) > 0) || (priceNum > 0 && Number(flashDiscount) >= priceNum))
+        e.flash = 'Flash discount must be greater than 0 and less than the price'
+      else if (Number(flashDiscount) <= Number(discount || 0))
+        e.flash = 'Flash discount must be bigger than the regular discount'
+      else if (Number.isNaN(start) || Number.isNaN(end)) e.flash = 'Set flash sale start and end time'
+      else if (end <= start) e.flash = 'Flash sale end must be after start'
+      else if (end - start > 7 * 24 * 3600 * 1000) e.flash = 'Flash sale can last at most 7 days'
+      else if (end <= Date.now()) e.flash = 'Flash sale end must be in the future'
+    }
     if (derivedStock === null && (stock === '' || !Number.isInteger(Number(stock)) || Number(stock) < 0))
       e.stock = 'Stock must be a whole number of 0 or more'
     if (images.length === 0) e.images = 'Add at least one image'
@@ -265,6 +296,10 @@ export default function AdminProductEdit({
         await update.mutateAsync({
           ...payload,
           sub_category_id: subCategoryId === '' ? null : Number(subCategoryId),
+          // '' = xoa flash sale
+          flash_discount: flashDiscount === '' ? '' : Number(flashDiscount),
+          flash_starts_at: flashDiscount === '' ? '' : new Date(flashStart).toISOString(),
+          flash_ends_at: flashDiscount === '' ? '' : new Date(flashEnd).toISOString(),
           variants: variantsPayload // full set; missing ones are removed
         })
       }
@@ -407,6 +442,47 @@ export default function AdminProductEdit({
                   }}
                 />
               </Field>
+              {!isNew && (
+                <div className="md:col-span-2">
+                  <Field label="Flash sale (discount replaces the regular one while active, max 7 days)" error={errors.flash}>
+                    <div id="pf-flash" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="Flash discount (amount)"
+                        aria-label="Flash discount"
+                        className={inputCls(errors.flash)}
+                        value={flashDiscount}
+                        onChange={e => {
+                          setFlashDiscount(e.target.value === '' ? '' : Number(e.target.value))
+                          clearError('flash')
+                        }}
+                      />
+                      <input
+                        type="datetime-local"
+                        aria-label="Flash sale start"
+                        className={inputCls(errors.flash)}
+                        value={flashStart}
+                        onChange={e => {
+                          setFlashStart(e.target.value)
+                          clearError('flash')
+                        }}
+                      />
+                      <input
+                        type="datetime-local"
+                        aria-label="Flash sale end"
+                        className={inputCls(errors.flash)}
+                        value={flashEnd}
+                        onChange={e => {
+                          setFlashEnd(e.target.value)
+                          clearError('flash')
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Leave the discount empty to clear the flash sale.</p>
+                  </Field>
+                </div>
+              )}
               <Field label="Stock" required error={errors.stock}>
                 <input
                   id="pf-stock"

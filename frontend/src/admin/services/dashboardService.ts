@@ -46,6 +46,7 @@ export type DashboardStats = {
     formatted: string
   }
   // Present on the seller (shop-scoped) stats only
+  followers?: { total: number; formatted: string }
   commission?: {
     rate: number
     ratePercent: string

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Star, Store } from 'lucide-react'
+import { Star, Store, Zap } from 'lucide-react'
 import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
 import ProductImage from '../products/ProductImage'
@@ -82,6 +82,12 @@ const ProductCard = ({
       )}
 
       <div className="relative aspect-square bg-gray-50">
+        {product.flash_sale?.active && (
+          <span className="absolute top-2 left-2 z-10 flex items-center gap-0.5 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+            <Zap className="w-3 h-3 fill-current" />
+            Flash
+          </span>
+        )}
         {product.img && product.img.length > 0 ? (
           <ProductImage
             src={product.img[0]}

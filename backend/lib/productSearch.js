@@ -67,7 +67,8 @@ export const fuseByRRF = (rankings, { k = RRF_K } = {}) => {
  */
 export const tokenize = (text) => tokenizeText(text, 2);
 
-const SELECT_COLUMNS = `p.id, p.name, p.price, p.discount, p.quantity, p.img,
+const SELECT_COLUMNS = `p.id, p.name, p.price, p.discount,
+    p.flash_discount, p.flash_starts_at, p.flash_ends_at, p.quantity, p.img,
     s.name AS shop_name, COALESCE(pe.content, '') AS content`;
 
 /**

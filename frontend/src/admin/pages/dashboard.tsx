@@ -127,6 +127,12 @@ export default function AdminDashboard() {
               <div className="text-2xl font-semibold">{stats?.customers.formatted || '0'}</div>
               <div className="text-gray-500">Customers</div>
             </div>
+            {stats?.followers && (
+              <div>
+                <div className="text-2xl font-semibold">{stats.followers.formatted}</div>
+                <div className="text-gray-500">Followers</div>
+              </div>
+            )}
             <div>
               <div className="text-2xl font-semibold">{stats?.products.formatted.total || '0'}</div>
               <div className="text-gray-500">Total Products</div>

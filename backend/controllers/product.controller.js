@@ -13,6 +13,7 @@ import {
   calculateProductPrices,
   fetchPaginatedProducts,
   fetchRankedProducts,
+  effectiveDiscount,
   resolveOrderBy,
   shopSelect,
   variantsInclude,
@@ -136,6 +137,60 @@ const settleVariants = async (tx, productId, price, discount) => {
   const sumQty = active.reduce((s, v) => s + v.quantity, 0);
   await tx.product.update({ where: { id: productId }, data: { quantity: sumQty } });
   return sumQty;
+};
+
+// Flash sale: toi da 7 ngay. Gui flash_discount rong/null de xoa ca 3 cot.
+const FLASH_MAX_MS = 7 * 24 * 3600 * 1000;
+const FLASH_KEYS = ["flash_discount", "flash_starts_at", "flash_ends_at"];
+
+// Tra { data } (cot can ghi, {} neu khong dong toi flash) hoac { error }.
+const parseFlash = (body, price, current, regularDiscount) => {
+  const now = new Date();
+  if (!FLASH_KEYS.some((k) => body[k] !== undefined)) {
+    // Chi doi gia: flash con hieu luc van phai < gia moi
+    if (
+      current.flash_discount != null &&
+      current.flash_ends_at > now &&
+      Number(current.flash_discount) >= price
+    ) {
+      return { error: "Flash discount must be less than the product price" };
+    }
+    return { data: {} };
+  }
+  const pick = (k) => {
+    const v = body[k] !== undefined ? body[k] : current[k];
+    return v === "" ? null : v;
+  };
+  const rawDiscount = pick("flash_discount");
+  if (rawDiscount == null) {
+    return { data: { flash_discount: null, flash_starts_at: null, flash_ends_at: null } };
+  }
+  const discount = Number(rawDiscount);
+  const start = new Date(pick("flash_starts_at") ?? NaN);
+  const end = new Date(pick("flash_ends_at") ?? NaN);
+  if (!Number.isFinite(discount) || discount <= 0 || discount >= price) {
+    return { error: "Flash discount must be greater than 0 and less than the product price" };
+  }
+  // Form sua san pham gui lai khung flash cu: da het han ma khong doi gi thi coi nhu xoa,
+  // khong chan seller luu thay doi khac
+  const unchanged = (k) =>
+    body[k] === undefined ||
+    (k === "flash_discount"
+      ? Number(body[k]) === Number(current[k])
+      : new Date(body[k]).getTime() === new Date(current[k] ?? NaN).getTime());
+  if (end <= now && FLASH_KEYS.every(unchanged)) {
+    return { data: { flash_discount: null, flash_starts_at: null, flash_ends_at: null } };
+  }
+  if (discount <= regularDiscount) {
+    return { error: "Flash discount must be bigger than the regular discount" };
+  }
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return { error: "Flash sale start and end times are required" };
+  }
+  if (end <= start) return { error: "Flash sale end must be after start" };
+  if (end - start > FLASH_MAX_MS) return { error: "Flash sale window must be at most 7 days" };
+  if (end <= now) return { error: "Flash sale end must be in the future" };
+  return { data: { flash_discount: discount, flash_starts_at: start, flash_ends_at: end } };
 };
 
 // Map loi sync bien the sang HTTP; tra true neu da xu ly.
@@ -396,14 +451,27 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     } else where.name = { contains: String(search), mode: "insensitive" };
   }
   // Tim kiem ma nguoi dung khong tu chon sap xep: giu thu hang do khop (khop nhat len dau)
-  const fetchPage = (w) =>
-    rankedIds && !req.query.sort
+  const fetchPage = async (w) => {
+    // "Top deals" phai xep theo giam gia hieu luc (tinh ca flash sale), Prisma orderBy khong lam duoc.
+    // shortcut: doc id + gia cua moi san pham khop roi xep bang JS; doi sang SQL CASE khi catalog lon.
+    if (sort === "discount") {
+      const now = new Date();
+      const rows = await prisma.product.findMany({
+        where: w,
+        select: { id: true, discount: true, flash_discount: true, flash_starts_at: true, flash_ends_at: true },
+      });
+      rows.sort((a, b) => effectiveDiscount(b, now) - effectiveDiscount(a, now));
+      return fetchRankedProducts(w, rows.map((r) => r.id), skip, perPage);
+    }
+    return rankedIds && !req.query.sort
       ? fetchRankedProducts(w, rankedIds, skip, perPage)
       : fetchPaginatedProducts(w, orderBy, skip, perPage);
+  };
   if (category_id) where.category_id = BigInt(category_id);
   if (sub_category_id) where.sub_category_id = BigInt(sub_category_id);
   if (shop_id) where.shop_id = BigInt(shop_id);
   if (in_stock === "true") where.quantity = { gt: 0 };
+  // shortcut: loc/sap theo price, discount luu trong DB, khong tinh flash sale; nang cap neu can loc theo gia flash.
   if (discount === "true") where.discount = { gt: 0 };
   if (price_min || price_max) {
     where.price = {};
@@ -453,6 +521,24 @@ export const getAllProducts = asyncHandler(async (req, res) => {
     products: products.map(calculateProductPrices),
     pagination: buildPaginationMeta(currentPage, perPage, total_count),
   });
+});
+
+// GET /api/products/flash-sale?limit= - san pham dang trong khung flash sale, het som nhat len dau
+export const getFlashSaleProducts = asyncHandler(async (req, res) => {
+  const now = new Date();
+  const { products } = await fetchPaginatedProducts(
+    {
+      deleted_at: null,
+      ...buyerVisibilityWhere(req),
+      flash_discount: { gt: 0 },
+      flash_starts_at: { lte: now },
+      flash_ends_at: { gt: now },
+    },
+    { flash_ends_at: "asc" },
+    0,
+    clampLimit(req.query.limit, 12)
+  );
+  res.json({ products: products.map(calculateProductPrices) });
 });
 
 export const getProductById = asyncHandler(async (req, res) => {
@@ -573,7 +659,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
   // nothing on either the frontend or backend blocking it.
   const currentProduct = await prisma.product.findUnique({
     where: { id: BigInt(req.params.id) },
-    select: { price: true, discount: true },
+    select: { price: true, discount: true, flash_discount: true, flash_starts_at: true, flash_ends_at: true },
   });
   if (!currentProduct) {
     return res.status(404).json({ message: "Product not found" });
@@ -600,6 +686,9 @@ export const updateProduct = asyncHandler(async (req, res) => {
     });
   }
 
+  const { data: flashData, error: flashError } = parseFlash(data, numericPrice, currentProduct, numericDiscount);
+  if (flashError) return res.status(400).json({ message: flashError });
+
   const { variants: variantsInput, error: variantError } = parseVariantsInput(
     data.variants
   );
@@ -616,6 +705,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
         name: data.name ?? undefined,
         price: data.price !== undefined ? numericPrice : undefined,
         discount: data.discount !== undefined ? numericDiscount : undefined,
+        ...flashData,
         // Anh moi tai len noi sau danh sach URL giu lai, khong ghi de.
         img: imageUrls
           ? [...(Array.isArray(parsedImg) ? parsedImg : []), ...imageUrls]
@@ -674,7 +764,15 @@ export const updateProduct = asyncHandler(async (req, res) => {
       tx,
       BigInt(req.params.id),
       numericPrice,
-      numericDiscount
+      // gia hieu dung thap nhat = khi flash sale chay; flash da het han thi khong tinh
+      Math.max(
+        numericDiscount,
+        (() => {
+          const end = "flash_ends_at" in flashData ? flashData.flash_ends_at : currentProduct.flash_ends_at;
+          if (!end || new Date(end) <= new Date()) return 0;
+          return Number(("flash_discount" in flashData ? flashData.flash_discount : currentProduct.flash_discount) ?? 0);
+        })()
+      )
     );
     if (settledQty !== null) updated.quantity = settledQty;
 
@@ -1157,6 +1255,9 @@ export const getSimilarProducts = asyncHandler(async (req, res) => {
       p.name,
       p.price,
       p.discount,
+      p.flash_discount,
+      p.flash_starts_at,
+      p.flash_ends_at,
       p.quantity,
       p.img,
       p.specs,

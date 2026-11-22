@@ -16,6 +16,7 @@ import {
 import ProductGrid from '../components/collection/ProductGrid'
 import Pagination from '../components/collection/Pagination'
 import { ShopChatPanel } from '../components/chat/ChatWidget'
+import FollowButton from '../components/shop/FollowButton'
 import ShopVouchers from '../components/shop/ShopVouchers'
 
 const SORT_OPTIONS = [
@@ -147,6 +148,7 @@ const ShopPublic = () => {
                 <MessageCircle className="w-4 h-4" /> Chat with shop
               </button>
             )}
+            {shop.status === 'active' && <FollowButton shop={shop} />}
             {shop.is_owner && (
               <Link
                 to="/seller"

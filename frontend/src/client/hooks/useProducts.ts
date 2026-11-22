@@ -4,6 +4,7 @@ import {
   fetchNewProducts,
   fetchPopularProducts,
   fetchTopDeals,
+  fetchFlashSale,
   fetchCollectionProducts,
   fetchProductById,
   fetchProductsByIds,
@@ -30,6 +31,13 @@ export const useNewProducts = () =>
     queryKey: ['newProducts'],
     queryFn: fetchNewProducts,
     staleTime: 5 * 60 * 1000
+  })
+
+export const useFlashSale = () =>
+  useQuery<{ products: Product[] }>({
+    queryKey: ['flashSale'],
+    queryFn: fetchFlashSale,
+    staleTime: 60 * 1000
   })
 
 export const useTopDeals = () =>

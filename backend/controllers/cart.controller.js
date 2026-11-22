@@ -1,6 +1,7 @@
 import { prisma } from "../lib/db.js";
 import { SHOP_STATUS } from "../constants/status.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { effectiveDiscount } from "../lib/productQuery.js";
 
 export const addToCart = asyncHandler(async (req, res) => {
   const { product_id } = req.params;
@@ -197,7 +198,7 @@ export const getCartProducts = asyncHandler(async (req, res) => {
   const formattedItems = items.map(item => {
     const product = item.product;
     const price = Number(product.price);
-    const discount = Number(product.discount || 0);
+    const discount = effectiveDiscount(product);
     const variantDelta = Number(item.variant?.price_delta || 0);
     const finalPrice = price - discount + variantDelta;
     const unitFinalPrice = finalPrice;
@@ -403,7 +404,7 @@ async function summarizeCart(cartId) {
   for (const it of items) {
     if (it.variant?.deleted_at || it.product.is_active === false) continue; // khong tinh gia dong khong mua duoc
     const price = Number(it.product.price);
-    const discount = Number(it.product.discount || 0);
+    const discount = effectiveDiscount(it.product);
     const unit_final = price - discount + Number(it.variant?.price_delta || 0);
     total_items += it.quantity;
     total_original_price += (price + Number(it.variant?.price_delta || 0)) * it.quantity;

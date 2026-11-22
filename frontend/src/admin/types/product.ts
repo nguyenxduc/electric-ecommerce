@@ -24,6 +24,10 @@ export type AdminProduct = {
   name: string
   price: number
   discount?: number
+  flash_discount?: number | null
+  flash_starts_at?: string | null
+  flash_ends_at?: string | null
+  flash_sale?: { active: boolean; ends_at: string | null; original_discount: number }
   quantity?: number
   weight_grams?: number
   sold?: number

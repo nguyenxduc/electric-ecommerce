@@ -36,6 +36,8 @@ export type Product = {
   final_price: number
   discount: number
   discount_percentage?: number
+  // Flash sale: active = dang trong khung gio; discount/final_price da la gia flash
+  flash_sale?: { active: boolean; ends_at: string | null; original_discount: number }
   quantity: number
   sold: number
   rating: number

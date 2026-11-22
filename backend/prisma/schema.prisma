@@ -84,6 +84,11 @@ model Product {
   taken_down_at   DateTime?
   // Khoi luong mot don vi, dung de bao gia van chuyen theo can nang.
   weight_grams    Int                      @default(500)
+  // Flash sale: trong [flash_starts_at, flash_ends_at) giam flash_discount thay cho discount.
+  // Gia hieu luc tinh qua effectiveDiscount (lib/productQuery.js).
+  flash_discount  Decimal?                 @db.Decimal(10, 2)
+  flash_starts_at DateTime?
+  flash_ends_at   DateTime?
   // Cột full-text do trigger trong DB tự cập nhật, Prisma không ghi vào cột này.
   // Xem prisma/migrations/20260909_product_search_vector.
   search_vector   Unsupported("tsvector")?
@@ -99,6 +104,7 @@ model Product {
   filter_values   ProductFilterValue[]
   variants        ProductVariant[]
 
+  @@index([flash_ends_at])
   @@index([name])
   @@index([shop_id])
   @@index([category_id])
@@ -154,6 +160,7 @@ model Shop {
   return_requests  ReturnRequest[]
   invoices         Invoice[]
   tax_withholdings TaxWithholding[]
+  followers        ShopFollow[]
 
   @@index([status])
   @@index([slug])
@@ -262,6 +269,8 @@ model User {
   ai_chats        AiChat[]
   shop            Shop?           @relation("ShopOwner")
   return_requests ReturnRequest[]
+
+  shop_follows ShopFollow[]
 
   @@map("users")
 }
@@ -470,21 +479,21 @@ model OrderItem {
 }
 
 model Review {
-  id         BigInt    @id @default(autoincrement())
-  user_id    BigInt
-  product_id BigInt
-  rating     Int?
-  comment    String?
+  id              BigInt    @id @default(autoincrement())
+  user_id         BigInt
+  product_id      BigInt
+  rating          Int?
+  comment         String?
   // Anh nguoi mua dinh kem (URL Cloudinary), toi da 5
-  images     String[]  @default([])
+  images          String[]  @default([])
   // Seller tra loi cong khai mot lan (sua duoc)
   seller_reply    String?
   seller_reply_at DateTime?
-  client_ip  String?
-  device_id  String?
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  deleted_at DateTime?
+  client_ip       String?
+  device_id       String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  deleted_at      DateTime?
 
   // relations
   user    User    @relation(fields: [user_id], references: [id])
@@ -532,10 +541,10 @@ model Coupon {
   deleted_at     DateTime?
 
   // relations
-  shop         Shop?        @relation(fields: [shop_id], references: [id])
+  shop         Shop?         @relation(fields: [shop_id], references: [id])
   orders       Order[]
   order_groups OrderGroup[]
-  users        User[]       @relation("UserCoupons")
+  users        User[]        @relation("UserCoupons")
   claims       CouponClaim[]
 
   @@index([shop_id])
@@ -1001,4 +1010,18 @@ model CouponClaim {
   @@unique([user_id, coupon_id])
   @@index([coupon_id])
   @@map("coupon_claims")
+}
+
+// Nguoi mua theo doi gian hang (nut "Theo doi" kieu Shopee).
+model ShopFollow {
+  id         BigInt   @id @default(autoincrement())
+  user_id    BigInt
+  shop_id    BigInt
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop       Shop     @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, shop_id])
+  @@index([shop_id])
+  @@map("shop_follows")
 }

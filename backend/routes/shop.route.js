@@ -12,6 +12,7 @@ import {
   suspendShop,
   adminUpdateShopTax,
 } from "../controllers/shop.controller.js";
+import { follow, unfollow, myFollowedShops } from "../controllers/shopFollow.controller.js";
 import { getProductsByShop } from "../controllers/product.controller.js";
 import { protectRoute, adminRoute } from "../middleware/auth.middleware.js";
 import { optionalAuth } from "../middleware/optionalAuth.middleware.js";
@@ -62,6 +63,11 @@ router.patch("/:id/tax", protectRoute, adminRoute, adminUpdateShopTax);
 router.post("/apply", protectRoute, shopImages, applyForShop);
 router.get("/me", protectRoute, getMyShop);
 router.patch("/me", protectRoute, shopImages, updateMyShop);
+
+// Follow (truoc /:slug de "following" khong bi coi la slug)
+router.get("/following/mine", protectRoute, myFollowedShops);
+router.post("/:slug/follow", protectRoute, follow);
+router.delete("/:slug/follow", protectRoute, unfollow);
 
 // Public
 router.get("/", listShops);

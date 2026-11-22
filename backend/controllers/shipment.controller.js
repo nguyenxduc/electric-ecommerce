@@ -6,6 +6,7 @@ import { writeAuditLog } from "../services/audit.service.js";
 import { actorFromReq } from "../services/orderLifecycle.service.js";
 import { groupItemsByShop, round2 } from "../services/pricing.service.js";
 import { getSettingNumber } from "../lib/settings.js";
+import { effectiveDiscount } from "../lib/productQuery.js";
 import { notifyAdmins } from "../lib/notify.js";
 import { upsertShipperFlag } from "../services/shipperFraud.service.js";
 import { quoteShippingForGroups } from "../services/shipping/index.js";
@@ -49,7 +50,7 @@ export const quote = asyncHandler(async (req, res) => {
     prepared.push({
       shop: product.shop,
       weightGrams: (product.weight_grams || 0) * qty,
-      data: { total_price: round2((Number(product.price) - Number(product.discount || 0) + Number(variant?.price_delta || 0)) * qty) },
+      data: { total_price: round2((Number(product.price) - effectiveDiscount(product) + Number(variant?.price_delta || 0)) * qty) },
     });
   }
   const groups = groupItemsByShop(prepared);

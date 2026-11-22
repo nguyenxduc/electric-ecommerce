@@ -1,4 +1,4 @@
-import { Star, Store as StoreIcon } from 'lucide-react'
+import { Star, Store as StoreIcon, Zap } from 'lucide-react'
 import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
@@ -15,6 +15,7 @@ import ReviewComponent from './Review'
 import { getProductColors } from '../../utils/productColors'
 import VariantPicker from './VariantPicker'
 import ShopCard from './ShopCard'
+import Countdown from '../common/Countdown'
 import MoreFromShop from './MoreFromShop'
 import ShopVouchers from '../shop/ShopVouchers'
 
@@ -234,6 +235,21 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
 
             {/* Payment Section - Sticky on desktop */}
             <div className="lg:col-span-1">
+              {product.flash_sale?.active && product.flash_sale.ends_at && (
+                <div
+                  data-testid="flash-banner"
+                  className="mb-3 flex items-center justify-between rounded-xl bg-gradient-to-r from-red-600 to-orange-500 px-4 py-2 text-white"
+                >
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Zap className="w-4 h-4 fill-current" />
+                    Flash Sale
+                  </span>
+                  <span className="flex items-center gap-2 text-sm">
+                    Ends in
+                    <Countdown endsAt={product.flash_sale.ends_at} className="bg-black/30 rounded px-2 py-0.5 font-bold" />
+                  </span>
+                </div>
+              )}
               <Payment
                 discount={product.discount}
                 price={product.price}

@@ -447,6 +447,13 @@ de phat hien giao gia va giu COD.
 | `GET /orders/shop/export.csv?status&q&from&to` | cung bo loc `applyOrderListFilters` (`lib/orderFilters.js`, dung chung admin/seller/finance); `lib/csv.js` boc ngoac kep moi o va them `'` truoc o bat dau bang `= + - @` (chong CSV injection); toi da 5000 dong |
 | `GET /dashboard/shop/finance?from&to` | `services/finance.service.js`: released = don `delivered`, pending = `processing`/`shipped`, phi san tren released. Ty le va cong thuc phi (`computeCommission`) dung chung voi "Platform fee / Net payout" cua dashboard seller |
 
+### Theo doi shop
+
+`services/shopFollow.service.js` (bang `shop_follows`, unique user+shop). `POST|DELETE /shops/:slug/follow`
+(dang nhap, idempotent, chi shop active; theo doi shop cua minh -> 400) tra `{is_following, follower_count}`.
+`GET /shops/following/mine?page&limit` liet ke shop da theo doi (kem `product_count`, `follower_count`).
+`GET /shops/:slug` them `follower_count` va `is_following` (optionalAuth); `GET /dashboard/shop/stats` them `followers`.
+
 `PATCH /shops/me` nhan logo/banner multipart chi JPG/PNG/WebP <= 2MB (loi -> 400).
 Trang Shop Profile gui anh trong request rieng sau khi luu thong tin, nen upload
 loi (Cloudinary) khong lam mat cac truong khac (tests/40-seller-tools).
@@ -468,6 +475,15 @@ shop minh), `PUT /reviews/:id/reply {reply}` (1-1000 ky tu, sua duoc) va
 (tests/41-reviews).
 
 ---
+
+### Flash sale (giam gia theo khung gio)
+
+San pham co 3 cot `flash_discount`, `flash_starts_at`, `flash_ends_at`. Khi `now` thuoc `[starts, ends)` va `flash_discount > 0`, giam gia hieu dung la `flash_discount` THAY cho `discount`. Quy tac nam o MOT cho: `isFlashActive` / `effectiveDiscount` trong `lib/productQuery.js`.
+
+- Di qua `effectiveDiscount`: `calculateProductPrices` (tra them `flash_sale {active, ends_at, original_discount}`), gio hang (dong + `summarizeCart`), **tao don** (gia chot `unit_price` tren order item), bao gia van chuyen, top san pham dashboard. Cac select/raw SQL (`productSearch`, similar, suggest, AI tools) lay them 3 cot flash de tinh dung.
+- Co y KHONG di qua: sap xep/loc theo `price`, `discount` (`SORT_ORDER_BY`, `?discount=true`, bo loc discount) dung cot luu trong DB, khong tinh flash (co comment `shortcut:`).
+- Seller/admin dat qua `PATCH /products/:id` (`flash_discount`, `flash_starts_at`, `flash_ends_at`): end > start, toi da 7 ngay, 0 < giam < gia, end o tuong lai; gui `flash_discount` rong de xoa. Chi dat duoc khi sua san pham da co, khong dat luc tao.
+- `GET /products/flash-sale?limit=` tra san pham dang chay (qua `buyerVisibilityWhere`), het som nhat truoc. Frontend: dai Flash Sale o Home, banner o trang chi tiet, `Countdown` tu invalidate query khi ve 0.
 
 ## 6. Vong doi gian hang
 

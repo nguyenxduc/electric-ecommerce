@@ -41,6 +41,7 @@ import { parsePagination } from "../lib/pagination.js";
 import { applyOrderListFilters } from "../lib/orderFilters.js";
 import { toCsv } from "../lib/csv.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { effectiveDiscount } from "../lib/productQuery.js";
 
 const HTTP_BY_CODE = { NOT_FOUND: 404, INVALID_TRANSITION: 400, CONFLICT: 409, SHIPMENT_ACTIVE: 409 };
 
@@ -183,7 +184,7 @@ export const createOrder = async (req, res) => {
       // Charge the discounted price - matches what the cart displays
       const unitPrice = round2(
         Number(product.price) -
-          Number(product.discount || 0) +
+          effectiveDiscount(product) +
           Number(variant?.price_delta || 0)
       );
       // Chan gia <= 0: mot dong am (bien the price_delta am) se bu tru tien hang

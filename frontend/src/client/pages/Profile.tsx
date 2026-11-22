@@ -20,6 +20,7 @@ import ProfileContent from '../components/profile/Profile'
 import Loyalty from '../components/profile/Loyalty'
 import VoucherWarehouse from '../components/profile/VoucherWarehouse'
 import SellerTab from '../components/profile/SellerTab'
+import FollowedShops from '../components/profile/FollowedShops'
 import AddressBook from '../components/profile/AddressBook'
 import {
   useValidateToken,
@@ -33,6 +34,7 @@ export type ProfileTabKey =
   | 'profile'
   | 'orders'
   | 'wishlist'
+  | 'following'
   | 'addresses'
   | 'security'
   | 'loyalty'
@@ -56,6 +58,7 @@ const NAV: Array<{
   { key: 'profile', label: 'Personal Data', icon: 'profile' },
   { key: 'orders', label: 'Orders', icon: 'orders' },
   { key: 'wishlist', label: 'Wish list', icon: 'wishlist' },
+  { key: 'following', label: 'Followed shops', icon: 'loyalty' },
   { key: 'addresses', label: 'Addresses', icon: 'loyalty' },
   { key: 'security', label: 'Security & access', icon: 'security' },
   { key: 'loyalty', label: 'Loyalty & Rewards', icon: 'loyalty' },
@@ -391,6 +394,7 @@ function Profile() {
           {tabActive === 'profile' && <ProfileContent />}
           {tabActive === 'orders' && <Order />}
           {tabActive === 'wishlist' && <Wishlist />}
+          {tabActive === 'following' && <FollowedShops />}
           {tabActive === 'addresses' && <AddressBook />}
           {tabActive === 'security' && <Security />}
           {tabActive === 'loyalty' && <Loyalty />}

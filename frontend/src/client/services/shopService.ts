@@ -23,6 +23,8 @@ export type Shop = {
   tax_entity_type?: 'household' | 'company'
   created_at: string
   is_owner?: boolean
+  follower_count?: number
+  is_following?: boolean
   rating?: number | null
   review_count?: number
   _count?: { products: number }
@@ -112,4 +114,27 @@ export const getShopVouchers = async (slug: string): Promise<ShopVoucher[]> => {
     `/coupons/shop/${encodeURIComponent(slug)}`
   )
   return res.data.data?.coupons || []
+}
+
+export type FollowedShop = {
+  id: number
+  name: string
+  slug: string
+  logo_url: string | null
+  product_count: number
+  follower_count: number
+  followed_at: string
+}
+
+export const followShop = async (slug: string) => {
+  await axiosClient.post(`/shops/${encodeURIComponent(slug)}/follow`)
+}
+
+export const unfollowShop = async (slug: string) => {
+  await axiosClient.delete(`/shops/${encodeURIComponent(slug)}/follow`)
+}
+
+export const getFollowedShops = async (params?: { page?: number; limit?: number }): Promise<FollowedShop[]> => {
+  const res = await axiosClient.get('/shops/following/mine', { params })
+  return res.data.data.shops
 }

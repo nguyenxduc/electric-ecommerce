@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { MessageCircle, Store, Star, Package, MapPin, CalendarDays } from 'lucide-react'
 import { getShopBySlug } from '../../services/shopService'
+import FollowButton from '../shop/FollowButton'
 import { ShopChatPanel } from '../chat/ChatWidget'
 
 // The shop block under the product, like the seller strip on marketplace product pages
@@ -38,7 +39,7 @@ const ShopCard = ({ slug }: { slug: string }) => {
           <span className="inline-block mt-1 text-xs font-medium text-blue-700 bg-blue-50 rounded px-2 py-0.5">
             Verified seller
           </span>
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2 mt-3">
             {!shop.is_owner && (
               <button
                 onClick={() => setChatOpen(true)}
@@ -47,6 +48,7 @@ const ShopCard = ({ slug }: { slug: string }) => {
                 <MessageCircle className="w-4 h-4" /> Chat
               </button>
             )}
+            <FollowButton shop={shop} />
             <Link
               to={`/shop/${shop.slug}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50"

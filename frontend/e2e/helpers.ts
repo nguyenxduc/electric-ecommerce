@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { expect, type Page } from '@playwright/test'
 
-export const API = 'http://localhost:3000/api'
+export const API = process.env.E2E_API_URL || 'http://localhost:3000/api'
 export const PASSWORD = 'password123'
 const STATE_FILE = path.join(process.cwd(), 'e2e', '.state.json')
 

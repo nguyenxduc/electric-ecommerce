@@ -74,6 +74,8 @@ export const adminProductService = {
     if (data?.price !== undefined) form.append('price', String(data.price))
     if (data?.discount !== undefined)
       form.append('discount', String(data.discount))
+    for (const k of ['flash_discount', 'flash_starts_at', 'flash_ends_at'])
+      if (data?.[k] !== undefined) form.append(k, String(data[k]))
     if (data?.quantity !== undefined)
       form.append('quantity', String(data.quantity))
     if (data?.weight_grams !== undefined)

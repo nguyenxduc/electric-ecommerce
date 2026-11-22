@@ -87,6 +87,7 @@ export const resolveFilteredProductIds = async (filterParams) => {
           queryValueMap.get(singleValue.toLowerCase()) || singleValue;
 
         if (queryValue.startsWith(">=")) {
+          // shortcut: loc theo discount luu trong DB, khong tinh flash sale.
           const minDiscount = parseFloat(queryValue.substring(2));
           const discountProducts = await prisma.product.findMany({
             where: {

@@ -104,6 +104,9 @@ export const createShoppingTools = (prisma) => {
           quantity: true,
           price: true,
           discount: true,
+          flash_discount: true,
+          flash_starts_at: true,
+          flash_ends_at: true,
           shop: { select: { name: true } },
           product_colors: {
             where: { deleted_at: null },
