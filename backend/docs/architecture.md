@@ -184,13 +184,15 @@ sequenceDiagram
   rect rgb(238, 246, 242)
     note over API,DB: Tat ca trong MOT transaction
     API->>DB: tao OrderGroup
-    loop moi shop
-      API->>DB: tao Order + OrderItem
+    loop moi mon cua ca checkout, sap theo (product_id, variant_id, mau)
       API->>DB: tru ton kho CO DIEU KIEN (quantity >= can)
       alt khong du hang
         DB-->>API: count = 0
         API-->>B: 400 — san pham vua het hang
       end
+    end
+    loop moi shop
+      API->>DB: tao Order + OrderItem
       API->>DB: cong diem thuong (tren tien hang, khong gom ship)
     end
     API->>DB: chiem luot voucher CO DIEU KIEN (used_count < usage_limit)
@@ -215,6 +217,15 @@ thi bang chi tiet se lech 1 xu so voi tong.
 nhat co dieu kien* thay vi doc-roi-ghi. PostgreSQL danh gia lai menh de `WHERE`
 sau khi giao dich truoc commit, nen nguoi den sau nhan `count = 0` va giao dich
 cua ho bi huy — thay vi ca hai cung di lot.
+
+**Khoa theo mot thu tu co dinh.** Moi UPDATE khoa dong toi cuoi giao dich. Neu
+tru kho theo thu tu trong gio, hai gio {X, Y} va {Y, X} dat cung luc se moi ben
+giu mot dong va cho dong kia — Postgres bao deadlock (40P01) va huy mot ben, nguoi
+mua nhan loi du hang con du. Vi vay buoc tru kho chay mot lan cho ca checkout,
+sap theo `(product_id, variant_id, mau)`. Lop phong ho: `lib/transaction.js`
+(`withTxConflictRetry`) chay lai giao dich bi huy vi deadlock/xung dot toi da 3
+lan; van khong duoc thi tra 409 `CHECKOUT_BUSY`. Loi 500 khong tra
+`error.message` ra ngoai. Xem `tests/51-order-concurrency`.
 
 ---
 
