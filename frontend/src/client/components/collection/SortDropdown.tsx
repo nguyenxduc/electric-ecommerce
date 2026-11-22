@@ -38,12 +38,12 @@ const SortDropdown = ({ options, selected, onSelect }: SortDropdownProps) => {
         onClick={() => setIsOpen(o => !o)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm text-gray-600 ring-1 ring-inset ring-gray-200 transition-shadow hover:ring-ink aria-expanded:ring-ink"
+        className="group inline-flex items-center gap-2 py-2 text-sm text-gray-600 hover:text-ink"
       >
         Sort by
         <span className="font-semibold text-ink">{current?.label}</span>
         <ChevronDown
-          className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 text-gray-500 transition-transform duration-200 group-hover:text-ink ${isOpen ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
       </button>
