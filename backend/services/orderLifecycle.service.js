@@ -10,6 +10,7 @@ import { revertPointsForOrder } from "./loyalty.service.js";
 import { writeAuditLog } from "./audit.service.js";
 import { notifyUser } from "../lib/notify.js";
 import { restockOrderItems } from "../lib/restock.js";
+import { isTxConflict, withTxConflictRetry } from "../lib/transaction.js";
 import {
   ORDER_STATUS,
   ORDER_STATUS_FLOW,
@@ -189,7 +190,9 @@ export const transitionOrderStatus = async ({
   let refundOwed = null;
   let updated;
   try {
-    updated = await prisma.$transaction(async (tx) => {
+    // Huy don hoan kho, khoa cung dong voi checkout: bi Postgres chon lam nan
+    // nhan deadlock thi chay lai thay vi nem 500.
+    updated = await withTxConflictRetry(() => prisma.$transaction(async (tx) => {
       const claimed = await tx.order.updateMany({
         where: { id: order.id, status: { in: fromStatuses }, deleted_at: null },
         data: { status },
@@ -207,13 +210,20 @@ export const transitionOrderStatus = async ({
         await onOrderDelivered(tx, { ...fresh, order_items: order.order_items });
       }
       return fresh;
-    });
+    }));
   } catch (err) {
     if (err.message === "ORDER_STATUS_CONFLICT") {
       return {
         ok: false,
         code: "CONFLICT",
         message: "Order status was already changed by another request",
+      };
+    }
+    if (isTxConflict(err)) {
+      return {
+        ok: false,
+        code: "CONFLICT",
+        message: "Order is busy right now. Please try again.",
       };
     }
     throw err;
