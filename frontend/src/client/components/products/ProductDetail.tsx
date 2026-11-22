@@ -1,7 +1,7 @@
 import { Star, Store as StoreIcon, Zap } from 'lucide-react'
 import { PLACEHOLDER_IMAGE } from '../../utils/placeholderImage'
 import { Link } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { trackBehavior } from '../../services/behaviorService'
 import Payment from './Payment'
 import TechnicalDetail from './TechnicalDetail'
@@ -108,6 +108,16 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
     setSelectedVariantId(null)
   }, [product?.id])
 
+  // Huong hieu ung khi doi anh chinh: anh phia sau -> truot tu phai vao
+  const mainIndex = Math.max(0, product.img.indexOf(mainImage))
+  const galleryRef = useRef({ index: mainIndex, cls: '' })
+  if (galleryRef.current.index !== mainIndex) {
+    galleryRef.current = {
+      index: mainIndex,
+      cls: mainIndex > galleryRef.current.index ? 'gallery-in-right' : 'gallery-in-left'
+    }
+  }
+
   return (
     <div className="pt-6 sm:pt-10 pb-24 lg:pb-12">
       <div className="section-wrap">
@@ -115,15 +125,23 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
           <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_340px] gap-8 lg:gap-10">
             {/* Image Gallery */}
             <div className="lg:col-span-1 space-y-4">
-              <div className="relative aspect-square bg-[#f3f1ec] rounded-3xl overflow-hidden">
-                <ProductImage
-                  src={mainImage}
-                  alt={product.name}
-                  className="absolute inset-0 w-full h-full object-contain p-8 mix-blend-multiply"
-                />
+              {/* Anh chinh: vien rat manh + bong mo de noi nhe khoi nen */}
+              <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#f3f1ec] shadow-[0_24px_60px_-32px_rgb(23_24_27/0.35)] ring-1 ring-inset ring-black/[0.05]">
+                {/* Lop animation (transform/opacity) tao nhom ve rieng: mix-blend-multiply
+                    cua anh chi hoa voi nen cua chinh lop nay. Thieu bg thi nen trang cua
+                    anh san pham lo ra o anh lon (anh nho van hoa vao nen be). */}
+                <div key={mainImage} className={`absolute inset-0 bg-[#f3f1ec] ${galleryRef.current.cls}`}>
+                  <ProductImage
+                    src={mainImage}
+                    alt={product.name}
+                    className="h-full w-full object-contain p-8 mix-blend-multiply"
+                  />
+                </div>
               </div>
               {product.img.length > 1 && (
-                <div className="flex gap-3 overflow-x-auto pb-2">
+                // Chua padding 6px quanh dai anh nho: vien chon (ring-2 + offset-2 = 4px)
+                // nam ngoai o anh, overflow-x-auto tung cat mat mep tren va anh sat le
+                <div className="-mx-1.5 flex gap-3 overflow-x-auto px-1.5 py-1.5 [scrollbar-width:thin]">
                   {product.img.map((image, index) => (
                     <button
                       key={index}

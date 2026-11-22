@@ -100,6 +100,18 @@
   }
 }
 
+/* Doi anh chinh o trang chi tiet san pham: hien dan + truot nhe theo huong */
+@keyframes gallery-in-right {
+  from { opacity: 0; transform: translateX(18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes gallery-in-left {
+  from { opacity: 0; transform: translateX(-18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.gallery-in-right { animation: gallery-in-right 360ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+.gallery-in-left { animation: gallery-in-left 360ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
