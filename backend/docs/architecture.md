@@ -233,7 +233,7 @@ qua `lib/restock.js`, cung khoa cac dong ay. Thu tu khoa nam o MOT cho,
 bien the -> mau -> san pham. Ca checkout lan hoan kho dung no; them noi nao cham
 vao kho thi cung phai dung. Ba giao dich hoan kho (`transitionOrderStatus`,
 duyet tra hang, `deleteOrder`) cung boc `withTxConflictRetry`, het luot thi tra
-409. Xem `tests/42-restock-concurrency`.
+409. Xem `tests/53-restock-concurrency`.
 
 ---
 
