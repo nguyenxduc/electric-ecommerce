@@ -8,10 +8,10 @@ interface Props {
 }
 
 const btn = (active: boolean, disabled = false) =>
-  `px-3 py-2 rounded-lg border text-sm transition-all ${
+  `px-3 py-2 rounded-lg border text-sm transition-colors ${
     active
-      ? 'border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-200'
-      : 'border-gray-300 text-gray-700 hover:border-gray-400'
+      ? 'border-ink font-medium text-ink'
+      : 'border-gray-200 text-gray-700 hover:border-gray-400'
   } ${disabled ? 'opacity-40' : ''}`
 
 const VariantPicker = ({ variants, selectedId, onSelect }: Props) => {

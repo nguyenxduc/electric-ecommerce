@@ -207,11 +207,16 @@ const ProductDetail = ({ product }: ProductDetailProps) => {
                     {colors.map(c => (
                       <button
                         key={c.name}
+                        type="button"
                         onClick={() => setSelectedColor(c.name)}
-                        className={`w-10 h-10 rounded-full border-2 transition-all ${
+                        aria-label={c.name}
+                        aria-pressed={c.name === selectedColor}
+                        // Vien chon mong (ring-1 + khe offset-2) cung kieu anh nho; vien
+                        // nhat border-black/10 de mau sang (trang, bac) khong chim vao nen
+                        className={`h-9 w-9 rounded-full border border-black/10 ring-1 ring-offset-2 ring-offset-paper transition-shadow ${
                           c.name === selectedColor
-                            ? 'border-blue-600 ring-2 ring-blue-200 scale-110'
-                            : 'border-gray-300 hover:border-gray-400'
+                            ? 'ring-ink'
+                            : 'ring-transparent hover:ring-gray-300'
                         }`}
                         style={{ backgroundColor: c.code }}
                         title={c.name}
