@@ -70,7 +70,7 @@ import shopRoutes from "./routes/shop.route.js";
 import returnRoutes from "./routes/return.route.js";
 import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
-import { getLiveness, getReadiness } from "./controllers/health.controller.js";
+import { getLiveness, getReadiness, getMetrics } from "./controllers/health.controller.js";
 import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
 import addressRoutes from "./routes/address.route.js";
 import productReportRoutes from "./routes/productReport.route.js";
@@ -122,6 +122,7 @@ const server = createServer(app);
 // mot lan, khong duoc lam lech so lieu hay bi chan 429.
 app.get("/healthz", getLiveness);
 app.get("/readyz", getReadiness);
+app.get("/metrics", getMetrics);
 
 // Header bảo mật (X-Frame-Options, HSTS, noSniff...). Tắt CSP vì đây là API
 // JSON, giao diện do Vite phục vụ riêng; mở CORP cross-origin để frontend ở

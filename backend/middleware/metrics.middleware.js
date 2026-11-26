@@ -12,6 +12,7 @@
 
 import { percentile } from "../lib/stats.js";
 import { notifyAdmins } from "../lib/notify.js";
+import { httpRequestDuration, statusClass } from "../lib/promMetrics.js";
 
 // Chan bo nho: toi da 200 khoa route. Het cho thi moi khoa moi gop vao mot
 // bucket "(other)" duy nhat (tong cong <= 201 entry), khong de Map lon theo
@@ -65,8 +66,12 @@ export const metricsMiddleware = (req, res, next) => {
       `${req.method} ${req.baseUrl}${req.route?.path ?? "(unmatched)"}`
     );
 
-    bucket.latencies[bucket.count % RING] = Date.now() - start;
+    const ms = Date.now() - start;
+    bucket.latencies[bucket.count % RING] = ms;
     bucket.count += 1;
+    httpRequestDuration
+      .labels(req.method, bucket.route.slice(req.method.length + 1), statusClass(res.statusCode))
+      .observe(ms / 1000);
     if (res.statusCode >= 500) bucket.c5xx += 1;
 
     const p95 = percentile(samplesOf(bucket), 95);

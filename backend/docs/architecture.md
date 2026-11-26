@@ -704,4 +704,5 @@ Manifest, ArgoCD va cluster k3d nam o repo rieng `ngx-platform`. Phia app chi ca
 - **`TRUST_PROXY=<so hop>`**: sau ingress dat `1` de `req.ip` lay tu `X-Forwarded-For`; khong thi moi client chung IP proxy va chung han muc rate limit.
 - Frontend goi API cung origin (`/api`, `/socket.io`), ingress chia duong.
 - **Pipeline** (`.github/workflows/devsecops.yml`): gitleaks (ca lich su git) · semgrep (ERROR) · trivy fs (chan CRITICAL co ban va) · hadolint + trivy config · test (`ci.yml` goi qua `workflow_call`) → build image → trivy image → SBOM CycloneDX. Tren `main`: push `ghcr.io/nguyenxduc/electric-ecommerce-{api,web}:<sha7>`, ky cosign keyless theo digest, attest SBOM. Repo nay khong co quyen ghi vao ngx-platform: ben do tu keo, verify chu ky roi moi bump tag.
+- **`GET /metrics`** (prom-client): histogram `http_request_duration_seconds{method,route,status}` + metric mac dinh cua Node; nhan route lay tu khoa da gioi han cua metrics.middleware (<= 201). Ngoai /api, ingress khong dinh tuyen toi.
 - **Image runtime**: api khong co npm/yarn (chi `node ...`), web la nginx cua Alpine chay uid 101, moi duong ghi o `/tmp`.
