@@ -9,6 +9,7 @@ import crypto from "crypto";
 import { writeAuditLog } from "../services/audit.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
 import { getSettingNumber } from "../lib/settings.js";
+import { momoCredentials } from "../lib/momo.js";
 
 const requiredEnv = ["VNP_TMN_CODE", "VNP_HASH_SECRET"];
 
@@ -208,12 +209,11 @@ export const createMomoPayment = async (req, res) => {
       });
     }
 
-    const partnerCode =
-      process.env.MOMO_PARTNER_CODE || "MOMO";
-    const accessKey =
-      process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
-    const secretKey =
-      process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
+    const creds = momoCredentials();
+    if (!creds) {
+      return res.status(503).json({ message: "MoMo payment is not configured" });
+    }
+    const { partnerCode, accessKey, secretKey } = creds;
     const endpoint =
       process.env.MOMO_ENDPOINT || "https://test-payment.momo.vn/v2/gateway/api/create";
 
@@ -393,9 +393,9 @@ export const createBankTransferQR = createMomoPayment;
 // requestId deu co the POST resultCode=0 de danh dau don da thanh toan ma khong
 // tra dong nao. Thu tu cac truong duoi day la thu tu MoMo quy dinh cho IPN v2.
 const verifyMomoIpnSignature = (data) => {
-  const secretKey =
-    process.env.MOMO_SECRET_KEY || "K951B6PE1waDMi640xX08PD3vg6EkVlz";
-  const accessKey = process.env.MOMO_ACCESS_KEY || "F8BBA842ECF85";
+  const creds = momoCredentials();
+  if (!creds) return false;
+  const { secretKey, accessKey } = creds;
   const provided = String(data.signature || "");
   if (!provided) return false;
 

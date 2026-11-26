@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 
 // Chạy qua shell: Node >=18.20.2 cấm spawn npm.cmd trực tiếp trên Windows (EINVAL).
+// `app` chỉ là hằng "backend"/"frontend", không có input ngoài đi vào shell.
+// nosemgrep: javascript.lang.security.audit.spawn-shell-true.spawn-shell-true
 const run = (app) => spawn(`npm --prefix ${app} run dev`, { stdio: "inherit", shell: true });
 const children = [run("backend"), run("frontend")];
 

@@ -1,7 +1,10 @@
 name: CI
+# Goi tu devsecops.yml (job `test`), khong tu chay de khong chay test hai lan.
 on:
-  push:
-  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -51,7 +54,7 @@ jobs:
         run: |
           npm run seed
           node server.js > server.log 2>&1 &
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             nc -z localhost 3000 && exit 0
             sleep 1
           done

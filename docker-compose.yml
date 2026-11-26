@@ -28,7 +28,8 @@ services:
       DATABASE_URL: 'postgresql://postgres:postgres@db:5432/ecommerce?schema=public'
       SHIPPING_FEE: '9.99'
       FREE_SHIPPING_THRESHOLD: '199'
-    command: ['sh', '-c', 'npx prisma migrate deploy && npm run seed']
+    # Image prod khong co npm: goi thang prisma va node.
+    command: ['sh', '-c', 'node_modules/.bin/prisma migrate deploy && node seed/index.js']
     depends_on:
       db:
         condition: service_healthy
@@ -90,7 +91,7 @@ services:
       AI_HTTP_PROXY: ''
       HTTPS_PROXY: ''
       HTTP_PROXY: ''
-    command: ['npm', 'run', 'worker']
+    command: ['node', 'jobs/worker.js']
     restart: unless-stopped
     stop_grace_period: 30s
     depends_on:

@@ -1,0 +1,189 @@
+# Pipeline DevSecOps: cong chan (secret, SAST, SCA, cau hinh, test) -> build image ->
+# quet image -> (chi main) push GHCR, ky cosign keyless, dinh kem SBOM.
+# Promote sang cluster do repo ngx-platform tu keo (verify chu ky roi bump tag),
+# repo nay khong giu token ghi nao vao repo platform.
+#
+# Action pin theo commit SHA (tag co the bi ghi de). Cong cu chay bang image pin version.
+name: DevSecOps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  TRIVY_IMAGE: aquasec/trivy:0.76.2
+
+jobs:
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # Quet toan bo lich su git: secret da commit roi xoa van con trong history.
+      - run: >
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1
+          git /repo --no-banner --redact --config /repo/.gitleaks.toml
+
+  sast:
+    name: SAST (semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Chi chan muc ERROR; ket qua day len tab Security.
+      - run: >
+          docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep:1.187.0
+          semgrep scan --config p/default --severity ERROR --metrics off --error
+          --exclude node_modules --exclude backend/tests
+          --sarif-output semgrep.sarif
+      - if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+  sca:
+    name: Dependency scan (trivy fs)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Bao cao HIGH+CRITICAL len tab Security, nhung chi chan CRITICAL co ban va.
+      - run: |
+          docker run --rm -v "$PWD:/src" "$TRIVY_IMAGE" fs --quiet --scanners vuln \
+            --severity HIGH,CRITICAL --format sarif --output /src/trivy-fs.sarif /src
+          docker run --rm -v "$PWD:/src" "$TRIVY_IMAGE" fs --quiet --scanners vuln \
+            --severity CRITICAL --ignore-unfixed --exit-code 1 /src
+      - if: always() && hashFiles('trivy-fs.sarif') != ''
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+  config:
+    name: Dockerfile + IaC lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          for f in backend/Dockerfile frontend/Dockerfile; do
+            echo "::group::hadolint $f"
+            docker run --rm -i -v "$PWD/.hadolint.yaml:/.config/hadolint.yaml" \
+              hadolint/hadolint:v2.15.1 hadolint -c /.config/hadolint.yaml - < "$f"
+            echo "::endgroup::"
+          done
+      - run: >
+          docker run --rm -v "$PWD:/src" "$TRIVY_IMAGE" config --quiet --skip-dirs "**/node_modules"
+          --severity HIGH,CRITICAL --exit-code 1 /src
+
+  test:
+    name: Test
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    name: Image ${{ matrix.name }}
+    needs: [secrets, sast, sca, config, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push GHCR
+      id-token: write # cosign keyless (OIDC)
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            context: backend
+          - name: web
+            context: frontend
+    env:
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tag
+        run: echo "IMAGE=$IMAGE_PREFIX-${{ matrix.name }}:${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Build vao docker local de quet; qua cong moi push (cache gha nen lan 2 nhanh).
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          load: true
+          pull: true # luon lay base image moi nhat (ban va bao mat)
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Scan image (chan CRITICAL co ban va)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" "$TRIVY_IMAGE" \
+            image --quiet --severity HIGH,CRITICAL --format sarif --output /out/trivy-image.sarif "$IMAGE"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+            image --quiet --severity CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
+      - if: always() && hashFiles('trivy-image.sarif') != ''
+        uses: github/codeql-action/upload-sarif@915412ff23e8b7659517e607487dbeae018f2934 # v4.39.5
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image-${{ matrix.name }}
+      - name: SBOM (CycloneDX)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" "$TRIVY_IMAGE" \
+            image --quiet --format cyclonedx --output /out/sbom.cdx.json "$IMAGE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ matrix.name }}
+          path: sbom.cdx.json
+
+      - if: env.PUBLISH == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: env.PUBLISH == 'true'
+        id: push
+        name: Push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ env.IMAGE }}
+          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+      - if: env.PUBLISH == 'true'
+        uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+      # Ky theo digest (tag doi duoc, digest thi khong). Danh tinh ky = workflow nay tren main;
+      # ngx-platform (va Kyverno sau nay) verify dung danh tinh do.
+      - if: env.PUBLISH == 'true'
+        name: Sign + attest SBOM
+        env:
+          REF: ${{ env.IMAGE_PREFIX }}-${{ matrix.name }}@${{ steps.push.outputs.digest }}
+        run: |
+          cosign sign --yes "$REF"
+          cosign attest --yes --type cyclonedx --predicate sbom.cdx.json "$REF"

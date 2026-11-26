@@ -1,0 +1,12 @@
+# gitleaks: dung bo luat mac dinh, chi bo qua nhung "secret" da biet la cong khai.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Khoa sandbox cong khai cua MoMo (co trong tai lieu MoMo), khong phai bi mat"
+regexes = ['''K951B6PE1waDMi640xX08PD3vg6EkVlz''', '''F8BBA842ECF85''']
+
+[[allowlists]]
+description = "Vi du curl trong tai lieu dung token gia (YOUR_ADMIN_TOKEN, ADMIN_TOKEN)"
+regexes = ['''Bearer (YOUR_)?ADMIN_TOKEN''']
+regexTarget = "line"

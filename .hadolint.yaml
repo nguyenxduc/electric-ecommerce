@@ -1,0 +1,5 @@
+# DL3018 (pin version cho apk add): goi alpine bi go ban cu nen pin la build vo
+# sau vai tuan; image base da pin theo tag, Trivy quet lo hong cua goi.
+ignored:
+  - DL3018
+failure-threshold: warning
