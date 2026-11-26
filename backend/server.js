@@ -70,6 +70,7 @@ import shopRoutes from "./routes/shop.route.js";
 import returnRoutes from "./routes/return.route.js";
 import shipmentRoutes, { shippingRouter } from "./routes/shipment.route.js";
 import healthRoutes from "./routes/health.route.js";
+import { getLiveness, getReadiness } from "./controllers/health.controller.js";
 import invoiceRoutes, { taxRouter } from "./routes/invoice.route.js";
 import addressRoutes from "./routes/address.route.js";
 import productReportRoutes from "./routes/productReport.route.js";
@@ -96,6 +97,10 @@ import { requireScalarBody } from "./middleware/scalarBody.middleware.js";
 const app = express();
 dotenv.config();
 
+// Sau reverse proxy (Traefik/ingress) dat TRUST_PROXY=<so hop proxy>, vd 1, de
+// req.ip lay tu X-Forwarded-For; khong thi moi client chung IP proxy va chung han muc rate limit.
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY));
+
 const AI_PROXY_URL =
   process.env.AI_HTTP_PROXY ||
   process.env.HTTPS_PROXY ||
@@ -112,6 +117,11 @@ const PORT = process.env.PORT || 3000;
 
 // Create HTTP server
 const server = createServer(app);
+
+// Probe cho Kubernetes, dat truoc metrics va rate limit: kubelet goi vai giay
+// mot lan, khong duoc lam lech so lieu hay bi chan 429.
+app.get("/healthz", getLiveness);
+app.get("/readyz", getReadiness);
 
 // Header bảo mật (X-Frame-Options, HSTS, noSniff...). Tắt CSP vì đây là API
 // JSON, giao diện do Vite phục vụ riêng; mở CORP cross-origin để frontend ở

@@ -694,3 +694,12 @@ Danh sach id luu o `localStorage` (khoa `recentlyViewed`, toi da 20, moi nhat da
 ### Chon tinh/thanh trong form dia chi
 
 `AddressFormModal` dung `input + datalist` voi 34 tinh/thanh sau sap nhap 2025 (`frontend/src/client/utils/vnProvinces.ts`); van nhan chuoi tu do cu. Quan/huyen da bo nen o "District (optional)".
+
+## 10. Chay tren Kubernetes (repo ngx-platform)
+
+Manifest, ArgoCD va cluster k3d nam o repo rieng `ngx-platform`. Phia app chi can:
+
+- **Image prod**: `backend/Dockerfile` (multi-stage, `npm ci --omit=dev`, user `node`, `CMD node server.js`) dung chung cho API, worker (`node jobs/worker.js`), job migrate (`npx prisma migrate deploy`) va job seed. `prisma` nam trong `dependencies` vi job migrate chay bang image prod. `frontend/Dockerfile` build tinh voi `VITE_API_BASE_URL=/api` roi phuc vu bang nginx-unprivileged cong 8080; target `dev` giu cho docker-compose.
+- **Probe**: `GET /healthz` (liveness, khong cham DB) va `GET /readyz` (readiness, `SELECT 1`, loi thi 503). Dat ngoai `/api`, truoc metrics va rate limit. `/api/health` van chi cho admin.
+- **`TRUST_PROXY=<so hop>`**: sau ingress dat `1` de `req.ip` lay tu `X-Forwarded-For`; khong thi moi client chung IP proxy va chung han muc rate limit.
+- Frontend goi API cung origin (`/api`, `/socket.io`), ingress chia duong.

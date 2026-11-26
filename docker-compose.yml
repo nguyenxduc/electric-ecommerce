@@ -125,6 +125,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     image: ngx-ecommerce-frontend
     working_dir: /app
     ports:
