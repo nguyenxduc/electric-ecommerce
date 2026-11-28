@@ -1,5 +1,6 @@
 import { prisma } from "../lib/db.js";
 import cloudinary from "../lib/cloudinary.js";
+import { singleFlight } from "../lib/singleFlight.js";
 import { ROLES } from "../constants/roles.js";
 import { SHOP_STATUS } from "../constants/status.js";
 import {
@@ -397,7 +398,15 @@ export const createProduct = asyncHandler(async (req, res) => {
   });
 });
 
+// Danh sach chi phu thuoc vai tro (admin thay ca hang an) + query string, nen request giong het
+// dang chay song song dung chung mot lan query + stringify (do tai 300 nguoi: nut co chai la CPU).
 export const getAllProducts = asyncHandler(async (req, res) => {
+  const key = `${req.user?.role === ROLES.ADMIN ? "admin" : "buyer"}:${req.originalUrl}`;
+  const body = await singleFlight(key, async () => JSON.stringify(await listProductsPayload(req)));
+  res.type("json").send(body);
+});
+
+const listProductsPayload = async (req) => {
   // Standard query parameters (not filters)
   const standardParams = [
     "search",
@@ -504,20 +513,20 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   if (Object.keys(filterParams).length === 0) {
     const { total_count, products } = await fetchPage(baseWhere);
 
-    return res.json({
+    return {
       products: products.map(calculateProductPrices),
       pagination: buildPaginationMeta(currentPage, perPage, total_count),
-    });
+    };
   }
 
   // Bo loc dong: giai ra danh sach id, quy tac nam o services/productFilter.
   const productIdsArray = await resolveFilteredProductIds(filterParams);
 
   if (productIdsArray.length === 0) {
-    return res.json({
+    return {
       products: [],
       pagination: buildPaginationMeta(currentPage, perPage, 0),
-    });
+    };
   }
 
   // Giao voi ket qua tim kiem (neu co), khong ghi de mat dieu kien tim kiem
@@ -528,11 +537,11 @@ export const getAllProducts = asyncHandler(async (req, res) => {
   const filteredWhere = { ...baseWhere, id: { in: ids } };
   const { total_count, products } = await fetchPage(filteredWhere);
 
-  res.json({
+  return {
     products: products.map(calculateProductPrices),
     pagination: buildPaginationMeta(currentPage, perPage, total_count),
-  });
-});
+  };
+};
 
 // GET /api/products/flash-sale?limit= - san pham dang trong khung flash sale, het som nhat len dau
 export const getFlashSaleProducts = asyncHandler(async (req, res) => {

@@ -117,6 +117,7 @@ const main = async () => {
 };
 
 main().catch((err) => {
-  console.error("\nLoad test dung lai:", err.message);
+  // "fetch failed" cua undici giau loi that (ECONNRESET, ECONNREFUSED...) trong err.cause
+  console.error("\nLoad test dung lai:", err.message, err.cause?.code ?? err.cause?.message ?? "");
   process.exit(1);
 });

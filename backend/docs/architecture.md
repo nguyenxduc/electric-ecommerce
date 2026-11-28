@@ -528,6 +528,13 @@ Tung san pham con co co `is_active` (nguoi ban bat/tat qua
 voi nguoi khong phai admin; chu shop van thay hang an trong
 `GET /products/shop/mine` (`?status=live|hidden`) va `GET /products/:id`.
 
+`GET /products` (danh sach) gop cac request giong het dang chay cung luc qua
+`lib/singleFlight.js`: mot lan query + `JSON.stringify`, cac request con lai cho
+chung ket qua; xong la xoa, khong phai cache nen gia/ton kho van moi. Khoa gop la
+vai tro (admin / khong phai admin) + URL, vi `buyerVisibilityWhere` chi phan biet
+admin. Neu danh sach bat dau phu thuoc nguoi xem cu the (vd gia rieng tung user),
+phai dua user id vao khoa. Do tai 300 nguoi: p95 964 ms → ~250 ms.
+
 ### Kiem duyet san pham (takedown)
 
 Admin go san pham vi pham bang `PATCH /products/:id/takedown { reason }` (ly do
