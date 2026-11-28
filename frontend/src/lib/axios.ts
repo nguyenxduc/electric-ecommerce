@@ -44,11 +44,16 @@ axiosClient.interceptors.response.use(
   async error => {
     // Do not auto-remove token on 401 to avoid logging out during protected flows
     // Tai khoan bi admin khoa: bo token ngay de UI ve trang thai chua dang nhap
-    if (error?.response?.data?.code === 'ACCOUNT_SUSPENDED' && localStorage.getItem('accessToken')) {
+    // Token bi thu hoi vi mat khau da doi o noi khac: cung dang xuat nhu vay
+    const code = error?.response?.data?.code
+    if ((code === 'ACCOUNT_SUSPENDED' || code === 'SESSION_REVOKED') && localStorage.getItem('accessToken')) {
       localStorage.removeItem('accessToken')
       // Trang tai lai mat toast: gui ly do qua sessionStorage de App hien sau khi tai
       try {
-        sessionStorage.setItem('auth_notice', error.response.data.message || 'Your account has been suspended')
+        sessionStorage.setItem(
+          'auth_notice',
+          error.response.data.error || error.response.data.message || 'Your account has been suspended'
+        )
       } catch {
         // private mode: van dang xuat, chi khong hien ly do
       }

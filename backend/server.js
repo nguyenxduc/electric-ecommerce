@@ -40,6 +40,7 @@ import { Server } from "socket.io";
 import { ProxyAgent, setGlobalDispatcher } from "undici";
 import { prisma } from "./lib/db.js";
 import { ACCESS_TOKEN_SECRET } from "./lib/jwtSecret.js";
+import { isTokenRevoked } from "./middleware/auth.middleware.js";
 BigInt.prototype.toJSON = function () {
   return Number(this);
 };
@@ -250,7 +251,7 @@ io.use(async (socket, next) => {
     // Get user from database to get role
     const user = await prisma.user.findUnique({
       where: { id: BigInt(userId) },
-      select: { id: true, role: true, suspended_at: true },
+      select: { id: true, role: true, suspended_at: true, password_changed_at: true },
     });
 
     if (!user) {
@@ -258,6 +259,9 @@ io.use(async (socket, next) => {
     }
     if (user.suspended_at) {
       return next(new Error("Authentication error: Account suspended"));
+    }
+    if (isTokenRevoked(user, decoded)) {
+      return next(new Error("Authentication error: Session revoked"));
     }
 
     socket.userId = userId;

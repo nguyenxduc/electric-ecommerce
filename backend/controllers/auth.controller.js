@@ -336,9 +336,10 @@ export const changePassword = asyncHandler(async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(new_password, 10);
+  // password_changed_at thu hoi moi JWT cu (thiet bi khac); thiet bi dang doi nhan token moi
   await prisma.user.update({
     where: { id: BigInt(userId) },
-    data: { password_digest: hashed },
+    data: { password_digest: hashed, password_changed_at: new Date() },
   });
 
   writeAuditLog({
@@ -350,7 +351,11 @@ export const changePassword = asyncHandler(async (req, res) => {
     userAgent: req.headers["user-agent"],
   });
 
-  res.json({ success: true, message: "Password changed successfully" });
+  res.json({
+    success: true,
+    message: "Password changed successfully",
+    data: { accessToken: generateAccessToken(String(userId)) },
+  });
 });
 
 export const resendVerification = asyncHandler(async (req, res) => {

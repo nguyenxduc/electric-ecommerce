@@ -213,6 +213,7 @@ erDiagram
     datetime deleted_at
     datetime suspended_at
     string suspend_reason
+    datetime password_changed_at
   }
   UserAddress {
     bigint id "PK"

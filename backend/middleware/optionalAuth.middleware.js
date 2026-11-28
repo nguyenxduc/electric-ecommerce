@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/db.js";
 import { ACCESS_TOKEN_SECRET } from "../lib/jwtSecret.js";
+import { isTokenRevoked } from "./auth.middleware.js";
 
 /** Sets req.user when Bearer/cookie token is valid; otherwise continues without user. */
 export const optionalAuth = async (req, res, next) => {
@@ -25,8 +26,8 @@ export const optionalAuth = async (req, res, next) => {
       where: { id: BigInt(decoded.userId) },
     });
 
-    // Tai khoan bi khoa: coi nhu khach vang lai
-    if (userRecord && !userRecord.suspended_at) {
+    // Tai khoan bi khoa hoac token da bi thu hoi (doi mat khau): coi nhu khach vang lai
+    if (userRecord && !userRecord.suspended_at && !isTokenRevoked(userRecord, decoded)) {
       req.user = {
         id: userRecord.id.toString(),
         name: userRecord.name,

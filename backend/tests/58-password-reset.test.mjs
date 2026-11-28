@@ -94,6 +94,34 @@ test('ma dung: doi mat khau, dang nhap bang mat khau moi, ma khong dung lai duoc
   assert.ok(audit, 'phai ghi audit log')
 })
 
+test('doi mat khau thu hoi token cu, token moi tra ve van dung duoc', async () => {
+  const oldToken = (await login(NEW_PASSWORD)).json.data.accessToken
+  // iat tinh theo giay: doi sang giay moi de token cu chac chan "cu hon" lan doi
+  await new Promise(r => setTimeout(r, 1100))
+  const changed = await req('/auth/change_password', {
+    method: 'POST',
+    token: oldToken,
+    body: { current_password: NEW_PASSWORD, new_password: ORIGINAL }
+  })
+  assert.equal(changed.status, 200, JSON.stringify(changed.json))
+  const fresh = changed.json.data.accessToken
+  const stale = await req('/auth/me', { token: oldToken })
+  assert.equal(stale.status, 401)
+  assert.equal(stale.json.code, 'SESSION_REVOKED')
+  assert.equal((await req('/auth/me', { token: fresh })).status, 200)
+  // optionalAuth: token cu coi nhu khach, khong loi
+  assert.equal((await req('/products?limit=1', { token: oldToken })).status, 200)
+})
+
+test('reset mat khau thu hoi token dang mo', async () => {
+  const token = (await login(ORIGINAL)).json.data.accessToken
+  await new Promise(r => setTimeout(r, 1100))
+  await skipCooldown()
+  const { dev_code: code } = (await forgot(EMAIL)).json.data
+  assert.equal((await reset(code, NEW_PASSWORD)).status, 200)
+  assert.equal((await req('/auth/me', { token })).status, 401)
+})
+
 test('ma quen mat khau khong chan OTP so dien thoai', async () => {
   await skipCooldown()
   await forgot(EMAIL)

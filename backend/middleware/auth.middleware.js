@@ -6,6 +6,20 @@ import { ROLES } from "../constants/roles.js";
 export const suspendedMessage = (reason) =>
   `Your account has been suspended${reason ? `: ${reason}` : ""}. Please contact support.`;
 
+// JWT cap truoc lan doi/reset mat khau gan nhat bi thu hoi (moi thiet bi cu phai dang nhap lai).
+// iat tinh theo giay: so voi giay cua password_changed_at, token cap cung giay van qua
+// (de token moi tra ve ngay sau khi doi mat khau dung duoc).
+export const isTokenRevoked = (user, decoded) =>
+  Boolean(user?.password_changed_at) &&
+  typeof decoded?.iat === "number" &&
+  decoded.iat < Math.floor(user.password_changed_at.getTime() / 1000);
+
+export const SESSION_REVOKED = {
+  success: false,
+  code: "SESSION_REVOKED",
+  error: "Your password was changed. Please log in again.",
+};
+
 export const protectRoute = async (req, res, next) => {
   try {
     let accessToken;
@@ -47,6 +61,9 @@ export const protectRoute = async (req, res, next) => {
           code: "ACCOUNT_SUSPENDED",
           error: suspendedMessage(userRecord.suspend_reason),
         });
+      }
+      if (isTokenRevoked(userRecord, decoded)) {
+        return res.status(401).json(SESSION_REVOKED);
       }
 
       req.user = {

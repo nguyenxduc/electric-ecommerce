@@ -123,7 +123,13 @@ export const resetPasswordWithCode = async ({ email: rawEmail, code: rawCode, ne
     });
     await tx.user.update({
       where: { id: user.id },
-      data: { password_digest: passwordDigest, reset_code: null, reset_expires_at: null },
+      // password_changed_at: moi phien dang mo (JWT cu) bi thu hoi
+      data: {
+        password_digest: passwordDigest,
+        password_changed_at: new Date(),
+        reset_code: null,
+        reset_expires_at: null,
+      },
     });
     return true;
   });

@@ -256,6 +256,8 @@ model User {
   // Admin khoa tai khoan: khong dang nhap / goi API duoc cho toi khi mo lai
   suspended_at            DateTime?
   suspend_reason          String?
+  // Doi/reset mat khau: JWT cap truoc thoi diem nay bi tu choi (thu hoi phien cu)
+  password_changed_at     DateTime?
 
   // relations
   addresses       UserAddress[]

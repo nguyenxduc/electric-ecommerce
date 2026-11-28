@@ -55,6 +55,8 @@ export const changePassword = async (payload: {
   new_password: string
 }) => {
   const { data } = await axiosClient.post('/auth/change_password', payload)
+  // Doi mat khau thu hoi token cu; luu token moi de thiet bi nay van dang nhap
+  if (data?.data?.accessToken) localStorage.setItem('accessToken', data.data.accessToken)
   return data
 }
 
