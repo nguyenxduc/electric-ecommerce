@@ -649,6 +649,27 @@ cac cho nay von da doc ban ghi user:
 
 Xem `tests/39-moderation`.
 
+### Quen mat khau
+
+`POST /auth/forgot-password { email }` -> ma 6 so qua email, `POST
+/auth/reset-password { email, code, new_password }` doi mat khau. Nghiep vu o
+`services/passwordReset.service.js`, dung chung bang `otp_codes` voi OTP so dien
+thoai (`purpose = "reset_password"`, cot `phone` chua email nhan ma):
+
+- Khong do duoc tai khoan: email co hay khong ton tai deu nhan cung 200 va cung
+  cau tra loi; dang cooldown / qua han muc cung 200 (khong tao ma moi, khong 429);
+  loi gui mail chi ghi log.
+- Ma bam sha256 (gan email + purpose + secret), het han 10 phut, cooldown 60 s,
+  toi da 5 ma/gio, toi da 5 lan nhap sai moi ma (tang `attempts` nguyen tu truoc
+  khi so sanh), dung mot lan; doi xong thi cac ma con lai het hieu luc. Audit
+  `RESET_PASSWORD`.
+- Dev/test (`exposeDevCode()`, nhu OTP SMS console): tra `dev_code`, khong gui mail.
+- OTP so dien thoai loc theo `purpose = "verify_phone"` de ma quen mat khau khong
+  chan cooldown/han muc cua no.
+
+Gioi han: JWT dang con hieu luc khong bi thu hoi khi doi mat khau (token
+stateless). Xem `tests/58-password-reset`, `e2e/27-forgot-password`.
+
 ---
 
 ## 8. So dia chi nguoi mua

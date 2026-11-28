@@ -10,6 +10,11 @@ import { asyncHandler } from "../middleware/error.middleware.js";
 import { suspendedMessage } from "../middleware/auth.middleware.js";
 import crypto from "node:crypto";
 import { normalizeVnPhone, sendSms, exposeDevCode } from "../lib/sms.js";
+import {
+  PasswordResetError,
+  requestPasswordReset,
+  resetPasswordWithCode,
+} from "../services/passwordReset.service.js";
 
 const generateAccessToken = (userId) => {
   const secret = ACCESS_TOKEN_SECRET;
@@ -437,90 +442,62 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Email verified successfully" });
 });
 
+const sendResetError = (res, err) => {
+  if (!(err instanceof PasswordResetError)) throw err;
+  return res.status(err.status).json({ success: false, error: err.message, ...err.extra });
+};
+
+// Email co hay khong ton tai deu nhan cung cau tra loi (khong do duoc tai khoan).
+const RESET_SENT = "If an account exists for that email, a reset code has been sent.";
+
 export const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Email is required" });
+  let issued;
+  try {
+    issued = await requestPasswordReset(req.body?.email);
+  } catch (err) {
+    return sendResetError(res, err);
   }
-
-  const user = await prisma.user.findFirst({
-    where: { email, deleted_at: null },
-  });
-  if (!user) {
-    return res.status(404).json({ success: false, error: "User not found" });
+  const data = { expires_in: 600 };
+  if (issued) {
+    if (exposeDevCode()) {
+      // Dev/test: giong OTP SMS (provider console), tra ma thay vi gui mail that
+      data.dev_code = issued.code;
+    } else {
+      try {
+        await sendEmail({
+          to: issued.to,
+          subject: "Reset your Tech Shop password",
+          html: `<p>Your password reset code is:</p><h2>${issued.code}</h2><p>The code expires in 10 minutes. If you did not ask for this, ignore this email.</p>`,
+        });
+      } catch (err) {
+        // Van tra loi giong het de khong lo email ton tai; ghi log de van hanh biet
+        console.error("forgotPassword sendEmail error:", err?.message || err);
+      }
+    }
   }
-
-  const otp = generateOtp();
-  const expires = new Date(Date.now() + 10 * 60 * 1000);
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      reset_code: otp,
-      reset_expires_at: expires,
-    },
-  });
-
-  await sendEmail({
-    to: email,
-    subject: "Reset your Tech Shop password",
-    html: `<p>Your password reset code is:</p><h2>${otp}</h2><p>Code expires in 10 minutes.</p>`,
-  });
-
-  res.json({ success: true, message: "Reset code sent to email" });
+  res.json({ success: true, message: RESET_SENT, data });
 });
 
 export const resetPassword = asyncHandler(async (req, res) => {
-  const { email, code, new_password } = req.body;
-  if (!email || !code || !new_password) {
-    return res.status(400).json({
-      success: false,
-      error: "Email, code, and new password are required",
+  let userId;
+  try {
+    userId = await resetPasswordWithCode({
+      email: req.body?.email,
+      code: req.body?.code,
+      newPassword: req.body?.new_password,
     });
+  } catch (err) {
+    return sendResetError(res, err);
   }
-  if (new_password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      error: "Password must be at least 6 characters",
-    });
-  }
-
-  const user = await prisma.user.findFirst({
-    where: { email, deleted_at: null },
+  await writeAuditLog({
+    userId,
+    action: "RESET_PASSWORD",
+    resource: "user",
+    resourceId: userId,
+    ip: req.ip,
+    userAgent: req.headers["user-agent"],
   });
-  if (!user) {
-    return res.status(404).json({ success: false, error: "User not found" });
-  }
-  if (!user.reset_code || !user.reset_expires_at) {
-    return res
-      .status(400)
-      .json({ success: false, error: "No reset code. Request again." });
-  }
-  const now = new Date();
-  if (now > user.reset_expires_at) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Reset code expired" });
-  }
-  if (String(code).trim() !== user.reset_code) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Invalid reset code" });
-  }
-
-  const hashed = await bcrypt.hash(new_password, 10);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      password_digest: hashed,
-      reset_code: null,
-      reset_expires_at: null,
-    },
-  });
-
-  res.json({ success: true, message: "Password reset successfully" });
+  res.json({ success: true, message: "Password reset successfully. Please log in." });
 });
 
 // Upload avatar
@@ -689,8 +666,9 @@ export const sendPhoneOtp = asyncHandler(async (req, res) => {
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const [last, byUser, byPhone] = await Promise.all([
-    prisma.otpCode.findFirst({ where: { user_id: userId }, orderBy: { created_at: "desc" } }),
-    prisma.otpCode.count({ where: { user_id: userId, created_at: { gte: hourAgo } } }),
+    // Loc theo purpose: ma quen mat khau (cung bang) khong duoc chan OTP so dien thoai
+    prisma.otpCode.findFirst({ where: { user_id: userId, purpose: "verify_phone" }, orderBy: { created_at: "desc" } }),
+    prisma.otpCode.count({ where: { user_id: userId, purpose: "verify_phone", created_at: { gte: hourAgo } } }),
     prisma.otpCode.count({ where: { phone, created_at: { gte: hourAgo } } }),
   ]);
   if (last && Date.now() - last.created_at.getTime() < OTP_COOLDOWN_MS) {
@@ -745,7 +723,7 @@ export const verifyPhoneOtp = asyncHandler(async (req, res) => {
   const userId = BigInt(req.user.id);
 
   const otp = await prisma.otpCode.findFirst({
-    where: { user_id: userId, phone, consumed_at: null },
+    where: { user_id: userId, phone, purpose: "verify_phone", consumed_at: null },
     orderBy: { created_at: "desc" },
   });
   if (!otp || otp.expires_at < new Date()) {
