@@ -2,7 +2,7 @@
 // cau tra loi hien cong khai; gioi han cau hoi treo; quyen xoa.
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
-import { req, login, ACCOUNTS, firstProductOf } from './helpers.mjs'
+import { req, login, ACCOUNTS, firstProductOf, waitFor, sleep } from './helpers.mjs'
 import { prisma } from '../lib/db.js'
 
 const admin = await login(ACCOUNTS.admin)
@@ -56,9 +56,9 @@ test('buyer hoi -> 201, hien cong khai, chu shop nhan thong bao va to-do', async
   assert.equal(l.json.data.pagination.total_count, 1)
 
   const owner = await prisma.shop.findFirst({ where: { slug: 'tech-world' }, select: { owner_id: true } })
-  const n = await prisma.notification.findFirst({
+  const n = await waitFor(() => prisma.notification.findFirst({
     where: { user_id: owner.owner_id, title: 'New question about your product', created_at: { gte: startedAt } }
-  })
+  }))
   assert.ok(n, 'chu shop khong nhan thong bao')
   assert.equal(n.link, '/seller/questions?filter=unanswered')
 
@@ -87,14 +87,15 @@ test('shop khac/buyer khong tra loi duoc; chu shop tra loi -> buyer nhan thong b
   assert.equal(l.json.data.questions[0].id, qid)
 
   const buyerRow = await prisma.user.findUnique({ where: { email: ACCOUNTS.buyer } })
-  const n = await prisma.notification.findFirst({
+  const n = await waitFor(() => prisma.notification.findFirst({
     where: { user_id: buyerRow.id, title: 'The shop answered your question', created_at: { gte: startedAt } }
-  })
-  assert.ok(n)
+  }))
+  assert.ok(n, 'nguoi hoi khong nhan thong bao')
   assert.match(n.link, new RegExp(`^/product/.+-p${p.id}#questions$`))
 
   // sua cau tra loi: khong bao lai
   assert.equal((await answer(seller, qid, 'Yes, 65W USB-C charger included.')).status, 200)
+  await sleep(300) // cho thong bao (neu lo gui lai) kip ghi, roi moi dem
   const count = await prisma.notification.count({
     where: { user_id: buyerRow.id, title: 'The shop answered your question', created_at: { gte: startedAt } }
   })

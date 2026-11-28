@@ -34,10 +34,13 @@ test('update quantity', async () => {
     token: buyer,
     body: { quantity: 2, color }
   })
-  assert.ok([200, 201].includes(res.status), `status=${res.status}`)
+  // Flaky 1 lan, chua tai hien: in du body + cac dong cua san pham de lan sau tim ra nguyen nhan
+  const lines = async () => JSON.stringify((await req('/cart', { token: buyer })).json?.cart?.items
+    ?.filter(i => i.product_id === product.id).map(i => ({ color: i.color, quantity: i.quantity })))
+  assert.ok([200, 201].includes(res.status), `status=${res.status} ${JSON.stringify(res.json)} lines=${await lines()}`)
   const cart = (await req('/cart', { token: buyer })).json?.cart
   const item = cart?.items?.find(isLine)
-  assert.equal(item?.quantity, 2)
+  assert.equal(item?.quantity, 2, `lines=${await lines()}`)
 })
 
 test('cart totals are consistent with items', async () => {

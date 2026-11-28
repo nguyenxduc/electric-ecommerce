@@ -1,7 +1,7 @@
 // Danh gia kieu Shopee: anh dinh kem, loc theo sao / co anh, seller tra loi.
 import test, { after, before } from 'node:test'
 import assert from 'node:assert/strict'
-import { API, req, login, ACCOUNTS } from './helpers.mjs'
+import { API, req, login, ACCOUNTS, waitFor, sleep } from './helpers.mjs'
 import { prisma } from '../lib/db.js'
 
 const seller1 = await login(ACCOUNTS.seller1) // Tech World
@@ -53,10 +53,10 @@ test('only the owning seller can reply; length is validated', async () => {
   assert.equal(edited.json.review.seller_reply, 'Edited reply')
 
   // Nguoi mua nhan duoc mot thong bao (lan tra loi dau) co link toi tab danh gia
-  const notes = await prisma.notification.count({
-    where: { user_id: jane.id, link: { endsWith: `-p${product.id}#reviews` } }
-  })
-  assert.equal(notes, 1)
+  const where = { user_id: jane.id, link: { endsWith: `-p${product.id}#reviews` } }
+  assert.ok(await waitFor(() => prisma.notification.findFirst({ where })), 'nguoi mua khong nhan thong bao')
+  await sleep(300) // lan sua co lo bao lai thi kip ghi truoc khi dem
+  assert.equal(await prisma.notification.count({ where }), 1)
 })
 
 test('product list filters by rating and photos and returns images + reply', async () => {

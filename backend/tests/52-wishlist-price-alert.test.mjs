@@ -3,7 +3,7 @@
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
 import { prisma } from '../lib/db.js'
-import { req, login, ACCOUNTS, firstProductOf } from './helpers.mjs'
+import { req, login, ACCOUNTS, firstProductOf, waitFor } from './helpers.mjs'
 
 const seller = await login(ACCOUNTS.seller1) // chu tech-world
 const buyer = await login(ACCOUNTS.buyer2)
@@ -22,13 +22,6 @@ const alerts = () =>
   prisma.notification.findMany({
     where: { user_id: buyerRow.id, title: TITLE, created_at: { gte: startedAt } }
   })
-const waitFor = async (pred, tries = 20) => {
-  for (let i = 0; i < tries; i++) {
-    if (await pred()) return true
-    await new Promise(r => setTimeout(r, 100))
-  }
-  return false
-}
 
 // Xoa thong bao PROMO cu cua san pham de dedupe 24h khong che test
 await prisma.notification.deleteMany({ where: { type: 'PROMO', link: { endsWith: `-p${p.id}` } } })

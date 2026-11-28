@@ -66,5 +66,17 @@ export const firstProductOf = async (slug, sort = 'price-asc') => {
   return (res.json?.products ?? []).find(noVariants)
 }
 
+// Thong bao (notifyUser) ghi kieu fire-and-forget, sau khi response da tra ve:
+// doc thong bao ngay sau request phai cho, khong thi test chap chon khi may cham.
+export const waitFor = async (pred, tries = 20, ms = 100) => {
+  for (let i = 0; i < tries; i++) {
+    const v = await pred()
+    if (v) return v
+    await new Promise(r => setTimeout(r, ms))
+  }
+  return null
+}
+export const sleep = ms => new Promise(r => setTimeout(r, ms))
+
 export const loyaltyPointsOf = async token =>
   Number((await req('/auth/me', { token })).json?.data?.loyalty_points ?? 0)
