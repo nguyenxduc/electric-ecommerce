@@ -728,7 +728,7 @@ const Search = () => {
   }
 
   return (
-    <div>
+    <div className="min-w-0 flex-1">
       {isOpen && (
         <Modal
           searchTerm={searchTerm}
@@ -739,17 +739,23 @@ const Search = () => {
           onSelectProduct={handleSelectProduct}
         />
       )}
+      {/* Thanh tim kiem luon hien nhu cac san (Shopee/Tiki): bam vao mo hop goi y day du */}
       <button
         type="button"
         onClick={() => {
           setIsOpen(true)
           setSearchTerm('')
         }}
-        className="icon-btn"
+        className="flex w-full items-center gap-2 rounded-full bg-white px-4 py-2 text-left text-sm text-gray-400 ring-1 ring-inset ring-gray-200 transition-colors hover:ring-ink"
         aria-label="Open search"
         aria-haspopup="dialog"
       >
-        <SearchGlyph aria-hidden="true" />
+        <SearchGlyph className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="sm:hidden">Search products</span>
+          <span className="max-sm:hidden">Search products, categories or shops</span>
+        </span>
+        <Camera className="h-4 w-4 shrink-0 text-gray-400 max-sm:hidden" aria-hidden="true" />
       </button>
     </div>
   )

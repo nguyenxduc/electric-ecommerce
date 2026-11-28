@@ -23,18 +23,19 @@ const Hero = () => {
   const productCount = newest?.pagination.total_count
 
   return (
-    <section className="section-wrap pt-8 sm:pt-12">
+    // Dien thoai: hero gon (tieu de + nut) de san pham len som nhu cac san; doan gioi thieu, so lieu va anh chi hien tu sm
+    <section className="section-wrap pt-5 sm:pt-12">
       <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_1fr]">
         <div className="animate-fade-up">
-          <p className="eyebrow">{storeName} marketplace</p>
-          <h1 className="mt-4 text-[40px] leading-[1.05] sm:text-6xl font-extrabold tracking-tight text-ink">
+          <p className="eyebrow max-sm:hidden">{storeName} marketplace</p>
+          <h1 className="sm:mt-4 text-[28px] leading-[1.1] sm:text-6xl sm:leading-[1.05] font-extrabold tracking-tight text-ink">
             Tech from shops we checked first.
           </h1>
-          <p className="mt-5 max-w-md text-lg text-gray-600">
+          <p className="mt-5 max-w-md text-lg text-gray-600 max-sm:hidden">
             Phones, laptops and accessories from independent sellers. Compare them side by side, or ask the assistant
             which one fits.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-4 sm:mt-8 flex flex-wrap gap-3">
             <Link to="/collection/all" className="btn-primary !px-6 !py-3 group">
               Shop all products
               <ArrowRight
@@ -47,7 +48,7 @@ const Hero = () => {
             </Link>
           </div>
           {(productCount || shops.length > 0) && (
-            <dl className="mt-10 flex gap-10">
+            <dl className="mt-10 flex gap-10 max-sm:hidden">
               {productCount ? (
                 <div>
                   <dt className="text-xs text-gray-500">Products</dt>
@@ -65,7 +66,7 @@ const Hero = () => {
         </div>
 
         {picks.length === 4 && (
-          <ul className="grid grid-cols-2 gap-3 sm:gap-4">
+          <ul className="grid grid-cols-2 gap-3 sm:gap-4 max-sm:hidden">
             {picks.map((p, i) => (
               <li
                 key={p.id}
@@ -92,7 +93,7 @@ const Hero = () => {
         )}
       </div>
 
-      <ul className="mt-16 grid grid-cols-2 gap-y-3 border-y border-gray-200 py-4 text-sm text-gray-600 lg:grid-cols-4">
+      <ul className="mt-6 sm:mt-16 grid grid-cols-2 gap-x-3 gap-y-2 sm:gap-y-3 border-y border-gray-200 py-3 sm:py-4 text-xs sm:text-sm text-gray-600 lg:grid-cols-4">
         {PERKS.map(p => (
           <li key={p} className="flex items-center gap-2">
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" aria-hidden="true" />

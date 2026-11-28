@@ -571,7 +571,7 @@ const Collection = () => {
           {(searchQuery ? isSearching : isCollectionLoading) && (
             <div className="space-y-4">
               <SectionSkeleton />
-              <ProductGridSkeleton count={9} />
+              <ProductGridSkeleton count={12} />
             </div>
           )}
 

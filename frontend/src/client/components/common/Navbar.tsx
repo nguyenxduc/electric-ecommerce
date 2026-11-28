@@ -67,13 +67,13 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="section-wrap flex items-center gap-6 h-16">
+      <nav className="section-wrap flex items-center gap-3 sm:gap-6 h-16">
         <Link to="/" className="flex items-center gap-2 shrink-0" aria-label={`${storeName} home`}>
           <img src={Logo} alt="" className="h-7 w-auto" width={28} height={28} />
           <span className="hidden sm:block text-[17px] font-bold tracking-tight text-ink">{storeName}</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-7">
+        <div className="hidden lg:flex items-center gap-7">
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} className={navClass}>
               {n.label}
@@ -81,8 +81,13 @@ const Navbar = () => {
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          <Search />
+        <div className="flex min-w-0 flex-1 justify-center">
+          <div className="flex w-full max-w-xl">
+            <Search />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <CartDrawer cartProducts={isCartLoading ? null : cartProducts?.cart || null} />
           {userLoggedIn ? (
             <>
@@ -139,7 +144,7 @@ const Navbar = () => {
         </div>
       </nav>
       {/* Dien thoai: link dieu huong thanh hang cuon ngang duoi logo */}
-      <div className="md:hidden border-t border-gray-200/70">
+      <div className="lg:hidden border-t border-gray-200/70">
         <div className="section-wrap flex gap-6 overflow-x-auto py-2.5">
           {NAV.map(n => (
             <NavLink key={n.to} to={n.to} className={navClass}>

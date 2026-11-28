@@ -11,7 +11,7 @@ import type {
   SearchSuggestRes
 } from '../types/product'
 
-export const COLLECTION_PAGE_SIZE = 9
+export const COLLECTION_PAGE_SIZE = 20
 import type { ReviewRes } from '../types/review'
 
 export const fetchNewProducts = async (): Promise<ListProductRes> => {

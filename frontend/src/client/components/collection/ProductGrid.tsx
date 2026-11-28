@@ -16,26 +16,9 @@ const ProductGrid = ({ products, selectedCompareProducts = [], onCompareToggle, 
   const selectedCategoryId = selectedCompareProducts[0]?.category_id;
 
   return (
-    <div className={`grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 ${className}`}>
-      {products.slice(0, 9).map((product) => (
-        <ProductCard
-          key={product.id}
-          product={product}
-          slug={makeProductSlug(product.name, product.id)}
-          compareSelected={selectedCompareIds.includes(product.id)}
-          compareDisabled={
-            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS ||
-            (selectedCategoryId !== undefined && product.category_id !== selectedCategoryId)
-          }
-          compareDisabledReason={
-            selectedCompareIds.length >= MAX_COMPARE_PRODUCTS
-              ? `You can compare up to ${MAX_COMPARE_PRODUCTS} products`
-              : 'Only products from the same category can be compared'
-          }
-          onCompareToggle={onCompareToggle}
-        />
-      ))}
-      {products.slice(9, 15).map((product) => (
+    // Day nhu cac san: 2 cot dien thoai, 3-4 cot desktop (canh sidebar loc)
+    <div className={`grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 ${className}`}>
+      {products.map((product) => (
         <ProductCard
           key={product.id}
           product={product}
