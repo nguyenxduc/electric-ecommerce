@@ -4,6 +4,7 @@ import { trackBehavior } from '../../services/behaviorService'
 import type { Product } from '../../types/product'
 import ProductImage from '../products/ProductImage'
 import { makeProductSlug } from '../../utils/productSlug'
+import { formatPrice } from '../../utils/formatMoney'
 
 interface ProductCardProps {
   product: Product
@@ -18,7 +19,9 @@ interface ProductCardProps {
 
 // 1234 -> "1.2K": so da ban dang gon nhu cac san
 const compact = (n: number) =>
-  n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}K` : String(n)
+  n >= 1000
+    ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}K`
+    : String(n)
 
 const asNumber = (value: unknown, fallback = 0) => {
   const n = Number(value)
@@ -41,10 +44,9 @@ const ProductCard = ({
   const discountPercentageValue = Number(product.discount_percentage)
 
   // Calculate discount percentage if not provided
-  const discountPercentage =
-    Number.isFinite(discountPercentageValue)
-      ? discountPercentageValue
-      : price > 0
+  const discountPercentage = Number.isFinite(discountPercentageValue)
+    ? discountPercentageValue
+    : price > 0
       ? Math.round((discount / price) * 100)
       : 0
 
@@ -54,7 +56,7 @@ const ProductCard = ({
   const shown = finalPrice > 0 ? finalPrice : price
   // So tien tiet kiem that (tinh ca flash sale): so tron thi bo phan le
   const saved = Math.round((price - shown) * 100) / 100
-  const savedLabel = Number.isInteger(saved) ? `$${saved.toLocaleString('en-US')}` : `$${saved.toFixed(2)}`
+  const savedLabel = formatPrice(saved)
 
   return (
     <div className="zoom-on-hover lift group relative flex h-full flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-gray-200/70 focus-within:ring-2 focus-within:ring-brand-500">
@@ -73,8 +75,8 @@ const ProductCard = ({
             compareDisabled && !compareSelected
               ? compareDisabledReason || 'This product cannot be compared'
               : compareSelected
-              ? 'Remove from comparison'
-              : 'Add to comparison'
+                ? 'Remove from comparison'
+                : 'Add to comparison'
           }
         >
           {compareSelected ? 'Selected' : 'Compare'}
@@ -89,9 +91,15 @@ const ProductCard = ({
           </span>
         )}
         {product.img && product.img.length > 0 ? (
-          <ProductImage src={product.img[0]} alt={product.name} className="absolute inset-0 h-full w-full object-contain p-5 mix-blend-multiply" />
+          <ProductImage
+            src={product.img[0]}
+            alt={product.name}
+            className="absolute inset-0 h-full w-full object-contain p-5 mix-blend-multiply"
+          />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">No image</div>
+          <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
+            No image
+          </div>
         )}
       </div>
 
@@ -100,7 +108,9 @@ const ProductCard = ({
           {/* Link phu ca the (after:inset-0): bam dau tren the cung mo san pham, van la <a> that */}
           <Link
             to={href}
-            onClick={() => trackBehavior('click', product.id, { source: 'product_card' })}
+            onClick={() =>
+              trackBehavior('click', product.id, { source: 'product_card' })
+            }
             className="after:absolute after:inset-0 after:z-10 focus-visible:outline-none"
           >
             {product.name}
@@ -108,26 +118,43 @@ const ProductCard = ({
         </h3>
         {showSavings && hasDiscount ? (
           <div className="mt-2">
-            <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
+            <span className="price text-lg font-bold text-ink">
+              {formatPrice(shown)}
+            </span>
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs">
-              <span className="price text-gray-400 line-through">${price.toFixed(2)}</span>
-              <span className="price font-semibold text-sale-600">-{discountPercentage}%</span>
-              {saved > 0 && <span className="price text-gray-400">Save {savedLabel}</span>}
+              <span className="price text-gray-400 line-through">
+                {formatPrice(price)}
+              </span>
+              <span className="price font-semibold text-sale-600">
+                -{discountPercentage}%
+              </span>
+              {saved > 0 && (
+                <span className="price text-gray-400">Save {savedLabel}</span>
+              )}
             </div>
           </div>
         ) : (
           <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
-            <span className="price text-lg font-bold text-ink">${shown.toFixed(2)}</span>
+            <span className="price text-lg font-bold text-ink">
+              {formatPrice(shown)}
+            </span>
             {hasDiscount && (
               <>
-                <span className="price text-xs text-gray-400 line-through">${price.toFixed(2)}</span>
-                <span className="price text-xs font-semibold text-sale-600">-{discountPercentage}%</span>
+                <span className="price text-xs text-gray-400 line-through">
+                  {formatPrice(price)}
+                </span>
+                <span className="price text-xs font-semibold text-sale-600">
+                  -{discountPercentage}%
+                </span>
               </>
             )}
           </div>
         )}
         <div className="mt-auto flex items-center gap-1.5 pt-3 text-xs text-gray-500">
-          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
+          <Star
+            className="h-3.5 w-3.5 fill-amber-400 text-amber-400"
+            aria-hidden="true"
+          />
           <span className="font-medium text-gray-700">{rating.toFixed(1)}</span>
           <span aria-hidden="true">·</span>
           <span>{compact(asNumber(product.sold))} sold</span>

@@ -16,6 +16,7 @@ import {
   getNextTierByKey,
   TIERS
 } from '../../hooks/useLoyalty'
+import { formatPrice } from '../../utils/formatMoney'
 
 /** Subtle tier colors for labels without overpowering the shared blue theme. */
 const TIER_BADGE: Record<
@@ -299,7 +300,7 @@ export default function Loyalty() {
             <CheckCircle2 className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-emerald-800 mb-1">
-                A ${redeemResult.discount_value} off voucher has been added to your warehouse!
+                A {formatPrice(redeemResult.discount_value)} off voucher has been added to your warehouse!
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <span className="font-mono text-sm tracking-widest bg-white border-2 border-dashed border-emerald-300 text-emerald-700 px-3 py-1.5 rounded-lg select-all">
@@ -355,7 +356,7 @@ export default function Loyalty() {
         {showRedeemForm ? (
           <div className="space-y-3">
             <p className="text-xs text-gray-500">
-              100 pts = $1 off. The voucher will be added to your voucher warehouse automatically.
+              100 pts = {formatPrice(1)} off. The voucher will be added to your voucher warehouse automatically.
             </p>
             <div>
               <label className="block text-xs font-medium text-blue-700 mb-1.5">
@@ -374,7 +375,7 @@ export default function Loyalty() {
               {redeemAmount && parseInt(redeemAmount) >= minRedeemPoints && (
                 <p className="text-xs text-blue-600 mt-1.5">
                   → You will receive a{' '}
-                  <strong>${Math.floor(parseInt(redeemAmount) / 100)}</strong> off voucher
+                  <strong>{formatPrice(Math.floor(parseInt(redeemAmount) / 100))}</strong> off voucher
                 </p>
               )}
             </div>
@@ -405,7 +406,7 @@ export default function Loyalty() {
             <span className="font-semibold text-gray-900">
               {points.toLocaleString()} pts
             </span>
-            . Redeem points for discount vouchers — 100 pts = $1. Minimum: {minRedeemPoints} pts.
+            . Redeem points for discount vouchers — 100 pts = {formatPrice(1)}. Minimum: {minRedeemPoints} pts.
           </p>
         )}
       </div>

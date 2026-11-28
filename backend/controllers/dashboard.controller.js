@@ -4,6 +4,7 @@ import { asyncHandler } from "../middleware/error.middleware.js";
 import { effectiveDiscount } from "../lib/productQuery.js";
 import { getShopTodo, getAdminTodo } from "../services/todo.service.js";
 import { computeCommission, getShopFinance as buildShopFinance } from "../services/finance.service.js";
+import { formatVnd } from "../lib/gatewayAmount.js";
 
 // Get dashboard statistics.
 // shopId (optional) scopes orders/products to one shop (seller dashboard).
@@ -463,11 +464,7 @@ export const getBehaviorAnalytics = asyncHandler(async (req, res) => {
 
 // Helper functions
 function formatCurrency(amount) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(amount);
+  return formatVnd(amount);
 }
 
 function formatNumber(num) {

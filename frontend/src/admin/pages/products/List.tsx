@@ -17,6 +17,7 @@ import adminShopService from '../../services/shopService'
 import type { AdminProductListQuery } from '../../services/productService'
 import type { AdminProduct } from '../../types'
 import { apiErrorMessage } from '../../../lib/apiError'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 type StatusFilter = NonNullable<AdminProductListQuery['status']>
 
@@ -202,7 +203,7 @@ export default function AdminProductsList() {
                   <td className="p-2">{p.id}</td>
                   <td className="p-2">{p.name}</td>
                   <td className="p-2">{p.shop?.name || '—'}</td>
-                  <td className="p-2">${p.price}</td>
+                  <td className="p-2">{formatPrice(p.price)}</td>
                   <td className="p-2">
                     {Array.isArray(p.available_colors) &&
                     p.available_colors.length > 0

@@ -6,6 +6,7 @@ import { useAdminOrders, useAdminOrderStats } from '../../hooks'
 import SkeletonTable from '../../components/common/SkeletonTable'
 import AdminPagination from '../../components/common/AdminPagination'
 import { fmtDate } from '../../utils/date'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 export default function AdminOrdersList() {
   const [page, setPage] = useState(1)
@@ -65,7 +66,7 @@ export default function AdminOrdersList() {
         <KpiCard
           title="Total Revenue"
           value={
-            statsLoading ? '...' : formatCurrency(Number(stats?.revenue || 0))
+            statsLoading ? '...' : formatPrice(Number(stats?.revenue || 0))
           }
           delta=""
         />
@@ -229,7 +230,7 @@ export default function AdminOrdersList() {
                       : '-'}
                   </td>
                   <td className="p-2 font-semibold">
-                    {formatCurrency(Number(o.total_amount))}
+                    {formatPrice(Number(o.total_amount))}
                   </td>
                   <td className="p-2 flex items-center gap-2">
                     {getPaymentStatus(o.payment_method)}
@@ -336,10 +337,3 @@ function formatNumber(num: number): string {
   return num.toString()
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2
-  }).format(amount)
-}

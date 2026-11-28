@@ -8,6 +8,10 @@ export const usdToGatewayVnd = (usdAmount) => {
   return Math.round(usd * USD_TO_VND_RATE);
 };
 
+/** Gia luu USD; chu hien cho nguoi dung (thong bao, dashboard, tro ly AI) bang VND. */
+export const toDisplayVnd = (usd) => Math.round(Number(usd || 0) * USD_TO_VND_RATE);
+export const formatVnd = (usd) => `₫${toDisplayVnd(usd).toLocaleString("vi-VN")}`;
+
 export const momoMinOrderUsd = () =>
   Math.ceil((MOMO_MIN_AMOUNT_VND / USD_TO_VND_RATE) * 100) / 100;
 

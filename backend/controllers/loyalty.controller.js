@@ -11,6 +11,7 @@ import {
   REDEEM_POINTS_PER_DOLLAR,
 } from "../services/loyalty.service.js";
 import { asyncHandler } from "../middleware/error.middleware.js";
+import { formatVnd } from "../lib/gatewayAmount.js";
 
 export const getLoyaltySummary = asyncHandler(async (req, res) => {
   const userId = BigInt(req.user.id);
@@ -144,7 +145,7 @@ export const redeemPoints = asyncHandler(async (req, res) => {
   if (discountValue <= 0) {
     return res.status(400).json({
       success: false,
-      error: `Cần ít nhất ${REDEEM_POINTS_PER_DOLLAR} điểm để đổi $1 giảm giá`,
+      error: `Cần ít nhất ${REDEEM_POINTS_PER_DOLLAR} điểm để đổi ${formatVnd(1)} giảm giá`,
     });
   }
 
@@ -158,7 +159,7 @@ export const redeemPoints = asyncHandler(async (req, res) => {
     const coupon = await tx.coupon.create({
       data: {
         code: couponCode,
-        description: `Redeemed ${points} pts — $${discountValue} off`,
+        description: `Redeemed ${points} pts — ${formatVnd(discountValue)} off`,
         discount_type: "fixed",
         discount_value: discountValue,
         min_order: 0,
@@ -177,7 +178,7 @@ export const redeemPoints = asyncHandler(async (req, res) => {
         user_id: userId,
         points: -points,
         type: "REDEEM",
-        description: `Redeemed ${points} pts for voucher ${couponCode} ($${discountValue} off)`,
+        description: `Redeemed ${points} pts for voucher ${couponCode} (${formatVnd(discountValue)} off)`,
       },
     });
 
@@ -192,7 +193,7 @@ export const redeemPoints = asyncHandler(async (req, res) => {
 
   return res.json({
     success: true,
-    message: `Points redeemed! A $${discountValue} off voucher has been added to your warehouse.`,
+    message: `Points redeemed! A ${formatVnd(discountValue)} off voucher has been added to your warehouse.`,
     data: {
       loyalty_points: result.updatedUser.loyalty_points,
       voucher: {

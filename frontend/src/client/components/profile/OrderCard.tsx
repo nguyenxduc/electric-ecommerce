@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Store, ChevronRight, MessageCircle } from 'lucide-react'
-import { formatUsd } from '../../utils/formatMoney'
+import { formatPrice } from '../../utils/formatMoney'
 import { orderDiscount } from '../../utils/orderMoney'
 
 interface Order {
@@ -105,12 +105,12 @@ const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain, onPayNo
               {product.variant && <p className="text-xs text-gray-500 mt-0.5">{product.variant}</p>}
               <p className="text-xs text-gray-500 mt-0.5">
                 x{product.quantity ?? 1}
-                {product.price != null && ` · ${formatUsd(Number(product.price))} each`}
+                {product.price != null && ` · ${formatPrice(Number(product.price))} each`}
               </p>
             </div>
             {product.price != null && (
               <span className="text-sm font-medium text-gray-900 shrink-0">
-                {formatUsd(Number(product.price) * (product.quantity ?? 1))}
+                {formatPrice(Number(product.price) * (product.quantity ?? 1))}
               </span>
             )}
           </li>
@@ -125,9 +125,9 @@ const OrderCard = ({ order, onClick, onContact, onBuyAgain, buyingAgain, onPayNo
           {order.orderNumber || `#${order.id}`} · {order.placedOn}
         </span>
         <span className="text-sm text-gray-600">
-          {discount > 0 && <span className="mr-2 text-green-600">Discount −{formatUsd(discount)}</span>}
+          {discount > 0 && <span className="mr-2 text-green-600">Discount −{formatPrice(discount)}</span>}
           {itemCount} item{itemCount > 1 ? 's' : ''}:{' '}
-          <span className="font-semibold text-rose-600">{formatUsd(order.total)}</span>
+          <span className="font-semibold text-rose-600">{formatPrice(order.total)}</span>
         </span>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2 px-4 sm:px-5 py-3 border-t border-gray-100">

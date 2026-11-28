@@ -12,6 +12,7 @@ import {
 } from '../../services/sellerService'
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import CouponStatusChip from '../../../client/components/common/CouponStatusChip'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 type FormState = {
   code: string
@@ -295,13 +296,13 @@ export default function SellerCouponsList() {
                   <td className="p-2 whitespace-nowrap">
                     {c.discount_type === 'percent'
                       ? `${Number(c.discount_value)}%`
-                      : `$${Number(c.discount_value)}`}
+                      : formatPrice(c.discount_value)}
                     {c.discount_type === 'percent' && c.max_discount != null && (
-                      <span className="text-xs text-gray-500"> (max ${Number(c.max_discount)})</span>
+                      <span className="text-xs text-gray-500"> (max {formatPrice(c.max_discount)})</span>
                     )}
                   </td>
                   <td className="p-2">
-                    {c.min_order ? `$${Number(c.min_order)}` : '—'}
+                    {c.min_order ? formatPrice(c.min_order) : '—'}
                   </td>
                   <td className="p-2">
                     {c.used_count ?? 0}/{c.usage_limit ?? '∞'}

@@ -9,7 +9,7 @@ import {
   resolveReturn,
   type ShopReturnRequest
 } from '../../services/sellerService'
-import { formatUsd } from '../../../client/utils/formatMoney'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -133,7 +133,7 @@ export default function SellerReturnsList() {
                     <div>{r.user?.name || '—'}</div>
                     <div className="text-xs text-gray-500">{r.user?.email}</div>
                   </td>
-                  <td className="p-2">{formatUsd(r.order.total_amount)}</td>
+                  <td className="p-2">{formatPrice(r.order.total_amount)}</td>
                   <td className="p-2 max-w-[240px]">
                     <span className="text-gray-700">{r.reason}</span>
                     {r.resolution_note && (

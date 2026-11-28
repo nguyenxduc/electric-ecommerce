@@ -12,7 +12,7 @@ import adminOrderService from '../../../admin/services/orderService'
 import { apiErrorMessage } from '../../../lib/apiError'
 import SkeletonTable from '../../../admin/components/common/SkeletonTable'
 import AdminPagination from '../../../admin/components/common/AdminPagination'
-import { formatUsd } from '../../../client/utils/formatMoney'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 export default function SellerOrdersList() {
   const [page, setPage] = useState(1)
@@ -158,7 +158,7 @@ export default function SellerOrdersList() {
         />
         <KpiCard
           title="Total Revenue"
-          value={statsLoading ? '...' : formatUsd(stats?.revenue || 0)}
+          value={statsLoading ? '...' : formatPrice(stats?.revenue || 0)}
         />
       </div>
 
@@ -293,7 +293,7 @@ export default function SellerOrdersList() {
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">{formatUsd(o.total_amount)}</span>
+                    <span className="font-semibold">{formatPrice(o.total_amount)}</span>
                     {primaryAction(o)}
                   </div>
                 </li>
@@ -372,7 +372,7 @@ export default function SellerOrdersList() {
                       : '-'}
                   </td>
                   <td className="p-2 font-semibold">
-                    {formatUsd(o.total_amount)}
+                    {formatPrice(o.total_amount)}
                   </td>
                   <td className="p-2">
                     <Link

@@ -6,8 +6,14 @@ import { useNewProducts } from '../../hooks/useProducts'
 import { listShops } from '../../services/shopService'
 import ProductImage from '../products/ProductImage'
 import { makeProductSlug } from '../../utils/productSlug'
+import { formatPrice } from '../../utils/formatMoney'
 
-const PERKS = ['Every shop reviewed before it opens', 'Orders tracked to your door', 'Cash on delivery or MoMo', 'One cart for many shops']
+const PERKS = [
+  'Every shop reviewed before it opens',
+  'Orders tracked to your door',
+  'Cash on delivery or MoMo',
+  'One cart for many shops'
+]
 
 // Hero trang chu: chu lon ben trai, ben phai la san pham that moi len ke (khong dung anh minh hoa)
 const Hero = () => {
@@ -32,18 +38,24 @@ const Hero = () => {
             Tech from shops we checked first.
           </h1>
           <p className="mt-5 max-w-md text-lg text-gray-600 max-sm:hidden">
-            Phones, laptops and accessories from independent sellers. Compare them side by side, or ask the assistant
-            which one fits.
+            Phones, laptops and accessories from independent sellers. Compare
+            them side by side, or ask the assistant which one fits.
           </p>
           <div className="mt-4 sm:mt-8 flex flex-wrap gap-3">
-            <Link to="/collection/all" className="btn-primary !px-6 !py-3 group">
+            <Link
+              to="/collection/all"
+              className="btn-primary !px-6 !py-3 group"
+            >
               Shop all products
               <ArrowRight
                 className="w-4 h-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5"
                 aria-hidden="true"
               />
             </Link>
-            <Link to="/profile?tab=seller" className="btn-secondary !px-6 !py-3">
+            <Link
+              to="/profile?tab=seller"
+              className="btn-secondary !px-6 !py-3"
+            >
               Sell on {storeName}
             </Link>
           </div>
@@ -52,13 +64,17 @@ const Hero = () => {
               {productCount ? (
                 <div>
                   <dt className="text-xs text-gray-500">Products</dt>
-                  <dd className="price text-2xl font-bold text-ink">{productCount.toLocaleString()}</dd>
+                  <dd className="price text-2xl font-bold text-ink">
+                    {productCount.toLocaleString()}
+                  </dd>
                 </div>
               ) : null}
               {shops.length > 0 && (
                 <div>
                   <dt className="text-xs text-gray-500">Verified shops</dt>
-                  <dd className="price text-2xl font-bold text-ink">{shops.length}</dd>
+                  <dd className="price text-2xl font-bold text-ink">
+                    {shops.length}
+                  </dd>
                 </div>
               )}
             </dl>
@@ -78,12 +94,18 @@ const Hero = () => {
                   className="zoom-on-hover lift block overflow-hidden rounded-3xl bg-white"
                 >
                   <div className="relative aspect-square">
-                    <ProductImage src={p.img[0]} alt={p.name} className="absolute inset-0 h-full w-full object-contain p-6" />
+                    <ProductImage
+                      src={p.img[0]}
+                      alt={p.name}
+                      className="absolute inset-0 h-full w-full object-contain p-6"
+                    />
                   </div>
                   <div className="flex items-baseline justify-between gap-2 border-t border-gray-100 px-4 py-3">
-                    <span className="truncate text-sm text-gray-700">{p.name}</span>
+                    <span className="truncate text-sm text-gray-700">
+                      {p.name}
+                    </span>
                     <span className="price shrink-0 text-sm font-semibold text-ink">
-                      ${Number(p.final_price || p.price).toFixed(2)}
+                      {formatPrice(p.final_price || p.price)}
                     </span>
                   </div>
                 </Link>
@@ -96,7 +118,10 @@ const Hero = () => {
       <ul className="mt-6 sm:mt-16 grid grid-cols-2 gap-x-3 gap-y-2 sm:gap-y-3 border-y border-gray-200 py-3 sm:py-4 text-xs sm:text-sm text-gray-600 lg:grid-cols-4">
         {PERKS.map(p => (
           <li key={p} className="flex items-center gap-2">
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" aria-hidden="true" />
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600"
+              aria-hidden="true"
+            />
             {p}
           </li>
         ))}

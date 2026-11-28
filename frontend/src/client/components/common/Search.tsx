@@ -27,7 +27,7 @@ import {
 } from '../../services/productService'
 import type { ImageSearchData } from '../../types/product'
 import { makeProductSlug } from '../../utils/productSlug'
-
+import { formatPrice } from '../../utils/formatMoney'
 
 type ModalProps = {
   searchTerm: string
@@ -61,7 +61,10 @@ const readRecent = (): string[] => {
 
 const saveRecent = (term: string) => {
   try {
-    const next = [term, ...readRecent().filter(x => x !== term)].slice(0, RECENT_MAX)
+    const next = [term, ...readRecent().filter(x => x !== term)].slice(
+      0,
+      RECENT_MAX
+    )
     localStorage.setItem(RECENT_KEY, JSON.stringify(next))
   } catch {
     /* localStorage bi chan: bo qua */
@@ -80,7 +83,7 @@ const useDebouncedValue = (value: string, delay = 250) => {
 }
 
 const money = (n?: number) =>
-  `$${Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  formatPrice(n ?? 0)
 
 // To dam phan khop voi tu khoa (khong phan biet hoa thuong)
 const highlight = (text: string, term: string): ReactNode => {
@@ -91,13 +94,21 @@ const highlight = (text: string, term: string): ReactNode => {
   return (
     <>
       {text.slice(0, i)}
-      <mark className="bg-transparent font-semibold text-ink">{text.slice(i, i + q.length)}</mark>
+      <mark className="bg-transparent font-semibold text-ink">
+        {text.slice(i, i + q.length)}
+      </mark>
       {text.slice(i + q.length)}
     </>
   )
 }
 
-const SectionTitle = ({ children, action }: { children: ReactNode; action?: ReactNode }) => (
+const SectionTitle = ({
+  children,
+  action
+}: {
+  children: ReactNode
+  action?: ReactNode
+}) => (
   <div className="mb-2 flex items-center justify-between">
     <h3 className="eyebrow">{children}</h3>
     {action}
@@ -229,7 +240,11 @@ function Modal({
                 />
               </span>
             ) : item.img ? (
-              <img src={item.img} alt="" className="h-9 w-9 shrink-0 rounded-full bg-paper object-cover" />
+              <img
+                src={item.img}
+                alt=""
+                className="h-9 w-9 shrink-0 rounded-full bg-paper object-cover"
+              />
             ) : (
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-paper">
                 <Store className="h-4 w-4 text-gray-500" />
@@ -239,7 +254,9 @@ function Modal({
               {highlight(item.label, searchTerm)}
             </span>
             {section === 'product' ? (
-              <span className="price shrink-0 text-sm font-semibold text-ink">{money(item.price)}</span>
+              <span className="price shrink-0 text-sm font-semibold text-ink">
+                {money(item.price)}
+              </span>
             ) : (
               <span className="shrink-0 text-xs text-gray-500">Shop</span>
             )}
@@ -392,7 +409,10 @@ function Modal({
         <div className="flex-shrink-0 border-b border-gray-100 p-3 sm:p-4">
           <div className="flex items-center gap-2">
             <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full bg-paper px-4 ring-1 ring-inset ring-transparent focus-within:bg-white focus-within:ring-ink">
-              <SearchGlyph className="h-4 w-4 shrink-0 text-gray-500" aria-hidden />
+              <SearchGlyph
+                className="h-4 w-4 shrink-0 text-gray-500"
+                aria-hidden
+              />
               <input
                 ref={inputRef}
                 autoFocus
@@ -522,7 +542,8 @@ function Modal({
                   <div>
                     <dt className="inline">Model: </dt>
                     <dd className="inline font-medium text-ink">
-                      {imageData.detected.line_or_model || 'Not clearly detected'}
+                      {imageData.detected.line_or_model ||
+                        'Not clearly detected'}
                     </dd>
                   </div>
                 </dl>
@@ -561,10 +582,13 @@ function Modal({
                     )
                   }
                 >
-                  <span id="image-related-products-heading">Related products</span>
+                  <span id="image-related-products-heading">
+                    Related products
+                  </span>
                 </SectionTitle>
                 <p className="mb-3 text-xs text-gray-500">
-                  Gợi ý dựa trên ảnh bạn tải lên — không phải khớp chính xác 100%.
+                  Gợi ý dựa trên ảnh bạn tải lên — không phải khớp chính xác
+                  100%.
                 </p>
                 {formattedImageResults.length > 0 ? (
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -603,7 +627,12 @@ function Modal({
           )}
 
           {!imageData && (
-            <div id="search-suggestions" role="listbox" aria-label="Search suggestions" className="space-y-5">
+            <div
+              id="search-suggestions"
+              role="listbox"
+              aria-label="Search suggestions"
+              className="space-y-5"
+            >
               {!term && recent.length > 0 && (
                 <section>
                   <SectionTitle
@@ -620,7 +649,10 @@ function Modal({
                     Recent searches
                   </SectionTitle>
                   <div className="flex flex-wrap gap-2">
-                    {renderChips('recent', <Clock className="h-3.5 w-3.5 shrink-0 opacity-60" />)}
+                    {renderChips(
+                      'recent',
+                      <Clock className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                    )}
                   </div>
                 </section>
               )}
@@ -628,11 +660,14 @@ function Modal({
                 <section>
                   <SectionTitle>Trending</SectionTitle>
                   <div className="flex flex-wrap gap-2">
-                    {renderChips('trending', <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-60" />)}
+                    {renderChips(
+                      'trending',
+                      <TrendingUp className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                    )}
                   </div>
                 </section>
               )}
-              {!term && recent.length === 0 && !(data?.trending?.length) && (
+              {!term && recent.length === 0 && !data?.trending?.length && (
                 <p className="py-6 text-center text-sm text-gray-500">
                   Start typing to search products, categories and shops.
                 </p>
@@ -643,7 +678,10 @@ function Modal({
                   {isFetching && items.length === 0 && (
                     <div className="space-y-2">
                       {[...Array(3)].map((_, idx) => (
-                        <div key={idx} className="flex items-center gap-3 px-2 py-2">
+                        <div
+                          key={idx}
+                          className="flex items-center gap-3 px-2 py-2"
+                        >
                           <div className="h-12 w-12 animate-pulse rounded-lg bg-paper" />
                           <div className="h-3.5 flex-1 animate-pulse rounded bg-paper" />
                         </div>
@@ -657,25 +695,32 @@ function Modal({
                   )}
                   {!isFetching && !isError && items.length === 0 && (
                     <p className="py-6 text-center text-sm text-gray-500">
-                      No matches for “{term}”. Try another keyword or search by image.
+                      No matches for “{term}”. Try another keyword or search by
+                      image.
                     </p>
                   )}
                   {hasCategories && (
                     <section>
                       <SectionTitle>Categories</SectionTitle>
-                      <div className="flex flex-wrap gap-2">{renderChips('category')}</div>
+                      <div className="flex flex-wrap gap-2">
+                        {renderChips('category')}
+                      </div>
                     </section>
                   )}
                   {hasProducts && (
                     <section>
                       <SectionTitle>Products</SectionTitle>
-                      <div className="-mx-2 space-y-0.5">{renderRows('product')}</div>
+                      <div className="-mx-2 space-y-0.5">
+                        {renderRows('product')}
+                      </div>
                     </section>
                   )}
                   {hasShops && (
                     <section>
                       <SectionTitle>Shops</SectionTitle>
-                      <div className="-mx-2 space-y-0.5">{renderRows('shop')}</div>
+                      <div className="-mx-2 space-y-0.5">
+                        {renderRows('shop')}
+                      </div>
                     </section>
                   )}
                 </>
@@ -692,7 +737,8 @@ function Modal({
             className="group flex flex-shrink-0 items-center justify-between gap-3 border-t border-gray-100 px-5 py-3 text-left text-sm hover:bg-paper sm:rounded-b-2xl"
           >
             <span className="min-w-0 truncate text-gray-700">
-              See all results for <span className="font-semibold text-ink">“{term}”</span>
+              See all results for{' '}
+              <span className="font-semibold text-ink">“{term}”</span>
             </span>
             <ArrowRight className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-hover:translate-x-0.5" />
           </button>
@@ -750,12 +796,20 @@ const Search = () => {
         aria-label="Open search"
         aria-haspopup="dialog"
       >
-        <SearchGlyph className="h-4 w-4 shrink-0 text-gray-500" aria-hidden="true" />
+        <SearchGlyph
+          className="h-4 w-4 shrink-0 text-gray-500"
+          aria-hidden="true"
+        />
         <span className="min-w-0 flex-1 truncate">
           <span className="sm:hidden">Search products</span>
-          <span className="max-sm:hidden">Search products, categories or shops</span>
+          <span className="max-sm:hidden">
+            Search products, categories or shops
+          </span>
         </span>
-        <Camera className="h-4 w-4 shrink-0 text-gray-400 max-sm:hidden" aria-hidden="true" />
+        <Camera
+          className="h-4 w-4 shrink-0 text-gray-400 max-sm:hidden"
+          aria-hidden="true"
+        />
       </button>
     </div>
   )

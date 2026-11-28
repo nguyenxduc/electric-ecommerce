@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import type { QuotedVoucher } from '../../services/couponService'
 import { useClaimVoucher } from '../../hooks/useVouchers'
 import { apiErrorMessage } from '../../../lib/apiError'
-import { formatUsd } from '../../utils/formatMoney'
+import { formatPrice } from '../../utils/formatMoney'
 import { voucherTerms, voucherTitle, voucherValidity } from '../../utils/voucherText'
 
 type Props = {
@@ -47,7 +47,7 @@ export default function VoucherPicker({
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">Choose voucher</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Order value after tier discount: {formatUsd(amount)}
+            Order value after tier discount: {formatPrice(amount)}
           </p>
 
           {loading ? (
@@ -87,13 +87,13 @@ export default function VoucherPicker({
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">{voucherValidity(v)}</p>
                       {v.applicable ? (
-                        <p className="text-xs text-green-700 mt-1">Save {formatUsd(v.discount)}</p>
+                        <p className="text-xs text-green-700 mt-1">Save {formatPrice(v.discount)}</p>
                       ) : (
                         <p className="text-xs text-red-500 mt-1">
                           {v.reason}
                           {/* Voucher san xet tren tong don: noi ro con thieu bao nhieu */}
                           {!v.shop && Number(v.min_order) > amount &&
-                            ` · Add ${formatUsd(Number(v.min_order) - amount)} more to use it`}
+                            ` · Add ${formatPrice(Number(v.min_order) - amount)} more to use it`}
                         </p>
                       )}
                     </div>

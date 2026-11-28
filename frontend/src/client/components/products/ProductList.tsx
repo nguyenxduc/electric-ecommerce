@@ -4,6 +4,7 @@ import { trackBehavior } from '../../services/behaviorService'
 import { makeProductSlug } from '../../utils/productSlug'
 import { useSimilarProducts } from '../../hooks/useProducts'
 import { getProductColors } from '../../utils/productColors'
+import { formatPrice } from '../../utils/formatMoney'
 
 const StarIcon = () => (
   <svg
@@ -114,10 +115,7 @@ const ProductSimilar = ({ productId }: ProductSimilarProps) => {
                   </p>
                 )}
                 <p className="text-gray-900 font-semibold mb-1">
-                  $
-                  {p.final_price
-                    ? p.final_price.toFixed(2)
-                    : p.price.toFixed(2)}
+                  {formatPrice(p.final_price || p.price)}
                 </p>
 
                 <div className="flex items-center justify-end text-sm font-medium text-gray-600">

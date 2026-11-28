@@ -2,6 +2,7 @@ import { prisma } from "../lib/db.js";
 import { SHOP_STATUS } from "../constants/status.js";
 import { effectiveDiscount } from "../lib/productQuery.js";
 import { createSlug } from "../lib/slug.js";
+import { formatVnd } from "../lib/gatewayAmount.js";
 
 // Cung cua so chong spam voi thong bao PROMO cua shop (shopFollow.service)
 const DEDUPE_MS = 24 * 3600 * 1000;
@@ -44,7 +45,7 @@ export const notifyWishlistPriceDrop = (before, after) =>
       data: fans.map((w) => ({
         user_id: w.user_id,
         title: "Price drop on your wishlist",
-        message: `${after.name} is now $${newPrice.toFixed(2)} (was $${oldPrice.toFixed(2)}${pct > 0 ? `, -${pct}%` : ""})`,
+        message: `${after.name} is now ${formatVnd(newPrice)} (was ${formatVnd(oldPrice)}${pct > 0 ? `, -${pct}%` : ""})`,
         type: "PROMO",
         link,
       })),

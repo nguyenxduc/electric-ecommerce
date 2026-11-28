@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useShopFinance } from '../../../admin/hooks'
-import { formatUsd } from '../../../client/utils/formatMoney'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 const STATUS_CLASS: Record<string, string> = {
   delivered: 'bg-green-100 text-green-700',
@@ -76,7 +76,7 @@ export default function SellerFinance() {
               <div key={c.title} className="bg-white rounded-lg border p-4 min-w-0">
                 <div className="text-xs text-gray-500">{c.title}</div>
                 <div className="mt-1 text-xl md:text-2xl font-semibold truncate">
-                  {isLoading ? '...' : formatUsd(c.value ?? 0)}
+                  {isLoading ? '...' : formatPrice(c.value ?? 0)}
                 </div>
                 <div className="mt-1 text-xs text-gray-400">{c.hint}</div>
               </div>
@@ -104,9 +104,9 @@ export default function SellerFinance() {
                         </span>
                       </div>
                       <div className="flex justify-between gap-2 text-gray-600">
-                        <span>Gross {formatUsd(o.gross)}</span>
-                        <span>Fee -{formatUsd(o.fee)}</span>
-                        <span className="font-semibold text-gray-900">{formatUsd(o.net)}</span>
+                        <span>Gross {formatPrice(o.gross)}</span>
+                        <span>Fee -{formatPrice(o.fee)}</span>
+                        <span className="font-semibold text-gray-900">{formatPrice(o.net)}</span>
                       </div>
                     </li>
                   ))}
@@ -132,9 +132,9 @@ export default function SellerFinance() {
                             </Link>
                           </td>
                           <td className="p-2">{new Date(o.created_at).toLocaleDateString()}</td>
-                          <td className="p-2 text-right">{formatUsd(o.gross)}</td>
-                          <td className="p-2 text-right text-red-600">-{formatUsd(o.fee)}</td>
-                          <td className="p-2 text-right font-semibold">{formatUsd(o.net)}</td>
+                          <td className="p-2 text-right">{formatPrice(o.gross)}</td>
+                          <td className="p-2 text-right text-red-600">-{formatPrice(o.fee)}</td>
+                          <td className="p-2 text-right font-semibold">{formatPrice(o.net)}</td>
                           <td className="p-2">
                             <span className={`px-2 py-0.5 rounded text-xs ${STATUS_CLASS[o.status] || ''}`}>
                               {o.status}

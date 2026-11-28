@@ -5,6 +5,7 @@ import type { Components } from 'react-markdown'
 import { Star, ShoppingBag } from 'lucide-react'
 import { useProductById } from '../../hooks/useProducts'
 import { parseProductIdFromSlug } from '../../utils/productSlug'
+import { formatPrice } from '../../utils/formatMoney'
 
 type Props = {
   text: string
@@ -174,7 +175,7 @@ function ProductPreviewCard({ entry, isUser }: { entry: ProductEntry; isUser: bo
   const title = product?.name || prettifyProductName(slug)
   const price = Number(product?.price) || 0
   const finalPrice = Number(product?.final_price) || price
-  const displayPrice = (finalPrice > 0 ? finalPrice : price).toFixed(2)
+  const displayPrice = formatPrice(finalPrice > 0 ? finalPrice : price)
   const rating = Number(product?.rating) || 0
 
   const wrapClass = isUser
@@ -209,7 +210,7 @@ function ProductPreviewCard({ entry, isUser }: { entry: ProductEntry; isUser: bo
           }`}
         >
           <span className={`font-semibold ${isUser ? 'text-white' : 'text-gray-900'}`}>
-            {isLoading ? '…' : `$${displayPrice}`}
+            {isLoading ? '…' : displayPrice}
           </span>
           <span className="inline-flex items-center gap-0.5">
             <Star className="h-3 w-3 fill-amber-400 text-amber-400" />

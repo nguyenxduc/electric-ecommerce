@@ -28,8 +28,8 @@ test('buyer: variant, cart, checkout COD with shipping quote', async ({ page }) 
   const basePrice = 739.99
   await page.getByRole('button', { name: '512GB', exact: true }).click()
   await expect(addBtn).toBeEnabled()
-  // price_delta = 80
-  await expect(page.getByRole('heading', { name: `$${(basePrice + 80).toFixed(2)}` })).toBeVisible()
+  // price_delta = 80; gia hien thi VND (ty gia mac dinh 25000)
+  await expect(page.getByRole('heading', { name: `₫${Math.round((basePrice + 80) * 25000).toLocaleString('vi-VN')}` })).toBeVisible()
 
   await addBtn.click()
   await expect(page.getByText('Added to cart successfully')).toBeVisible()

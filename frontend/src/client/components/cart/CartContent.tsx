@@ -3,6 +3,7 @@ import { Store } from 'lucide-react'
 import type { CartItem } from '../../types/cart'
 import { groupCartItemsByShop } from '../../utils/groupCartItemsByShop'
 import { makeProductSlug } from '../../utils/productSlug'
+import { formatPrice } from '../../utils/formatMoney'
 
 interface CartProps {
   cartProducts: CartItem[]
@@ -26,9 +27,12 @@ const CartContent = ({ cartProducts, onNavigate }: CartProps) => {
           </h4>
           <ul className="divide-y divide-gray-100">
             {group.items.map(item => {
-              const finalPrice = item.final_price || item.unit_final_price || item.price || 0
+              const finalPrice =
+                item.final_price || item.unit_final_price || item.price || 0
               const hasDiscount = item.discount > 0 && item.price > finalPrice
-              const meta = [item.variant?.name, item.color?.name].filter(Boolean).join(' · ')
+              const meta = [item.variant?.name, item.color?.name]
+                .filter(Boolean)
+                .join(' · ')
               return (
                 <li key={item.id}>
                   <Link
@@ -46,14 +50,20 @@ const CartContent = ({ cartProducts, onNavigate }: CartProps) => {
                           className="h-full w-full object-contain p-1 mix-blend-multiply"
                         />
                       ) : (
-                        <span className="text-[10px] text-gray-400">No image</span>
+                        <span className="text-[10px] text-gray-400">
+                          No image
+                        </span>
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-ink">{item.name}</span>
+                      <span className="block truncate text-sm font-medium text-ink">
+                        {item.name}
+                      </span>
                       <span className="mt-0.5 block truncate text-xs text-gray-500">
                         {item.unavailable ? (
-                          <span className="text-red-600">No longer available</span>
+                          <span className="text-red-600">
+                            No longer available
+                          </span>
                         ) : (
                           <>
                             {meta && `${meta} · `}Qty {item.quantity}
@@ -63,11 +73,11 @@ const CartContent = ({ cartProducts, onNavigate }: CartProps) => {
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="price block text-sm font-semibold text-ink">
-                        ${(finalPrice * item.quantity).toFixed(2)}
+                        {formatPrice(finalPrice * item.quantity)}
                       </span>
                       {hasDiscount && (
                         <span className="price block text-xs text-gray-400 line-through">
-                          ${(item.price * item.quantity).toFixed(2)}
+                          {formatPrice(item.price * item.quantity)}
                         </span>
                       )}
                     </span>

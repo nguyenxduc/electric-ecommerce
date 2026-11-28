@@ -17,6 +17,7 @@ import { z } from "zod";
 import { retrieveHybrid } from "./retrieval.js";
 import { slugifyText } from "../lib/vietnamese.js";
 import { calculateProductPrices } from "../lib/productQuery.js";
+import { toDisplayVnd } from "../lib/gatewayAmount.js";
 
 const PRODUCT_BASE_URL =
   process.env.FRONTEND_BASE_URL || "http://localhost:5173";
@@ -32,6 +33,8 @@ const productLink = (row) =>
 // tính giá ở đây rồi để hai chỗ trôi khỏi nhau. Lưu ý cột discount là SỐ TIỀN
 // giảm tuyệt đối, không phải phần trăm.
 const priceOf = (row) => calculateProductPrices(row);
+// DB luu USD; tro ly noi voi nguoi dung bang VND nhu giao dien
+const vnd = (usd) => (usd == null ? null : toDisplayVnd(usd));
 
 const stockLabel = (qty) => {
   const n = Number(qty) || 0;
@@ -59,16 +62,16 @@ export const createShoppingTools = (prisma) => {
       }
       return JSON.stringify({
         found: rows.length,
-        currency: "USD",
+        currency: "VND",
         products: rows.map((r) => {
           const priced = priceOf(r);
           return {
             product_id: Number(r.id),
             name: r.name,
-            list_price: priced.price,
-            discount_amount: priced.discount,
+            list_price: vnd(priced.price),
+            discount_amount: vnd(priced.discount),
             discount_percent: priced.discount_percentage,
-            final_price: priced.final_price,
+            final_price: vnd(priced.final_price),
             stock: priced.quantity,
             stock_label: stockLabel(priced.quantity),
             shop: r.shop_name,
@@ -128,8 +131,8 @@ export const createShoppingTools = (prisma) => {
         product_id: Number(product.id),
         name: product.name,
         shop: product.shop?.name || null,
-        list_price: priced.price,
-        final_price: priced.final_price,
+        list_price: vnd(priced.price),
+        final_price: vnd(priced.final_price),
         total_stock: priced.quantity,
         stock_label: stockLabel(priced.quantity),
         by_color: priced.available_colors.map((c) => ({
@@ -180,8 +183,8 @@ export const createShoppingTools = (prisma) => {
           found: false,
           note: "Không tìm thấy gian hàng đang hoạt động với tên này.",
           platform_default: {
-            shipping_fee: platform.shipping_fee ?? null,
-            free_shipping_threshold: platform.free_shipping_threshold ?? null,
+            shipping_fee: vnd(platform.shipping_fee),
+            free_shipping_threshold: vnd(platform.free_shipping_threshold),
           },
         });
       }
@@ -198,8 +201,8 @@ export const createShoppingTools = (prisma) => {
       return JSON.stringify({
         found: true,
         shop: shop.name,
-        shipping_fee: fee,
-        free_shipping_threshold: threshold,
+        shipping_fee: vnd(fee),
+        free_shipping_threshold: vnd(threshold),
         uses_own_policy: shop.shipping_fee_override != null,
       });
     },

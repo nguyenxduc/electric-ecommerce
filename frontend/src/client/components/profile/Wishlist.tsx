@@ -12,6 +12,7 @@ import { apiErrorMessage } from '../../../lib/apiError'
 import type { WishlistItem } from '../../services/wishlistService'
 import ConfirmModal from '../common/ConfirmModal'
 import { makeProductSlug } from '../../utils/productSlug'
+import { formatPrice } from '../../utils/formatMoney'
 
 export default function Wishlist() {
   const navigate = useNavigate()
@@ -79,7 +80,7 @@ export default function Wishlist() {
     )
   }
 
-  const formatPrice = (price: string, discount: string) => {
+  const renderPrice = (price: string, discount: string) => {
     const priceNum = parseFloat(price)
     const discountNum = parseFloat(discount)
     if (discountNum > 0) {
@@ -87,17 +88,17 @@ export default function Wishlist() {
       return (
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold text-gray-900">
-            ${discountedPrice.toFixed(2)}
+            {formatPrice(discountedPrice)}
           </span>
           <span className="text-sm text-gray-500 line-through">
-            ${priceNum.toFixed(2)}
+            {formatPrice(priceNum)}
           </span>
         </div>
       )
     }
     return (
       <span className="text-lg font-semibold text-gray-900">
-        ${priceNum.toFixed(2)}
+        {formatPrice(priceNum)}
       </span>
     )
   }
@@ -228,7 +229,7 @@ export default function Wishlist() {
                       {product.name}
                     </h3>
                     <div className="mb-2">
-                      {formatPrice(product.price, product.discount)}
+                      {renderPrice(product.price, product.discount)}
                     </div>
                     {product.quantity <= 0 && (
                       <p className="text-sm text-red-500">Out of stock</p>

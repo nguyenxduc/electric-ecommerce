@@ -10,6 +10,7 @@ import CouponStatusChip from '../../../client/components/common/CouponStatusChip
 import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import { useListQueryParams } from '../../hooks/useListQueryParams'
 import { fmtDate } from '../../utils/date'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 export default function AdminCouponsList() {
   const navigate = useNavigate()
@@ -172,7 +173,7 @@ export default function AdminCouponsList() {
                     <td className="p-2 whitespace-nowrap">
                       {Number(c.discount_value)}
                       {c.discount_type === 'percent' && c.max_discount != null && (
-                        <span className="text-xs text-gray-500"> (max ${Number(c.max_discount)})</span>
+                        <span className="text-xs text-gray-500"> (max {formatPrice(c.max_discount)})</span>
                       )}
                     </td>
                     <td className="p-2">

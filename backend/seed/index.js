@@ -666,7 +666,7 @@ async function seedFilterOptions(filterKeys, categories) {
     {
       filter_key_id: filterKeyMap.price_range.id,
       value: "0-500",
-      display_value: "Under $500",
+      display_value: "Under ₫12.500.000",
       query_value: "<500",
       category_id: categories[0].id, // Smartphones
       order: 1,
@@ -674,7 +674,7 @@ async function seedFilterOptions(filterKeys, categories) {
     {
       filter_key_id: filterKeyMap.price_range.id,
       value: "500-1000",
-      display_value: "$500 - $1000",
+      display_value: "₫12.500.000 - ₫25.000.000",
       query_value: "500-1000",
       category_id: categories[0].id,
       order: 2,
@@ -682,7 +682,7 @@ async function seedFilterOptions(filterKeys, categories) {
     {
       filter_key_id: filterKeyMap.price_range.id,
       value: "1000-2000",
-      display_value: "$1000 - $2000",
+      display_value: "₫25.000.000 - ₫50.000.000",
       query_value: "1000-2000",
       category_id: categories[1].id, // Laptops
       order: 1,
@@ -995,7 +995,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "GADGET5",
-      description: "Shop voucher: $5 off at Gadget Hub",
+      description: "Shop voucher: ₫125.000 off at Gadget Hub",
       discount_type: "fixed",
       discount_value: 5,
       min_order: 30,
@@ -1017,7 +1017,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "FLAT50",
-      description: "Flat $50 off",
+      description: "Flat ₫1.250.000 off",
       discount_type: "fixed",
       discount_value: 50,
       min_order: 300,
@@ -1038,7 +1038,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "NEW100",
-      description: "$100 off orders over $1000",
+      description: "₫2.500.000 off orders over ₫25.000.000",
       discount_type: "fixed",
       discount_value: 100,
       min_order: 1000,
@@ -1058,7 +1058,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "VIP25",
-      description: "25% off orders from $500",
+      description: "25% off orders from ₫12.500.000",
       discount_type: "percent",
       discount_value: 25,
       min_order: 500,
@@ -1078,7 +1078,7 @@ async function seedCoupons(shops) {
     },
     {
       code: "FREESHIP",
-      description: "Free shipping on orders over $50",
+      description: "Free shipping on orders over ₫1.250.000",
       discount_type: "fixed",
       discount_value: 10, // Assuming $10 shipping cost
       min_order: 50,

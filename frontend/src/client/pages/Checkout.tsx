@@ -16,7 +16,12 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useCart, useClearCart, useRemoveCartItem } from '../hooks/useCart'
-import { getExcluded, setExcluded, selectedItems, summarizeItems } from '../utils/cartSelection'
+import {
+  getExcluded,
+  setExcluded,
+  selectedItems,
+  summarizeItems
+} from '../utils/cartSelection'
 import { useValidateToken } from '../hooks/useAuth'
 import { usePublicSettings } from '../hooks/useSettings'
 
@@ -38,7 +43,7 @@ import {
 import { validateCoupon, type QuotedVoucher } from '../services/couponService'
 import { useVoucherQuote } from '../hooks/useVouchers'
 import VoucherPicker from '../components/checkout/VoucherPicker'
-import { formatUsd } from '../utils/formatMoney'
+import { formatPrice } from '../utils/formatMoney'
 import { canPayWithMomo, momoMinOrderUsd } from '../utils/gatewayAmount'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
 import { VN_PROVINCES } from '../utils/vnProvinces'
@@ -46,9 +51,17 @@ import { VN_PROVINCES } from '../utils/vnProvinces'
 const fieldCls =
   'w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
 
-const CheckoutField = ({ label, children }: { label: string; children: React.ReactNode }) => (
+const CheckoutField = ({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}) => (
   <label className="block">
-    <span className="block text-sm font-medium text-gray-700 mb-1.5">{label}</span>
+    <span className="block text-sm font-medium text-gray-700 mb-1.5">
+      {label}
+    </span>
     {children}
   </label>
 )
@@ -210,7 +223,9 @@ const Checkout = () => {
   }, [userData?.user, name, phone, address])
 
   // Debounced server-side shipping quote; failures fall back to the estimate
-  const quoteKey = items.map(i => `${i.product_id}:${i.variant?.id ?? ''}:${i.quantity}`).join(',')
+  const quoteKey = items
+    .map(i => `${i.product_id}:${i.variant?.id ?? ''}:${i.quantity}`)
+    .join(',')
   useEffect(() => {
     if (!quoteKey || !address.trim() || !localStorage.getItem('accessToken')) {
       setQuote(null)
@@ -252,7 +267,10 @@ const Checkout = () => {
     const { status, data } = apiErrorResponse(err)
     if (status === 403 && data?.code === 'PHONE_VERIFICATION_REQUIRED') {
       setNeedPhoneVerify(true)
-      toast.error((data.message as string) || 'Please verify your phone number to continue')
+      toast.error(
+        (data.message as string) ||
+          'Please verify your phone number to continue'
+      )
       return
     }
     if (status === 409 && data?.code === 'PRICE_CHANGED') {
@@ -263,7 +281,10 @@ const Checkout = () => {
     toast.error(apiErrorMessage(err, fallback))
   }
 
-  const createOrderFromCart = async (paymentMethod: string, clearCart = true) => {
+  const createOrderFromCart = async (
+    paymentMethod: string,
+    clearCart = true
+  ) => {
     const token = localStorage.getItem('accessToken')
     if (!token) {
       throw new Error('NOT_AUTHENTICATED')
@@ -321,7 +342,14 @@ const Checkout = () => {
         district: district.trim() || null,
         ward: ward.trim() || null
       })
-      .catch(err => toast.warning(apiErrorMessage(err, 'Could not save the address to your address book')))
+      .catch(err =>
+        toast.warning(
+          apiErrorMessage(
+            err,
+            'Could not save the address to your address book'
+          )
+        )
+      )
   }
 
   // Mua ca gio thi xoa gio; mua mot phan thi chi go cac dong da dat.
@@ -342,21 +370,28 @@ const Checkout = () => {
       return
     }
     const results = await Promise.allSettled(
-      ordered.map(it => removeItemMutation.mutateAsync({ productId: it.product_id, cartItemId: it.id }))
+      ordered.map(it =>
+        removeItemMutation.mutateAsync({
+          productId: it.product_id,
+          cartItemId: it.id
+        })
+      )
     )
-    const stuck = ordered.filter((_, i) => results[i].status === 'rejected').map(it => it.id)
+    const stuck = ordered
+      .filter((_, i) => results[i].status === 'rejected')
+      .map(it => it.id)
     // Dong khong go duoc da duoc mua: giu o trang thai bo chon de khong dat trung
     setExcluded(new Set(stuck))
     if (stuck.length) {
-      toast.warning(`${stuck.length} ordered item(s) are still in your cart. Remove them before checking out again.`)
+      toast.warning(
+        `${stuck.length} ordered item(s) are still in your cart. Remove them before checking out again.`
+      )
     }
   }
 
   // Tier discount applies to merchandise only (matches the backend);
   // shipping is added on top after all discounts.
-  const tierDiscountAmount = round2(
-    totals.merchandiseTotal * tierDiscountRate
-  )
+  const tierDiscountAmount = round2(totals.merchandiseTotal * tierDiscountRate)
   const amountAfterTierDiscount = Math.max(
     0,
     totals.merchandiseTotal - tierDiscountAmount
@@ -395,7 +430,10 @@ const Checkout = () => {
     }
 
     // Khong am tham bo qua yeu cau hoa don khi thieu thong tin
-    if (wantInvoice && (!invoice.company_name.trim() || !invoice.tax_code.trim())) {
+    if (
+      wantInvoice &&
+      (!invoice.company_name.trim() || !invoice.tax_code.trim())
+    ) {
       toast.error('Please enter company name and tax code for the VAT invoice')
       return
     }
@@ -444,7 +482,9 @@ const Checkout = () => {
       isSubmittingRef.current = true
       setProcessing(true)
       const orderResult = await createOrderFromCart('momo', false)
-      pendingOrderIds = (orderResult.orders ?? []).map((o: { id: number }) => Number(o.id))
+      pendingOrderIds = (orderResult.orders ?? []).map((o: { id: number }) =>
+        Number(o.id)
+      )
       // Number() tra ve NaN chu khong bao gio nullish, nen chuoi ?? cu khien
       // nhanh du phong momoPayAmount khong bao gio chay: total_amount thieu se
       // cho ra NaN va don hang vua tao bi ket o trang thai chua thanh toan.
@@ -541,11 +581,7 @@ const Checkout = () => {
   }
 
   // Backend da tinh muc giam theo pham vi shop + tran giam, chi viec hien
-  const setVoucher = (
-    code: string,
-    discount: number,
-    shopName?: string
-  ) => {
+  const setVoucher = (code: string, discount: number, shopName?: string) => {
     markVoucherTouched()
     setAppliedCoupon(code)
     setCouponInput(code)
@@ -574,7 +610,11 @@ const Checkout = () => {
     if (!best) return
     setAppliedCoupon(best.code)
     setCouponInput(best.code)
-    setCouponResult({ discount: best.discount, finalAmount: 0, shopName: best.shop?.name })
+    setCouponResult({
+      discount: best.discount,
+      finalAmount: 0,
+      shopName: best.shop?.name
+    })
   }, [voucherQuote.data, quoteKey])
 
   const handleApplyCoupon = () => {
@@ -622,8 +662,12 @@ const Checkout = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white shadow rounded-lg p-8 text-center space-y-4 max-w-md">
-          <p className="text-lg font-semibold text-gray-900">Order {momoOrderMeta.orderNumber} created</p>
-          <p className="text-sm text-gray-600">It is waiting for your MoMo payment.</p>
+          <p className="text-lg font-semibold text-gray-900">
+            Order {momoOrderMeta.orderNumber} created
+          </p>
+          <p className="text-sm text-gray-600">
+            It is waiting for your MoMo payment.
+          </p>
           <button
             onClick={handleConfirmPayment}
             className="px-5 py-3 bg-blue-600 text-white rounded-lg"
@@ -637,7 +681,13 @@ const Checkout = () => {
 
   // For MoMo: we may create an order and clear the cart before we redirect to MoMo.
   // Avoid showing "Your cart is empty" while we're in the middle of creating MoMo payment.
-  if (!items.length && !processing && !showQRModal && !momoOrderMeta && !qrData) {
+  if (
+    !items.length &&
+    !processing &&
+    !showQRModal &&
+    !momoOrderMeta &&
+    !qrData
+  ) {
     const nothingSelected = available.length > 0
     // Gio con dong nhung deu khong mua duoc (an/het bien the): dua ve gio de go bo
     const onlyUnavailable = !available.length && (cart?.items?.length ?? 0) > 0
@@ -701,26 +751,40 @@ const Checkout = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 sm:gap-8">
         <div className="space-y-6 min-w-0">
           {pickerOpen && (
-            <AddressPickerModal selectedId={addressId} onPick={applyAddress} onClose={() => setPickerOpen(false)} />
+            <AddressPickerModal
+              selectedId={addressId}
+              onPick={applyAddress}
+              onClose={() => setPickerOpen(false)}
+            />
           )}
           {!showManualAddress && (
-            <div className="bg-white rounded-lg shadow p-6" data-testid="deliver-to">
+            <div
+              className="bg-white rounded-lg shadow p-6"
+              data-testid="deliver-to"
+            >
               <div className="flex items-center justify-between gap-3 mb-3">
                 <h2 className="text-lg font-semibold flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-blue-600" /> Deliver to
                 </h2>
                 <div className="flex gap-3 text-sm shrink-0">
-                  <button onClick={() => setEditingAddress(true)} className="text-gray-600 hover:underline">
+                  <button
+                    onClick={() => setEditingAddress(true)}
+                    className="text-gray-600 hover:underline"
+                  >
                     Edit
                   </button>
-                  <button onClick={() => setPickerOpen(true)} className="font-medium text-blue-600 hover:underline">
+                  <button
+                    onClick={() => setPickerOpen(true)}
+                    className="font-medium text-blue-600 hover:underline"
+                  >
                     Change
                   </button>
                 </div>
               </div>
               <div className="min-w-0">
                 <div className="font-medium text-gray-900 break-words">
-                  {name} <span className="text-gray-400">|</span> <span className="text-gray-600 font-normal">{phone}</span>
+                  {name} <span className="text-gray-400">|</span>{' '}
+                  <span className="text-gray-600 font-normal">{phone}</span>
                 </div>
                 <p className="text-sm text-gray-600 mt-1 break-words">
                   {formatAddress({ street: address, ward, district, province })}
@@ -728,82 +792,105 @@ const Checkout = () => {
               </div>
             </div>
           )}
-          {showManualAddress && (<>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <User className="w-5 h-5" /> Contact
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <CheckoutField label="Receiver name">
-                <input
-                  className={fieldCls}
-                  placeholder="Full name"
-                  autoComplete="name"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                />
-              </CheckoutField>
-              <CheckoutField label="Phone number">
-                <input
-                  type="tel"
-                  className={fieldCls}
-                  placeholder="Phone number"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                />
-              </CheckoutField>
-            </div>
-          </div>
+          {showManualAddress && (
+            <>
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <User className="w-5 h-5" /> Contact
+                </h2>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <CheckoutField label="Receiver name">
+                    <input
+                      className={fieldCls}
+                      placeholder="Full name"
+                      autoComplete="name"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                    />
+                  </CheckoutField>
+                  <CheckoutField label="Phone number">
+                    <input
+                      type="tel"
+                      className={fieldCls}
+                      placeholder="Phone number"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                    />
+                  </CheckoutField>
+                </div>
+              </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Home className="w-5 h-5" /> Shipping address
-            </h2>
-            <div className="grid gap-4 md:grid-cols-3 mb-4">
-              <CheckoutField label="Province / City">
-                <input className={fieldCls} placeholder="Province / City" list="checkout-vn-provinces" value={province} onChange={e => setProvince(e.target.value)} />
-                <datalist id="checkout-vn-provinces">
-                  {VN_PROVINCES.map(p => <option key={p} value={p} />)}
-                </datalist>
-              </CheckoutField>
-              {/* Sau sap nhap 2025 khong con cap quan/huyen: tuy chon nhu so dia chi */}
-              <CheckoutField label="District (optional)">
-                <input className={fieldCls} placeholder="District" value={district} onChange={e => setDistrict(e.target.value)} />
-              </CheckoutField>
-              <CheckoutField label="Ward">
-                <input className={fieldCls} placeholder="Ward" value={ward} onChange={e => setWard(e.target.value)} />
-              </CheckoutField>
-            </div>
-            <CheckoutField label="Street address">
-              <textarea
-                className={`${fieldCls} min-h-[96px]`}
-                placeholder="Street, city, district..."
-                autoComplete="street-address"
-                value={address}
-                onChange={e => setAddress(e.target.value)}
-              />
-            </CheckoutField>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              {!addressId && (
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={saveAddress}
-                  onChange={e => setSaveAddress(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                Save this address to my address book
-              </label>
-              )}
-              {savedAddresses.length > 0 && (
-                <button onClick={() => setPickerOpen(true)} className="text-sm font-medium text-blue-600 hover:underline">
-                  Choose a saved address
-                </button>
-              )}
-            </div>
-          </div>
-          </>)}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Home className="w-5 h-5" /> Shipping address
+                </h2>
+                <div className="grid gap-4 md:grid-cols-3 mb-4">
+                  <CheckoutField label="Province / City">
+                    <input
+                      className={fieldCls}
+                      placeholder="Province / City"
+                      list="checkout-vn-provinces"
+                      value={province}
+                      onChange={e => setProvince(e.target.value)}
+                    />
+                    <datalist id="checkout-vn-provinces">
+                      {VN_PROVINCES.map(p => (
+                        <option key={p} value={p} />
+                      ))}
+                    </datalist>
+                  </CheckoutField>
+                  {/* Sau sap nhap 2025 khong con cap quan/huyen: tuy chon nhu so dia chi */}
+                  <CheckoutField label="District (optional)">
+                    <input
+                      className={fieldCls}
+                      placeholder="District"
+                      value={district}
+                      onChange={e => setDistrict(e.target.value)}
+                    />
+                  </CheckoutField>
+                  <CheckoutField label="Ward">
+                    <input
+                      className={fieldCls}
+                      placeholder="Ward"
+                      value={ward}
+                      onChange={e => setWard(e.target.value)}
+                    />
+                  </CheckoutField>
+                </div>
+                <CheckoutField label="Street address">
+                  <textarea
+                    className={`${fieldCls} min-h-[96px]`}
+                    placeholder="Street, city, district..."
+                    autoComplete="street-address"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                  />
+                </CheckoutField>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  {!addressId && (
+                    <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddress}
+                        onChange={e => setSaveAddress(e.target.checked)}
+                        className="h-4 w-4"
+                      />
+                      Save this address to my address book
+                    </label>
+                  )}
+                  {savedAddresses.length > 0 && (
+                    <button
+                      onClick={() => setPickerOpen(true)}
+                      className="text-sm font-medium text-blue-600 hover:underline"
+                    >
+                      Choose a saved address
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {needPhoneVerify && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
@@ -889,8 +976,8 @@ const Checkout = () => {
                     MoMo Wallet (QR)
                   </p>
                   <p className="text-sm text-gray-500">
-                    Pay through the MoMo sandbox. Unpaid orders are held for
-                    30 minutes, then cancelled automatically.
+                    Pay through the MoMo sandbox. Unpaid orders are held for 30
+                    minutes, then cancelled automatically.
                   </p>
                 </div>
               </label>
@@ -934,10 +1021,7 @@ const Checkout = () => {
                   {group.items.map(item => (
                     <div key={item.id} className="flex gap-3">
                       <img
-                        src={
-                          item.image_url ||
-                          PLACEHOLDER_IMAGE
-                        }
+                        src={item.image_url || PLACEHOLDER_IMAGE}
                         alt={item.name}
                         className="h-14 w-14 object-contain bg-gray-50 rounded"
                       />
@@ -953,7 +1037,7 @@ const Checkout = () => {
                         </p>
                       </div>
                       <div className="text-sm font-semibold">
-                        {formatUsd(item.final_price * item.quantity)}
+                        {formatPrice(item.final_price * item.quantity)}
                       </div>
                     </div>
                   ))}
@@ -962,7 +1046,7 @@ const Checkout = () => {
                     <span
                       className={group.freeShipping ? 'text-green-600' : ''}
                     >
-                      {group.freeShipping ? 'Free' : formatUsd(group.shipping)}
+                      {group.freeShipping ? 'Free' : formatPrice(group.shipping)}
                     </span>
                   </div>
                 </div>
@@ -999,7 +1083,7 @@ const Checkout = () => {
                 Applied: <span className="font-medium">{appliedCoupon}</span>
                 {couponResult && (
                   <span className="text-xs text-gray-600">
-                    (-{formatUsd(couponResult.discount)})
+                    (-{formatPrice(couponResult.discount)})
                   </span>
                 )}
                 <button
@@ -1018,12 +1102,12 @@ const Checkout = () => {
           <div className="border-t mt-4 pt-4 space-y-2 text-sm text-gray-600">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span>{formatUsd(totals.subtotal)}</span>
+              <span>{formatPrice(totals.subtotal)}</span>
             </div>
             {totals.discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Discount</span>
-                <span>-{formatUsd(totals.discount)}</span>
+                <span>-{formatPrice(totals.discount)}</span>
               </div>
             )}
             {tierDiscountRate > 0 && (
@@ -1031,7 +1115,7 @@ const Checkout = () => {
                 <span>
                   Tier discount ({Math.round(tierDiscountRate * 100)}%)
                 </span>
-                <span>-{formatUsd(tierDiscountAmount)}</span>
+                <span>-{formatPrice(tierDiscountAmount)}</span>
               </div>
             )}
             {couponResult && couponResult.discount > 0 && (
@@ -1040,7 +1124,7 @@ const Checkout = () => {
                   Voucher
                   {couponResult.shopName ? ` (${couponResult.shopName})` : ''}
                 </span>
-                <span>-{formatUsd(couponResult.discount)}</span>
+                <span>-{formatPrice(couponResult.discount)}</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -1052,7 +1136,7 @@ const Checkout = () => {
               >
                 {totals.isFreeShipping
                   ? 'Free!'
-                  : formatUsd(totals.shipmentCost)}
+                  : formatPrice(totals.shipmentCost)}
               </span>
             </div>
             {totals.isFreeShipping && (
@@ -1063,7 +1147,7 @@ const Checkout = () => {
             )}
             <div className="flex justify-between font-semibold text-gray-900 pt-2 border-t">
               <span>Total</span>
-              <span>{formatUsd(displayTotal)}</span>
+              <span>{formatPrice(displayTotal)}</span>
             </div>
           </div>
         </div>
@@ -1073,7 +1157,9 @@ const Checkout = () => {
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 px-4 py-3 flex items-center gap-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
         <div className="min-w-0">
           <p className="text-xs text-gray-500">Total</p>
-          <p className="text-lg font-bold text-rose-600 leading-tight">{formatUsd(displayTotal)}</p>
+          <p className="text-lg font-bold text-rose-600 leading-tight">
+            {formatPrice(displayTotal)}
+          </p>
         </div>
         <button
           type="button"
@@ -1108,9 +1194,7 @@ const Checkout = () => {
                 <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
                   <QrCode className="w-8 h-8 text-blue-600" />
                 </div>
-                <h2 className="text-2xl font-bold mb-2">
-                  MoMo Payment
-                </h2>
+                <h2 className="text-2xl font-bold mb-2">MoMo Payment</h2>
                 <p className="text-gray-600">
                   Scan QR using MoMo app or open payment link
                 </p>
@@ -1138,7 +1222,7 @@ const Checkout = () => {
                       Total Amount
                     </p>
                     <p className="text-2xl font-bold text-blue-700">
-                      {formatUsd(qrData.amount)}
+                      {formatPrice(qrData.amount)}
                     </p>
                   </div>
 
@@ -1153,7 +1237,9 @@ const Checkout = () => {
                         </p>
                         <button
                           onClick={() =>
-                            handleCopyAccount(qrData.payUrl || qrData.deeplink || '')
+                            handleCopyAccount(
+                              qrData.payUrl || qrData.deeplink || ''
+                            )
                           }
                           className="flex-shrink-0 p-2 hover:bg-gray-200 rounded-lg transition"
                           title="Copy payment link"
@@ -1162,7 +1248,12 @@ const Checkout = () => {
                         </button>
                       </div>
                       <button
-                        onClick={() => window.open(qrData.payUrl || qrData.deeplink, '_blank')}
+                        onClick={() =>
+                          window.open(
+                            qrData.payUrl || qrData.deeplink,
+                            '_blank'
+                          )
+                        }
                         className="mt-3 w-full px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                       >
                         Open MoMo Payment

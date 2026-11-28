@@ -119,7 +119,7 @@ export default function SellerDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Sales (7 days)"
-          value={stats?.sales.formatted || '$0.00'}
+          value={stats?.sales.formatted || '₫0'}
           delta={stats?.sales.delta}
           icon={DollarSign}
           iconClass="bg-green-100 text-green-600"
@@ -177,7 +177,7 @@ export default function SellerDashboard() {
             <div className="flex justify-between border-t pt-2 mt-2">
               <span className="text-gray-500">All-time revenue (excl. cancelled)</span>
               <span className="font-semibold">
-                {stats?.revenue.formatted || '$0.00'}
+                {stats?.revenue.formatted || '₫0'}
               </span>
             </div>
             {stats?.commission && (

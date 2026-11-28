@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiErrorMessage } from '../../../lib/apiError'
-import { formatUsd } from '../../utils/formatMoney'
+import { formatPrice } from '../../utils/formatMoney'
 import { orderDiscount, orderSubtotal } from '../../utils/orderMoney'
 import {
   fetchShipment,
@@ -98,7 +98,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
               ['Shop', order.shopName],
               ['Recipient', [order.sentTo, order.address].filter(Boolean).join(' · ')],
               ['Payment method', paymentLabel(order.paymentType)],
-              ['Order total', formatUsd(order.amountPaid ?? order.total)]
+              ['Order total', formatPrice(order.amountPaid ?? order.total)]
             ] as [string, string | undefined][]
           )
             .filter(([, v]) => v)
@@ -133,7 +133,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
           {shipment.cod_amount_vnd > 0 && (
             <p className="text-sm text-gray-600 mb-2">
               {shipment.status === 'delivered' ? 'Paid on delivery' : 'Cash to pay on delivery'}:{' '}
-              <span className="font-medium">{formatUsd(order.amountPaid ?? order.total)}</span>
+              <span className="font-medium">{formatPrice(order.amountPaid ?? order.total)}</span>
             </p>
           )}
           {shipment.events?.length > 0 && (
@@ -253,7 +253,7 @@ const OrderDetails = ({ order }: OrderDetail) => {
                   {product.quantity && (
                     <p className="text-sm text-gray-500">
                       ×{product.quantity}
-                      {priceVal !== undefined && !Number.isNaN(priceVal) && ` · ${formatUsd(priceVal)} each`}
+                      {priceVal !== undefined && !Number.isNaN(priceVal) && ` · ${formatPrice(priceVal)} each`}
                     </p>
                   )}
                   {order.status === 'delivered' && product.slug && (
@@ -269,12 +269,12 @@ const OrderDetails = ({ order }: OrderDetail) => {
               <div className="text-right shrink-0">
                 {originalVal !== undefined && !Number.isNaN(originalVal) && (
                   <p className="text-sm text-gray-400 line-through">
-                    {formatUsd(originalVal)}
+                    {formatPrice(originalVal)}
                   </p>
                 )}
                 {priceVal !== undefined && !Number.isNaN(priceVal) ? (
                   <p className="font-semibold">
-                    {formatUsd(priceVal * (product.quantity ?? 1))}
+                    {formatPrice(priceVal * (product.quantity ?? 1))}
                   </p>
                 ) : (
                   <p className="font-semibold text-gray-500">—</p>
@@ -288,21 +288,21 @@ const OrderDetails = ({ order }: OrderDetail) => {
       <dl className="mt-6 ml-auto max-w-xs space-y-1 text-sm">
         <div className="flex justify-between">
           <dt className="text-gray-500">Items subtotal</dt>
-          <dd>{formatUsd(orderSubtotal(order))}</dd>
+          <dd>{formatPrice(orderSubtotal(order))}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-gray-500">Shipping</dt>
-          <dd>{formatUsd(order.shippingFee ?? 0)}</dd>
+          <dd>{formatPrice(order.shippingFee ?? 0)}</dd>
         </div>
         {discount > 0 && (
           <div className="flex justify-between text-green-600">
             <dt>Discount (voucher/tier)</dt>
-            <dd>−{formatUsd(discount)}</dd>
+            <dd>−{formatPrice(discount)}</dd>
           </div>
         )}
         <div className="flex justify-between border-t pt-2 font-semibold">
           <dt>Total</dt>
-          <dd>{formatUsd(order.total)}</dd>
+          <dd>{formatPrice(order.total)}</dd>
         </div>
       </dl>
     </div>

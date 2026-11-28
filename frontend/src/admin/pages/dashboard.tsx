@@ -41,9 +41,9 @@ export default function AdminDashboard() {
         <KpiCard
           title="Total Sales"
           subtitle="Last 7 days"
-          value={stats?.sales.formatted || '$0'}
+          value={stats?.sales.formatted || '₫0'}
           delta={stats?.sales.delta || '0%'}
-          prev={`Previous 7 days (${stats?.sales.formattedPrev || '$0'})`}
+          prev={`Previous 7 days (${stats?.sales.formattedPrev || '₫0'})`}
         />
         <KpiCard
           title="Total Orders"
@@ -147,7 +147,7 @@ export default function AdminDashboard() {
               <div className="text-gray-500">Out of Stock</div>
             </div>
             <div>
-              <div className="text-2xl font-semibold">{stats?.revenue.formatted || '$0'}</div>
+              <div className="text-2xl font-semibold">{stats?.revenue.formatted || '₫0'}</div>
               <div className="text-gray-500">Revenue</div>
             </div>
           </div>

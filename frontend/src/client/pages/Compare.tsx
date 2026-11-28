@@ -10,6 +10,7 @@ import {
   MAX_COMPARE_PRODUCTS,
   MIN_COMPARE_PRODUCTS,
 } from '../constants/compare'
+import { formatPrice } from '../utils/formatMoney'
 
 const parseIds = (idsParam: string | null) => {
   if (!idsParam) return []
@@ -21,11 +22,6 @@ const parseIds = (idsParam: string | null) => {
         .filter(id => Number.isFinite(id) && id > 0)
     )
   ).slice(0, MAX_COMPARE_PRODUCTS)
-}
-
-const formatPrice = (value: unknown) => {
-  const price = Number(value)
-  return Number.isFinite(price) ? `$${price.toFixed(2)}` : 'N/A'
 }
 
 const getDisplayPrice = (product: Product) =>

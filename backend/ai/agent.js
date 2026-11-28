@@ -20,6 +20,7 @@ import {
 } from "../lib/vietnamese.js";
 import { calculateProductPrices } from "../lib/productQuery.js";
 import { createShoppingTools, MAX_TOOL_ROUNDS } from "./tools.js";
+import { formatVnd } from "../lib/gatewayAmount.js";
 import {
   INPUT_REFUSAL,
   buildGuardInstruction,
@@ -41,6 +42,7 @@ const SYSTEM_PROMPT = [
   "Khối dữ liệu sản phẩm bên dưới đã kèm giá và tồn kho đọc trực tiếp từ cơ sở dữ liệu ngay trước câu hỏi này. Hãy dùng đúng các con số đó, không làm tròn và không suy diễn.",
   "Chỉ gọi công cụ khi khối dữ liệu không có thứ cần: tồn kho theo từng màu (check_stock), phí vận chuyển của gian hàng (get_shop_policy), hoặc sản phẩm không nằm trong danh sách (lookup_product).",
   "Tuyệt đối không nói giá, tồn kho hay phí vận chuyển từ trí nhớ.",
+  "Mọi số tiền trong dữ liệu là đồng Việt Nam. Luôn ghi giá bằng VND (ví dụ ₫4.975.000), không đổi sang đô la.",
   "Khi ngữ cảnh có tên gian hàng bán sản phẩm, hãy nhắc đến gian hàng đó (ví dụ: 'bán bởi Tech World').",
   "Khi đề cập đến sản phẩm, hãy đưa đúng URL sản phẩm ở một dòng riêng để hệ thống tự render thành card.",
   "Không bịa link, chỉ dùng đúng các URL do công cụ hoặc ngữ cảnh cung cấp. Nếu chưa đủ thông tin, hãy hỏi lại.",
@@ -210,8 +212,8 @@ const buildContextBlock = (rows, nonce) => {
       `${idx + 1}. product_id=${r.id}`,
       `Tên: ${cleanedName.text}`,
       `Gian hàng: ${r.shop_name ?? ""}`,
-      `Giá hiện tại: ${priced.final_price}` +
-        (priced.discount > 0 ? ` (giá gốc ${priced.price})` : ""),
+      `Giá hiện tại: ${formatVnd(priced.final_price)}` +
+        (priced.discount > 0 ? ` (giá gốc ${formatVnd(priced.price)})` : ""),
       `Tồn kho: ${priced.quantity}`,
       `Mô tả: ${cleaned.text}`,
       `Link: ${link}`,

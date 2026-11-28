@@ -5,6 +5,7 @@ import { ArrowRight, ShoppingBag, X } from 'lucide-react'
 import CartContent from '../cart/CartContent'
 
 import { Cart, CartItem } from '../../types/cart'
+import { formatPrice } from '../../utils/formatMoney'
 
 type PopoverProps = {
   anchorRef: RefObject<HTMLButtonElement | null>
@@ -82,7 +83,7 @@ function CartPopover({ anchorRef, onClose, cartItemCount, totalCost, cartProduct
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-gray-600">Subtotal</span>
                 <span className="price text-lg font-semibold text-ink">
-                  ${(typeof totalCost === 'number' ? totalCost : 0).toFixed(2)}
+                  {formatPrice(typeof totalCost === 'number' ? totalCost : 0)}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-gray-500">Shipping and vouchers are applied at checkout.</p>

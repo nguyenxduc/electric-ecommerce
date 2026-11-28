@@ -1,3 +1,4 @@
+import { formatPrice } from './formatMoney'
 // Chu hien thi chung cho the voucher (trang shop, kho voucher, checkout)
 type VoucherLike = {
   discount_type: string
@@ -8,7 +9,7 @@ type VoucherLike = {
   expires_at?: string | null
 }
 
-const money = (v: number | string) => `$${Number(v).toLocaleString('en-US')}`
+const money = (v: number | string) => formatPrice(v)
 const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB')
 
 export const voucherTitle = (v: VoucherLike) =>
@@ -16,7 +17,7 @@ export const voucherTitle = (v: VoucherLike) =>
     ? `${Number(v.discount_value)}% OFF`
     : `${money(v.discount_value)} OFF`
 
-// "Min order $50 · Max $10"
+// "Min order ₫1.250.000 · Max ₫250.000"
 export const voucherTerms = (v: VoucherLike) =>
   [
     Number(v.min_order) ? `Min order ${money(v.min_order!)}` : 'No minimum',

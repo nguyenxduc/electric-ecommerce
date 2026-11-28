@@ -12,6 +12,7 @@ import ConfirmModal from '../../../client/components/common/ConfirmModal'
 import AdminPagination from '../../../admin/components/common/AdminPagination'
 import { useListQueryParams } from '../../../admin/hooks/useListQueryParams'
 import { apiErrorMessage } from '../../../lib/apiError'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
 const TABS = [
   { key: '', label: 'All' },
@@ -244,7 +245,7 @@ export default function SellerProductsList() {
                 {thumb(p, 'h-16 w-16')}
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-sm line-clamp-2 break-words">{p.name}</div>
-                  <div className="text-sm text-gray-700 mt-0.5">${p.price}</div>
+                  <div className="text-sm text-gray-700 mt-0.5">{formatPrice(p.price)}</div>
                   <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2">
                     Stock: <StockBadge stock={stockOf(p)} />
                     <span>· Sold {p.sold ?? 0}</span>
@@ -286,7 +287,7 @@ export default function SellerProductsList() {
                     </td>
                     <td className="p-2">{p.id}</td>
                     <td className="p-2">{p.name}</td>
-                    <td className="p-2">${p.price}</td>
+                    <td className="p-2">{formatPrice(p.price)}</td>
                     <td className="p-2">
                       <StockBadge stock={stockOf(p)} />
                     </td>

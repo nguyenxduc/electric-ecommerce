@@ -6,9 +6,9 @@ import {
   getMyTaxSummary,
   openInvoiceHtml
 } from '../../services/sellerService'
+import { formatPrice } from '../../../client/utils/formatMoney'
 
-const money = (v: number | string) =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(v || 0))
+const money = (v: number | string) => formatPrice(v || 0)
 
 export default function SellerTax() {
   const thisYear = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric' }).format(new Date()))

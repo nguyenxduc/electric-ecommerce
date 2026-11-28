@@ -14,14 +14,11 @@ import {
 import { useAdminOrder, useUpdateAdminOrderStatus } from '../../hooks'
 import { fmtDateTime } from '../../utils/date'
 import { apiErrorMessage } from '../../../lib/apiError'
-import { formatUsd } from '../../../client/utils/formatMoney'
-import { USD_TO_VND_RATE } from '../../../client/utils/gatewayAmount'
+import { formatPrice } from '../../../client/utils/formatMoney'
+import { fmtVnd } from '../../services/opsService'
 import Modal from '../../components/common/Modal'
 
 const errMsg = (e: unknown) => apiErrorMessage(e, 'Action failed')
-// Van don luu VND; hien USD gan dung theo ty gia cau hinh
-const vndAsUsd = (vnd: number | string | null | undefined) =>
-  `≈ ${formatUsd(Number(vnd || 0) / USD_TO_VND_RATE)}`
 
 const CANCEL_TEMPLATES = [
   'Out of stock',
@@ -133,17 +130,11 @@ function ShipmentPanel({
             </div>
             <div>
               <div className="text-gray-500">Fee</div>
-              {vndAsUsd(sh.fee_vnd)}
-              <div className="text-xs text-gray-400">
-                {Number(sh.fee_vnd || 0).toLocaleString('vi-VN')} VND
-              </div>
+              {fmtVnd(sh.fee_vnd)}
             </div>
             <div>
               <div className="text-gray-500">COD</div>
-              {vndAsUsd(sh.cod_amount_vnd)}
-              <div className="text-xs text-gray-400">
-                {Number(sh.cod_amount_vnd || 0).toLocaleString('vi-VN')} VND
-              </div>
+              {fmtVnd(sh.cod_amount_vnd)}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
@@ -418,8 +409,8 @@ export default function AdminOrderDetail() {
                       </span>
                     </td>
                     <td className="p-2">{it.quantity}</td>
-                    <td className="p-2">{formatUsd(it.unit_price)}</td>
-                    <td className="p-2">{formatUsd(it.total_price)}</td>
+                    <td className="p-2">{formatPrice(it.unit_price)}</td>
+                    <td className="p-2">{formatPrice(it.total_price)}</td>
                   </tr>
                 )
               })}
@@ -429,21 +420,21 @@ export default function AdminOrderDetail() {
         <dl className="border-t p-3 text-sm space-y-1 ml-auto max-w-xs">
           <div className="flex justify-between">
             <dt className="text-gray-500">Subtotal</dt>
-            <dd>{formatUsd(subtotal)}</dd>
+            <dd>{formatPrice(subtotal)}</dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-gray-500">Shipping</dt>
-            <dd>{formatUsd(shipping)}</dd>
+            <dd>{formatPrice(shipping)}</dd>
           </div>
           {discount > 0 && (
             <div className="flex justify-between">
               <dt className="text-gray-500">Discounts</dt>
-              <dd className="text-green-700">-{formatUsd(discount)}</dd>
+              <dd className="text-green-700">-{formatPrice(discount)}</dd>
             </div>
           )}
           <div className="flex justify-between font-semibold border-t pt-1">
             <dt>Total</dt>
-            <dd>{formatUsd(total)}</dd>
+            <dd>{formatPrice(total)}</dd>
           </div>
         </dl>
       </div>

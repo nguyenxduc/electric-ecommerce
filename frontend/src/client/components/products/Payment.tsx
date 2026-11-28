@@ -13,6 +13,7 @@ import { apiErrorMessage } from '../../../lib/apiError'
 import type { ProductVariant } from '../../types/product'
 import { fetchCart } from '../../services/cartService'
 import { setExcluded } from '../../utils/cartSelection'
+import { formatPrice } from '../../utils/formatMoney'
 
 interface ProductProps {
   discount: number
@@ -240,7 +241,7 @@ const Payment = ({
           <div className="flex items-baseline justify-between mb-2">
             <div className="flex items-baseline gap-2">
               <h2 className="price text-3xl font-extrabold text-ink">
-                ${finalPrice.toFixed(2)}
+                {formatPrice(finalPrice)}
               </h2>
               {discountPercent > 0 && (
                 <span className="price text-sm font-semibold text-sale-700 bg-sale-50 px-2 py-0.5 rounded-full">
@@ -251,7 +252,7 @@ const Payment = ({
           </div>
           {discountPercent > 0 && (
             <p className="price text-sm text-gray-500 line-through">
-              ${(Number(price) + priceDelta).toFixed(2)}
+              {formatPrice(Number(price) + priceDelta)}
             </p>
           )}
         </div>
@@ -368,7 +369,7 @@ const Payment = ({
             <p className="text-sm font-semibold text-gray-700 leading-tight">Select options</p>
           ) : (
             <>
-              <p className="price text-lg font-bold text-ink leading-tight">${(finalPrice * buyQty).toFixed(2)}</p>
+              <p className="price text-lg font-bold text-ink leading-tight">{formatPrice(finalPrice * buyQty)}</p>
               <p className="text-xs text-gray-500">Qty {buyQty}</p>
             </>
           )}
