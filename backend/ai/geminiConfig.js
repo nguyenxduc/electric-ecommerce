@@ -5,15 +5,16 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 export const GEMINI_API_KEY =
   process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
 
-/** Chat model — Gemini 3.1 Flash Lite */
+/** Chat model — Gemini 3.5 Flash Lite (2026-11-28: 3.1 hay 503/treo, TTFT 10.5 s; 3.5 la 1.16 s, chat luong RAG nhu cu) */
 export const GEMINI_CHAT_MODEL =
   process.env.GEMINI_CHAT_MODEL ||
   process.env.GEMINI_MODEL ||
-  "gemini-3.1-flash-lite";
+  "gemini-3.5-flash-lite";
 
-/** Vision: detect product from uploaded image (multimodal generateContent) */
+/** Vision: detect product from uploaded image (multimodal generateContent).
+ *  Giu 3.1: tim bang anh chua do lai voi 3.5 (`npm run eval:image`). */
 export const IMAGE_SEARCH_MODEL =
-  process.env.IMAGE_SEARCH_MODEL || GEMINI_CHAT_MODEL;
+  process.env.IMAGE_SEARCH_MODEL || "gemini-3.1-flash-lite";
 
 export const IMAGE_SEARCH_FALLBACK_MODEL = String(
   process.env.IMAGE_SEARCH_FALLBACK_MODEL || ""

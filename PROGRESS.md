@@ -96,10 +96,10 @@ và `backend/docs/ai-evaluation.md` (`npm run eval:ai`).
   kho đưa vào ngữ cảnh đọc trực tiếp từ cùng một truy vấn, và dùng chung hàm
   `calculateProductPrices` với API sản phẩm. Sai số chỉ xảy ra nếu model đọc sai
   con số đã cho, và đó chính là thứ Faithfulness 0.875 đang đo.
-- **TTFT 4.0 s chưa đạt mốc 1.5 s.** Phần còn lại gần như toàn bộ là thời gian
-  model cân nhắc trước khi phát token đầu. Đo riêng lượt sinh không bind công cụ
-  thì TTFT là 1.4 s, còn khi bind công cụ model dừng lại để quyết định có gọi
-  hay không. Xem T7.
+- **TTFT đạt mốc 1.5 s: 1.16 s trung vị 30 câu** (2026-11-28, `gemini-3.5-flash-lite`,
+  0 lỗi). Cùng ngày `gemini-3.1-flash-lite` hay trả 503 / treo tới 97 s, TTFT 10.5 s.
+  Đuôi vẫn phụ thuộc Gemini: `eval:ai` có một câu chat mất 99 s mà không báo lỗi;
+  chưa có timeout chờ token đầu. Xem T7.
 
 ---
 
@@ -264,3 +264,4 @@ có tụt dưới ngưỡng hay không.
 | 2026-11-05 | T9: bảng điểm theo câu cho thấy câu hỏi theo thông số có CR 0. Nguyên nhân: nội dung embedding bỏ trống toàn bộ thông số (`buildContent` đọc sai dạng nhóm của `specs_detail`). Sửa + test + embed lại. Câu đã qua cổng tên chỉ giữ 1 ứng viên. CR 0.425 → 0.625, AR 0.925, TTFT 1.43 s trung vị 30 câu. Test 145/146 + 1 bỏ qua có chủ đích (bảng embedding rỗng ngay sau reseed) | Claude Code |
 | 2026-11-05 | Đo lại sau khi sửa embedding: tìm bằng ảnh 19/20 (ca trượt do Gemini Vision lỗi). nDCG ra 0.568 < 0.60; thuật toán không đổi, nguyên nhân là 20 đơn ngẫu nhiên do `npm test` để lại làm nhiễu `product_similarity`. Sau `seed:full`: 0.660 và 0.675. `eval:reco` nay cảnh báo khi có đơn ngoài seed | Claude Code |
 | 2026-11-28 | p95 danh sách ở 300 người: đo lại được 964 ms. `GET /products` gộp request giống hệt đang chạy (`lib/singleFlight.js`, khoá = vai trò + URL, không cache nên giá/tồn kho vẫn mới): p95 222–289 ms (1 URL), 132 ms (20 URL trộn), 0 lỗi. Test `57-single-flight`. Đo cần `RATE_LIMIT_ENABLED=0`; burst 300 kết nối mới đôi khi bị `ECONNREFUSED` trên Windows, `eval:load` nay in mã lỗi gốc | Claude Code |
+| 2026-11-28 | TTFT: `eval:rag` với `gemini-3.1-flash-lite` ra 10.5 s (Gemini 503/treo). Đổi model chat mặc định sang `gemini-3.5-flash-lite` (`ai/geminiConfig.js`, `.env.example`, `docker-compose.yml`): TTFT 1.16 s, tổng 1.28 s, Recall@5 100%, MRR 0.936, F 1, AR 0.938, CR 0.6. `eval:ai`: kiểm duyệt 100% / FP 0%, trích dẫn 7/8. Tìm bằng ảnh giữ 3.1 vì chưa đo lại. `backend/.env` máy dev vẫn ghi đè 3.1, phải sửa tay | Claude Code |

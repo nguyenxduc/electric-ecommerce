@@ -1,6 +1,6 @@
 # Ket qua do luong cac tinh nang AI
 
-> Sinh tu `npm run eval:ai` luc 2026-11-05 03:54. Moi con so deu do truc tiep tren
+> Sinh tu `npm run eval:ai` luc 2026-11-28 13:19. Moi con so deu do truc tiep tren
 > he thong dang chay, khong phai uoc luong.
 
 ## 1. Truy hoi RAG cua chatbot tu van
@@ -13,23 +13,23 @@ khong, va san pham do co dung nhom hang nguoi dung hoi khong.
 |---|---|
 | So cau hoi | 8 |
 | Tra loi thanh cong | 8/8 (100%) |
-| Co trich dan san pham | 6/8 (75%) |
+| Co trich dan san pham | 7/8 (87.5%) |
 | Trich dan dung nhom hang | 7/8 (87.5%) |
-| Do tre trung vi (p50) | 11431ms |
-| Do tre p95 | 296610ms |
+| Do tre trung vi (p50) | 5326ms |
+| Do tre p95 | 99389ms |
 
 <details><summary>Chi tiet tung cau hoi</summary>
 
 | Cau hoi | Trich dan | Dung nhom | Do tre |
 |---|---|---|---|
-| Tu van cho toi mot chiec dien thoai chup anh dep | co | dung | 296610ms |
-| Toi can laptop de lam do hoa | co | dung | 17024ms |
-| Co tai nghe chong on nao tot khong | co | dung | 11431ms |
-| Goi y dong ho thong minh theo doi suc khoe | co | dung | 48965ms |
-| May tinh bang nao phu hop de hoc online | co | dung | 2381ms |
-| Toi muon mua may anh chup chuyen nghiep | co | dung | 1781ms |
-| Ban phim co nao go game tot | khong | dung | 1737ms |
-| Dien thoai tam gia duoi 500 do la | khong | sai | 1847ms |
+| Tu van cho toi mot chiec dien thoai chup anh dep | co | dung | 4743ms |
+| Toi can laptop de lam do hoa | co | dung | 99389ms |
+| Co tai nghe chong on nao tot khong | co | dung | 1831ms |
+| Goi y dong ho thong minh theo doi suc khoe | co | dung | 14020ms |
+| May tinh bang nao phu hop de hoc online | co | dung | 46662ms |
+| Toi muon mua may anh chup chuyen nghiep | co | dung | 2039ms |
+| Ban phim co nao go game tot | co | dung | 5326ms |
+| Dien thoai tam gia duoi 500 do la | khong | sai | 1635ms |
 
 </details>
 
