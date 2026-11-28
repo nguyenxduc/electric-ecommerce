@@ -767,7 +767,8 @@ const Checkout = () => {
                   {VN_PROVINCES.map(p => <option key={p} value={p} />)}
                 </datalist>
               </CheckoutField>
-              <CheckoutField label="District">
+              {/* Sau sap nhap 2025 khong con cap quan/huyen: tuy chon nhu so dia chi */}
+              <CheckoutField label="District (optional)">
                 <input className={fieldCls} placeholder="District" value={district} onChange={e => setDistrict(e.target.value)} />
               </CheckoutField>
               <CheckoutField label="Ward">

@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import ConfirmModal from '../components/common/ConfirmModal'
 import { makeProductSlug } from '../utils/productSlug'
 import { groupCartItemsByShop } from '../utils/groupCartItemsByShop'
+import ShopVouchers from '../components/shop/ShopVouchers'
 import {
   getExcluded,
   setExcluded,
@@ -399,6 +400,11 @@ const Cart = () => {
                         )
                       })}
                     </ul>
+
+                    {/* Nhu Shopee: luu voucher shop ngay trong gio, checkout tu chon voucher giam nhieu nhat */}
+                    {group.shopSlug && (
+                      <ShopVouchers slug={group.shopSlug} className="px-4 sm:px-6 py-3 border-t border-gray-100" />
+                    )}
 
                     <footer className="flex justify-end items-baseline gap-2 px-4 sm:px-6 py-3 bg-gray-50 text-sm">
                       <span className="text-gray-500">Shop subtotal</span>

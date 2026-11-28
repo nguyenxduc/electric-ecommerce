@@ -53,7 +53,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_CHAT_MODEL: 'gemini-3.5-flash-lite'
       GEMINI_EMBED_MODEL: 'gemini-embedding-001'
-      IMAGE_SEARCH_MODEL: 'gemini-3.1-flash-lite'
+      IMAGE_SEARCH_MODEL: 'gemini-3.5-flash-lite'
       SHIPPING_FEE: '9.99'
       FREE_SHIPPING_THRESHOLD: '199'
       USD_TO_VND_RATE: '25000'
@@ -84,7 +84,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_CHAT_MODEL: 'gemini-3.5-flash-lite'
       GEMINI_EMBED_MODEL: 'gemini-embedding-001'
-      IMAGE_SEARCH_MODEL: 'gemini-3.1-flash-lite'
+      IMAGE_SEARCH_MODEL: 'gemini-3.5-flash-lite'
       SHIPPING_FEE: '9.99'
       FREE_SHIPPING_THRESHOLD: '199'
       USD_TO_VND_RATE: '25000'

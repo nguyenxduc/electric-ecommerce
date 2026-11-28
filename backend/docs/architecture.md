@@ -314,6 +314,15 @@ Day la diem mau chot voi du lieu thuong mai dien tu: gia va ton kho doi lien
 tuc, trong khi vector nhung chi duoc sinh lai theo chu ky. Neu de mo hinh doc
 gia tu noi dung da nhung thi cau tra loi la anh chup cua qua khu.
 
+### Het gio cho chunk dau
+
+Gemini doi khi treo rat lau truoc chunk dau ma khong bao loi (2026-11-28: mot
+luot 97 s). `runModelTurn` trong `ai/agent.js` (duong stream) huy request bang
+`AbortController` neu chua co chunk nao sau `AI_FIRST_CHUNK_TIMEOUT_MS` (mac dinh
+8000) va goi lai dung mot lan; chi goi lai khi chua phat token nao nen khong lap
+chu. Lan hai cung het gio thi nem loi, agent tra loi du phong nhu moi loi model
+khac. Xem `tests/59-first-chunk-timeout` (model gia, khong goi Gemini).
+
 ### Ba lop phong thu tiem lenh
 
 San da gian hang co mot be mat tan cong ma cua hang mot chu khong co: **mo ta
@@ -667,8 +676,13 @@ thoai (`purpose = "reset_password"`, cot `phone` chua email nhan ma):
 - OTP so dien thoai loc theo `purpose = "verify_phone"` de ma quen mat khau khong
   chan cooldown/han muc cua no.
 
-Gioi han: JWT dang con hieu luc khong bi thu hoi khi doi mat khau (token
-stateless). Xem `tests/58-password-reset`, `e2e/27-forgot-password`.
+**Thu hoi phien cu.** Doi (`/auth/change_password`) hoac reset mat khau ghi
+`users.password_changed_at`. `isTokenRevoked` (`middleware/auth.middleware.js`)
+tu choi JWT co `iat` truoc moc do o `protectRoute` (401 `code: "SESSION_REVOKED"`),
+`optionalAuth` (coi nhu khach) va Socket.IO. `iat` tinh theo giay nen token cap
+cung giay voi lan doi van qua; `change_password` tra `accessToken` moi de thiet bi
+dang doi khong bi dang xuat, frontend luu lai. `lib/axios.ts` gap `SESSION_REVOKED`
+thi xoa token, hien ly do. Xem `tests/58-password-reset`, `e2e/27-forgot-password`.
 
 ---
 

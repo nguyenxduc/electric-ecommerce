@@ -251,24 +251,58 @@ const loadActiveCouponCodes = async (prisma) => {
  * model quyết định gọi công cụ thì phần nội dung rỗng nên không mất gì, còn
  * khi model trả lời thẳng thì người dùng thấy chữ ngay từ lượt đầu.
  */
-const runModelTurn = async (model, messages, onToken) => {
-  if (!onToken) return model.invoke(messages);
+// Gemini doi khi treo rat lau truoc chunk dau ma khong bao loi (do 2026-11-28: 97 s, va
+// mot cau chat 99 s trong eval:ai). Chua co chunk nao sau moc nay thi huy va goi lai 1 lan.
+export const FIRST_CHUNK_TIMEOUT_MS = Number(process.env.AI_FIRST_CHUNK_TIMEOUT_MS) || 8000;
 
-  const stream = await model.stream(messages);
-  let merged = null;
-  for await (const chunk of stream) {
-    merged = merged === null ? chunk : merged.concat(chunk);
-    const piece =
-      typeof chunk.content === "string"
-        ? chunk.content
-        : Array.isArray(chunk.content)
-        ? chunk.content
-            .map((c) => (typeof c === "string" ? c : c?.text || ""))
-            .join("")
-        : "";
-    if (piece) onToken(piece);
+const streamOnce = async (model, messages, onToken, timeoutMs) => {
+  const controller = new AbortController();
+  let gotChunk = false;
+  const timer = setTimeout(() => {
+    if (!gotChunk) controller.abort();
+  }, timeoutMs);
+  try {
+    const stream = await model.stream(messages, { signal: controller.signal });
+    let merged = null;
+    for await (const chunk of stream) {
+      if (!gotChunk) {
+        gotChunk = true;
+        clearTimeout(timer);
+      }
+      merged = merged === null ? chunk : merged.concat(chunk);
+      const piece =
+        typeof chunk.content === "string"
+          ? chunk.content
+          : Array.isArray(chunk.content)
+          ? chunk.content
+              .map((c) => (typeof c === "string" ? c : c?.text || ""))
+              .join("")
+          : "";
+      if (piece) onToken(piece);
+    }
+    return merged;
+  } catch (err) {
+    if (!gotChunk && controller.signal.aborted) {
+      const timeout = new Error(`No first chunk after ${timeoutMs} ms`);
+      timeout.firstChunkTimeout = true;
+      throw timeout;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return merged;
+};
+
+export const runModelTurn = async (model, messages, onToken, timeoutMs = FIRST_CHUNK_TIMEOUT_MS) => {
+  if (!onToken) return model.invoke(messages);
+  try {
+    return await streamOnce(model, messages, onToken, timeoutMs);
+  } catch (err) {
+    // Chi goi lai khi chua phat token nao (het gio truoc chunk dau) -> khong lap chu
+    if (!err?.firstChunkTimeout) throw err;
+    console.warn(`[agent] ${err.message}, retrying once`);
+    return streamOnce(model, messages, onToken, timeoutMs);
+  }
 };
 
 const messageText = (message) => {

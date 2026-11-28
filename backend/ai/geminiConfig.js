@@ -12,9 +12,9 @@ export const GEMINI_CHAT_MODEL =
   "gemini-3.5-flash-lite";
 
 /** Vision: detect product from uploaded image (multimodal generateContent).
- *  Giu 3.1: tim bang anh chua do lai voi 3.5 (`npm run eval:image`). */
+ *  3.5 do lai 2026-11-28: `eval:image` 20/20 nhu 3.1. */
 export const IMAGE_SEARCH_MODEL =
-  process.env.IMAGE_SEARCH_MODEL || "gemini-3.1-flash-lite";
+  process.env.IMAGE_SEARCH_MODEL || GEMINI_CHAT_MODEL;
 
 export const IMAGE_SEARCH_FALLBACK_MODEL = String(
   process.env.IMAGE_SEARCH_FALLBACK_MODEL || ""
